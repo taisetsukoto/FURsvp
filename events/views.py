@@ -1463,7 +1463,7 @@ def generate_badges(request, event_id):
                     text_width = p.stringWidth(name, name_font, 22)
         
         name_x = x + (badge_width - text_width) / 2
-        name_y = y + badge_height / 2 - 18  # Moved down a bit to fit better
+        name_y = y + badge_height / 2 - 16 # Moved down a bit to fit better
         p.drawString(name_x, name_y, name)
         
         # Draw badge number (small, bottom left)
