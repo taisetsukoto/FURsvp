@@ -1311,19 +1311,34 @@ def generate_badges(request, event_id):
     p = canvas.Canvas(response, pagesize=letter)
     width, height = letter
     
-    # Horizontal sticker badge dimensions (8 stickers per page, 2x8 grid)
-    # Each badge is wider than it is tall (horizontal name tag format)
+    # Avery 5164 label sheet (2 columns x 5 rows, 10 labels per page)
+    # Dimensions in points (1 inch = 72 points)
     stickers_per_row = 2
-    stickers_per_col = 8
-    badge_width = (width - 60) / stickers_per_row  # Wider badges
-    badge_height = (height - 80) / stickers_per_col  # Shorter badges (50% of previous height)
+    stickers_per_col = 5
+    badge_width = 4.0 * inch
+    badge_height = 3.33 * inch
+    horizontal_pitch = 4.25 * inch
+    vertical_pitch = 3.5 * inch
+    left_margin = 0.2197 * inch
+    top_margin = 0.5 * inch
+
+    # Fallback if label layout doesn't fit, degrade to more generic grid
+    if width < (left_margin + stickers_per_row * horizontal_pitch) or height < (top_margin + stickers_per_col * vertical_pitch):
+        stickers_per_row = 2
+        stickers_per_col = 8
+        badge_width = (width - 60) / stickers_per_row
+        badge_height = (height - 80) / stickers_per_col
+        horizontal_pitch = badge_width + 0.25 * inch
+        vertical_pitch = badge_height + 0.25 * inch
+        left_margin = 0.5 * inch
+        top_margin = 0.5 * inch
     
     for idx, rsvp in enumerate(rsvps):
         # Calculate position (2x4 grid for horizontal stickers)
         col = idx % stickers_per_row
         row = (idx // stickers_per_row) % stickers_per_col
-        x = 30 + col * badge_width
-        y = height - 40 - (row + 1) * badge_height
+        x = left_margin + col * horizontal_pitch
+        y = height - top_margin - (row * vertical_pitch) - badge_height
         
         # Start new page every 16 stickers
         if idx > 0 and idx % (stickers_per_row * stickers_per_col) == 0:
