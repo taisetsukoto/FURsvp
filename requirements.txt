@@ -1,4 +1,5 @@
 atproto
+beautifulsoup4
 Django
 django-cors-headers
 django-csp
@@ -13,6 +14,7 @@ feedparser
 gunicorn
 phonenumbers
 Pillow
+psycopg2-binary
 python-dotenv
 python-telegram-bot
 pytz
