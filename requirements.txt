@@ -12,9 +12,5 @@ drf_yasg
 feedparser
 gunicorn
 phonenumbers
-Pillow
-python-dotenv
-python-telegram-bot
-pytz
-qrcode
-requests
+reportlab
+svglib
