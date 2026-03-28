@@ -1240,7 +1240,7 @@ def export_attendees_csv(request, event_id):
 
 @login_required
 def generate_badges(request, event_id):
-    """Generate printable badges with QR codes"""
+    """Generate printable Avery 5162 badges with QR codes (no border)."""
     from reportlab.lib.pagesizes import letter
     from reportlab.lib.units import inch
     from reportlab.pdfgen import canvas
@@ -1249,162 +1249,122 @@ def generate_badges(request, event_id):
     from reportlab.pdfbase.ttfonts import TTFont
     from io import BytesIO
     import qrcode
-    
-    # Try to register Baloo 2 fonts (if available)
+
     try:
-        # Register Baloo 2 fonts from static/fonts directory
         fonts_dir = os.path.join(settings.BASE_DIR, 'static', 'fonts')
         baloo2_bold_path = os.path.join(fonts_dir, 'Baloo2-Bold.ttf')
         baloo2_extrabold_path = os.path.join(fonts_dir, 'Baloo2-ExtraBold.ttf')
-        
+
         if os.path.exists(baloo2_bold_path):
             pdfmetrics.registerFont(TTFont('Baloo2-Bold', baloo2_bold_path))
         if os.path.exists(baloo2_extrabold_path):
             pdfmetrics.registerFont(TTFont('Baloo2-ExtraBold', baloo2_extrabold_path))
-            name_font = 'Baloo2-ExtraBold'  # Use ExtraBold for names (bolder)
+            name_font = 'Baloo2-ExtraBold'
         else:
             name_font = 'Baloo2-Bold'
-        
-        font_name = 'Baloo2-Bold'  # For smaller text
+
+        font_name = 'Baloo2-Bold'
         if not os.path.exists(baloo2_bold_path):
             font_name = 'Helvetica-Bold'
             name_font = 'Helvetica-Bold'
-    except Exception as e:
-        print(f"Error loading Baloo 2 font: {e}")
+    except Exception:
         font_name = 'Helvetica-Bold'
         name_font = 'Helvetica-Bold'
-    
+
     event = get_object_or_404(Event, pk=event_id)
-    
-    # Check permissions
+
     is_organizer = request.user == event.organizer or request.user.is_superuser
     can_access_group = False
     if event.group:
         can_access_group = GroupRole.objects.filter(user=request.user, group=event.group).exists()
         if not can_access_group:
             can_access_group = GroupDelegation.objects.filter(delegated_user=request.user, group=event.group).exists()
-    
+
     if not (is_organizer or can_access_group):
         return HttpResponseForbidden("You don't have permission to generate badges.")
-    
-    # Get custom badge order if provided, otherwise use default (timestamp order)
-    badge_order = request.GET.get('order', '').split(',') if request.GET.get('order') else []
-    
-    # Get all confirmed RSVPs
+
     rsvps = event.rsvps.filter(status__in=['confirmed', 'waitlisted']).order_by('timestamp').select_related('user__profile')
-    
-    # Reorder if custom order provided
-    if badge_order:
-        rsvp_dict = {str(rsvp.id): rsvp for rsvp in rsvps}
-        ordered_rsvps = []
-        for rsvp_id in badge_order:
-            if rsvp_id in rsvp_dict:
-                ordered_rsvps.append(rsvp_dict[rsvp_id])
-        # Add any remaining RSVPs not in the custom order
-        ordered_rsvps.extend([r for r in rsvps if str(r.id) not in badge_order])
-        rsvps = ordered_rsvps
-    
-    # Create PDF
+
     response = HttpResponse(content_type='application/pdf')
-    response['Content-Disposition'] = f'attachment; filename="badge_stickers_{event.title.replace(" ", "_")}.pdf"'
-    
+    response['Content-Disposition'] = f'attachment; filename="badge_labels_{event.title.replace(" ", "_")}.pdf"'
+
     p = canvas.Canvas(response, pagesize=letter)
     width, height = letter
-    
-    # Avery 5164 label sheet (2 columns x 5 rows, 10 labels per page)
-    # Dimensions in points (1 inch = 72 points)
-    stickers_per_row = 2
-    stickers_per_col = 5
+
+    labels_per_row = 2
+    labels_per_col = 5
     badge_width = 4.0 * inch
-    badge_height = 3.33 * inch
+    badge_height = 2.0 * inch
     horizontal_pitch = 4.25 * inch
-    vertical_pitch = 3.5 * inch
-    left_margin = 0.2197 * inch
+    vertical_pitch = 2.3 * inch
+    left_margin = 0.25 * inch
     top_margin = 0.5 * inch
 
-    # Fallback if label layout doesn't fit, degrade to more generic grid
-    if width < (left_margin + stickers_per_row * horizontal_pitch) or height < (top_margin + stickers_per_col * vertical_pitch):
-        stickers_per_row = 2
-        stickers_per_col = 8
-        badge_width = (width - 60) / stickers_per_row
-        badge_height = (height - 80) / stickers_per_col
+    if width < (left_margin + labels_per_row * horizontal_pitch) or height < (top_margin + labels_per_col * vertical_pitch):
+        labels_per_row = 2
+        labels_per_col = 8
+        badge_width = (width - 60) / labels_per_row
+        badge_height = (height - 80) / labels_per_col
         horizontal_pitch = badge_width + 0.25 * inch
         vertical_pitch = badge_height + 0.25 * inch
         left_margin = 0.5 * inch
         top_margin = 0.5 * inch
-    
+
     for idx, rsvp in enumerate(rsvps):
-        # Calculate position (2x4 grid for horizontal stickers)
-        col = idx % stickers_per_row
-        row = (idx // stickers_per_row) % stickers_per_col
+        if idx > 0 and idx % (labels_per_row * labels_per_col) == 0:
+            p.showPage()
+
+        col = idx % labels_per_row
+        row = (idx // labels_per_row) % labels_per_col
         x = left_margin + col * horizontal_pitch
         y = height - top_margin - (row * vertical_pitch) - badge_height
-        
-        # Start new page every 16 stickers
-        if idx > 0 and idx % (stickers_per_row * stickers_per_col) == 0:
-            p.showPage()
-        
-        # Draw sticker border (rounded rectangle effect with thicker border)
-        p.setLineWidth(2)
-        p.roundRect(x + 5, y + 5, badge_width - 5, badge_height - 5, 5)
-        p.setLineWidth(1)
-        
-        # Get attendee info
+
+        # No border per request
+
         if rsvp.user:
             profile = rsvp.user.profile if hasattr(rsvp.user, 'profile') else None
             name = profile.get_display_name() if profile else rsvp.user.username
         else:
             name = rsvp.name or 'Anonymous'
-        
-        # Badge number (using position in list)
+
         badge_num = idx + 1
-        
-        # Generate QR code for organizer check-in
-        check_in_url = request.build_absolute_uri(
-            reverse('checkin_attendee', kwargs={'event_id': event.id, 'rsvp_id': rsvp.id})
-        )
-        qr = qrcode.QRCode(version=1, box_size=4, border=1)
+
+        check_in_url = request.build_absolute_uri(reverse('checkin_attendee', kwargs={'event_id': event.id, 'rsvp_id': rsvp.id}))
+        qr = qrcode.QRCode(version=1, box_size=3, border=1)
         qr.add_data(check_in_url)
         qr.make(fit=True)
-        qr_img = qr.make_image(fill_color="black", back_color="white")
-        
-        # Convert QR code to ImageReader
+        qr_img = qr.make_image(fill_color='black', back_color='white')
+
         qr_buffer = BytesIO()
         qr_img.save(qr_buffer, format='PNG')
         qr_buffer.seek(0)
         qr_reader = ImageReader(qr_buffer)
-        
-        # Draw QR code (small, at top left corner)
-        qr_size = 0.375 * inch  # 25% bigger than before
+
+        qr_size = 0.30 * inch
+        # Keep original QR position for consistency
         p.drawImage(qr_reader, x + 12, y + badge_height - qr_size - 10, qr_size, qr_size)
-        
-        # Draw accessibility icon if needed (next to QR code)
+
+        # Draw accessibility indicator if needed (same as prior behavior)
         if rsvp.accessibility_needs:
-            # Use the official accessibility SVG icon
             from svglib.svglib import svg2rlg
             from reportlab.graphics import renderPDF
-            
-            icon_size = qr_size  # Match QR code size
+            icon_size = 0.30 * inch
             icon_x = x + 12 + qr_size + 6
             icon_y = y + badge_height - qr_size - 10
-            
-            # Draw black square background
+
+            # Draw black background
             p.setFillColorRGB(0, 0, 0)
             p.rect(icon_x, icon_y, icon_size, icon_size, fill=1, stroke=0)
-            
-            # Try to load and render the SVG
+
             try:
                 svg_path = os.path.join(settings.BASE_DIR, 'static', 'accessible.svg')
                 if os.path.exists(svg_path):
-                    # Load SVG as ReportLab drawing
                     drawing = svg2rlg(svg_path)
                     if drawing:
-                        # Make all paths white
                         from reportlab.graphics.shapes import Path
                         from reportlab.lib import colors
-                        
+
                         def make_white(group):
-                            """Recursively make all shapes white"""
                             for item in group.contents:
                                 if hasattr(item, 'fillColor'):
                                     item.fillColor = colors.white
@@ -1412,33 +1372,25 @@ def generate_badges(request, event_id):
                                     item.strokeColor = colors.white
                                 if hasattr(item, 'contents'):
                                     make_white(item)
-                        
+
                         make_white(drawing)
-                        
-                        # Scale to fit icon size with padding (SVG is 1224x792)
-                        # Scale to 85% of icon size to add some padding
+
                         target_size = icon_size * 1.25
                         scale_factor = target_size / max(drawing.width, drawing.height)
-                        
-                        # Calculate centered position
                         scaled_width = drawing.width * scale_factor
                         scaled_height = drawing.height * scale_factor
                         offset_x = (icon_size - scaled_width) / 2
                         offset_y = (icon_size - scaled_height) / 2
-                        
+
                         drawing.width = scaled_width
                         drawing.height = scaled_height
                         drawing.scale(scale_factor, scale_factor)
-                        
-                        # Render the drawing on the canvas, centered
                         renderPDF.draw(drawing, p, icon_x + offset_x, icon_y + offset_y)
                 else:
-                    # Fallback: simple icon if SVG not found
                     p.saveState()
                     p.setFillColorRGB(1, 1, 1)
                     center_x = icon_x + icon_size / 2
                     center_y = icon_y + icon_size / 2
-                    # Simple wheelchair icon
                     p.circle(center_x + icon_size * 0.12, center_y + icon_size * 0.25, icon_size * 0.13, fill=1)
                     p.setLineWidth(icon_size * 0.10)
                     p.line(center_x - icon_size * 0.20, center_y + icon_size * 0.08,
@@ -1446,8 +1398,6 @@ def generate_badges(request, event_id):
                     p.circle(center_x + icon_size * 0.02, center_y - icon_size * 0.08, icon_size * 0.24, fill=0, stroke=1)
                     p.restoreState()
             except Exception as e:
-                # Fallback: simple icon if SVG rendering fails
-                print(f"SVG rendering error: {e}")
                 p.saveState()
                 p.setFillColorRGB(1, 1, 1)
                 center_x = icon_x + icon_size / 2
@@ -1458,39 +1408,39 @@ def generate_badges(request, event_id):
                        center_x + icon_size * 0.30, center_y + icon_size * 0.08)
                 p.circle(center_x + icon_size * 0.02, center_y - icon_size * 0.08, icon_size * 0.24, fill=0, stroke=1)
                 p.restoreState()
-        
-        # Draw name (LARGE and centered - main feature of badge) - using BOLD font
-        p.setFont(name_font, 32)
-        # Center the name in the middle of the badge
-        text_width = p.stringWidth(name, name_font, 32)
-        if text_width > badge_width - 40:
-            # If name is too long, use smaller font
-            p.setFont(name_font, 28)
-            text_width = p.stringWidth(name, name_font, 28)
-            if text_width > badge_width - 40:
-                # Still too long, use even smaller
-                p.setFont(name_font, 22)
-                text_width = p.stringWidth(name, name_font, 22)
-                if text_width > badge_width - 40:
-                    # Truncate if still too long
-                    max_name_length = 20
-                    name = name[:max_name_length] + "..." if len(name) > max_name_length else name
-                    text_width = p.stringWidth(name, name_font, 22)
-        
-        name_x = x + (badge_width - text_width) / 2
-        name_y = y + badge_height / 2 - 16 # Moved down a bit to fit better
-        p.drawString(name_x, name_y, name)
-        
-        # Draw badge number (small, bottom left)
-        p.setFont(font_name, 14)
-        p.drawString(x + 15, y + 15, f"{badge_num}")
-        
-        # Draw rank/status label (small, bottom right)
-        p.setFont(font_name, 9)
-        rank_label = rsvp.custom_rank if rsvp.custom_rank else rsvp.get_status_display()
-        rank_width = p.stringWidth(rank_label.upper(), font_name, 9)
-        p.drawString(x + badge_width - rank_width - 15, y + 15, rank_label.upper())
-    
+
+        font_size = 28
+        p.setFont(name_font, font_size)
+        text_width = p.stringWidth(name, name_font, font_size)
+
+        # Downsize name if too wide
+        if text_width > badge_width - 0.4 * inch:
+            font_size = 20
+            p.setFont(name_font, font_size)
+            text_width = p.stringWidth(name, name_font, font_size)
+        if text_width > badge_width - 0.4 * inch:
+            font_size = 16
+            p.setFont(name_font, font_size)
+            text_width = p.stringWidth(name, name_font, font_size)
+
+        # Truncate with ellipsis if still too wide
+        if text_width > badge_width - 0.4 * inch:
+            available = badge_width - 0.4 * inch
+            truncated = name
+            while truncated and p.stringWidth(truncated + '...', name_font, font_size) > available:
+                truncated = truncated[:-1]
+            name = truncated + '...' if truncated else '...'
+            text_width = p.stringWidth(name, name_font, font_size)
+
+        name_x = x + (badge_width / 2)
+        name_y = y + (badge_height / 2) - (font_size * 0.3)
+        p.drawCentredString(name_x, name_y, name)
+
+        p.setFont(font_name, 12)
+        status_label = rsvp.get_status_display().upper()
+        p.drawString(x + 0.12 * inch, y + 0.12 * inch, f'{badge_num}')
+        p.drawString(x + badge_width - p.stringWidth(status_label, font_name, 10) - 0.12 * inch, y + 0.12 * inch, status_label)
+
     p.save()
     return response
 
