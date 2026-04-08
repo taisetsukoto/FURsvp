@@ -30,10 +30,6 @@ jobs:
         run: |
           python manage.py collectstatic --noinput
 
-      - name: Test Django-Q Cluster startup
-        run: |
-          timeout 10s python manage.py qcluster || echo "qcluster exited (expected for CI)"
-
       - name: Run Tests
         run: |
           python manage.py test
