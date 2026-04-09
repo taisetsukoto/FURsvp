@@ -50,3 +50,7 @@ MANIFEST
 # Docker
 .dockerignore
 docker-compose.override.yml
+
+# Migrations Folder
+users/migrations/*
+events/migrations/*
