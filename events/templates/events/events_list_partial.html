@@ -1,4 +1,3 @@
-{% load dict_extras %}
 <style>
 .event-card-modern {
     border-radius: 1.25rem;
@@ -386,7 +385,7 @@
                     </span>
                     <div>
                         <i class="material-icons align-middle me-1" style="font-size: 18px; color: #a0aec0;">location_on</i>
-                        {{ event.city }}{% if event.state %}, <abbr title="{{ event.state }}">{{ event.state|state_abbr }}</abbr>{% endif %}
+                        {{ event.city }}{% if event.state %}, <abbr title="{{ event.state.state_name }}">{{ event.state.state_code }}</abbr>{% endif %}
                     </div>
                 </div>
                 <div class="mt-auto d-flex align-items-center">
@@ -466,7 +465,7 @@
                     </span>
                     <div>
                         <i class="material-icons align-middle me-1" style="font-size: 18px; color: #a0aec0;">location_on</i>
-                        {{ event.city }}{% if event.state %}, <abbr title="{{ event.state }}">{{ event.state|state_abbr }}</abbr>{% endif %}
+                        {{ event.city }}{% if event.state %}, <abbr title="{{ event.state.state_name }}">{{ event.state.state_code }}</abbr>{% endif %}
                     </div>
                 </div>
                 <div class="d-flex align-items-center">
