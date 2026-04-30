@@ -243,7 +243,7 @@ class EventViewSet(viewsets.ReadOnlyModelViewSet):
         event = self.get_object()
         
         # Check if attendee list is public
-        if not event.attendee_list_public and not request.user.is_authenticated:
+        if not event.attendee_list_public and not request.user.is_staff:
             return Response(
                 {'error': 'Attendee list is not public for this event'},
                 status=status.HTTP_403_FORBIDDEN
@@ -259,7 +259,7 @@ class EventViewSet(viewsets.ReadOnlyModelViewSet):
         event = self.get_object()
         
         # Check if attendee list is public
-        if not event.attendee_list_public and not request.user.is_authenticated:
+        if not event.attendee_list_public and not request.user.is_staff:
             return Response(
                 {'error': 'Attendee list is not public for this event'},
                 status=status.HTTP_403_FORBIDDEN
@@ -289,7 +289,6 @@ class EventViewSet(viewsets.ReadOnlyModelViewSet):
         
         serializer = self.get_serializer(events, many=True)
         return Response(serializer.data)
-
 
 class CustomAPIRootView(APIView):
     api_root_dict = None

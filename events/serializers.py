@@ -154,8 +154,5 @@ class RSVPSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = RSVP
-        fields = [
-            'id', 'user', 'name', 'timestamp', 'status',
-            'question1', 'question2', 'question3'
-        ]
-        read_only_fields = ['timestamp'] 
+        fields = ['id', 'user', 'name', 'timestamp', 'status']
+        read_only_fields = ['timestamp']
