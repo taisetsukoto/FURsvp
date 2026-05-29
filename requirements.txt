@@ -13,6 +13,8 @@ drf_yasg
 feedparser
 gunicorn
 phonenumbers
+reportlab
+svglib
 Pillow
 psycopg2-binary
 python-dotenv
