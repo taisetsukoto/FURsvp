@@ -1,10 +1,21 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
-from events.models import Event, Group, RSVP
+from events.models import Country, Event, Group, RSVP, State
 from users.models import Profile, GroupDelegation, GroupRole
 from tinymce.widgets import TinyMCE
 from django.core.validators import URLValidator
+import pytz
+
+class StateSelect(forms.Select):
+    def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
+        option = super().create_option(name, value, label, selected, index, subindex=subindex, attrs=attrs)
+        instance = getattr(value, 'instance', None)
+        if instance is None and hasattr(value, 'obj'):
+            instance = getattr(value, 'obj', None)
+        if instance is not None and hasattr(instance, 'country') and instance.country is not None:
+            option['attrs']['data-country'] = instance.country.alpha_2_code
+        return option
 
 class UserRegisterForm(UserCreationForm):
     class Meta:
@@ -17,33 +28,30 @@ class EventForm(forms.ModelForm):
         ('adult', '18+ (Adult)'),
         ('mature', '21+ (Mature)'),
     ]
-    US_STATE_CHOICES = [
-        ('', 'Select State'),
-        ('Alabama', 'Alabama'), ('Alaska', 'Alaska'), ('Arizona', 'Arizona'), ('Arkansas', 'Arkansas'),
-        ('California', 'California'), ('Colorado', 'Colorado'), ('Connecticut', 'Connecticut'), ('Delaware', 'Delaware'),
-        ('Florida', 'Florida'), ('Georgia', 'Georgia'), ('Hawaii', 'Hawaii'), ('Idaho', 'Idaho'),
-        ('Illinois', 'Illinois'), ('Indiana', 'Indiana'), ('Iowa', 'Iowa'), ('Kansas', 'Kansas'),
-        ('Kentucky', 'Kentucky'), ('Louisiana', 'Louisiana'), ('Maine', 'Maine'), ('Maryland', 'Maryland'),
-        ('Massachusetts', 'Massachusetts'), ('Michigan', 'Michigan'), ('Minnesota', 'Minnesota'), ('Mississippi', 'Mississippi'),
-        ('Missouri', 'Missouri'), ('Montana', 'Montana'), ('Nebraska', 'Nebraska'), ('Nevada', 'Nevada'),
-        ('New Hampshire', 'New Hampshire'), ('New Jersey', 'New Jersey'), ('New Mexico', 'New Mexico'),
-        ('New York', 'New York'), ('North Carolina', 'North Carolina'), ('North Dakota', 'North Dakota'),
-        ('Ohio', 'Ohio'), ('Oklahoma', 'Oklahoma'), ('Oregon', 'Oregon'), ('Pennsylvania', 'Pennsylvania'),
-        ('Rhode Island', 'Rhode Island'), ('South Carolina', 'South Carolina'), ('South Dakota', 'South Dakota'),
-        ('Tennessee', 'Tennessee'), ('Texas', 'Texas'), ('Utah', 'Utah'), ('Vermont', 'Vermont'),
-        ('Virginia', 'Virginia'), ('Washington', 'Washington'), ('West Virginia', 'West Virginia'),
-        ('Wisconsin', 'Wisconsin'), ('Wyoming', 'Wyoming'),
-    ]
     age_restriction = forms.ChoiceField(
         choices=AGE_CHOICES,
         required=True,
         label='Age Restriction',
         widget=forms.Select(attrs={'class': 'form-select'})
     )
-    state = forms.ChoiceField(
-        choices=US_STATE_CHOICES,
+    country = forms.ModelChoiceField(
+        queryset=Country.objects.none(),
+        required=False,
+        label='Country',
+        widget=forms.Select(attrs={'class': 'form-select'}),
+        empty_label='Select Country'
+    )
+    state = forms.ModelChoiceField(
+        queryset=State.objects.none(),
         required=False,
         label='State',
+        widget=StateSelect(attrs={'class': 'form-select'}),
+        empty_label='Select State'
+    )
+    timezone = forms.ChoiceField(
+        choices=[(tz, tz) for tz in pytz.common_timezones],
+        required=True,
+        label='Time Zone',
         widget=forms.Select(attrs={'class': 'form-select'})
     )
     description = forms.CharField(widget=TinyMCE(attrs={'cols': 80, 'rows': 30}))
@@ -85,7 +93,7 @@ class EventForm(forms.ModelForm):
         model = Event
         fields = [
             'title', 'group', 'date', 'start_time', 'end_time',
-            'address', 'city', 'state', 'age_restriction', 'description',
+            'address', 'city', 'country', 'state', 'timezone', 'age_restriction', 'description',
             'capacity', 'waitlist_enabled', 'attendee_list_public', 'enable_rsvp_questions',
             'question1_text', 'question2_text', 'question3_text',
             'accessibility_details',
@@ -98,6 +106,9 @@ class EventForm(forms.ModelForm):
             'end_time': forms.TimeInput(attrs={'type': 'time', 'class': 'form-control'}),
             'address': forms.TextInput(attrs={'class': 'form-control'}),
             'city': forms.TextInput(attrs={'class': 'form-control'}),
+            'country': forms.Select(attrs={'class': 'form-select'}),
+            'state': forms.Select(attrs={'class': 'form-select'}),
+            'timezone': forms.Select(attrs={'class': 'form-select'}),
             'description': forms.Textarea(attrs={'class': 'form-control'}),
             'waitlist_enabled': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'attendee_list_public': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
@@ -111,6 +122,9 @@ class EventForm(forms.ModelForm):
         user = kwargs.pop('user', None)
         instance = kwargs.get('instance') or getattr(self, 'instance', None)
         super().__init__(*args, **kwargs)
+        self.fields['country'].queryset = Country.objects.order_by('country_name')
+        self.fields['state'].queryset = State.objects.select_related('country').order_by('country__alpha_2_code', 'state_name')
+        self.fields['timezone'].choices = [(tz, tz) for tz in pytz.common_timezones]
 
         date_widget = self.fields['date'].widget
         time_widget = self.fields['start_time'].widget
@@ -127,6 +141,8 @@ class EventForm(forms.ModelForm):
         if instance:
             self.fields['eula_agreement'].required = False
             self.fields['state_agreement'].required = False
+            if instance.state and not instance.country:
+                self.initial['country'] = instance.state.country
         else:
             self.fields['eula_agreement'].required = True
             self.fields['state_agreement'].required = True
@@ -178,7 +194,16 @@ class EventForm(forms.ModelForm):
         if waitlist_enabled and not capacity:
             self.add_error('waitlist_enabled', 'Capacity must be set when waitlist is enabled.')
             self.add_error('capacity', 'Capacity must be set when waitlist is enabled.')
-        
+
+        country = cleaned_data.get('country')
+        state = cleaned_data.get('state')
+
+        if state and country and state.country != country:
+            self.add_error('state', 'Selected state does not belong to the selected country.')
+            self.add_error('country', 'Selected country does not match the state.')
+        if state and not country:
+            cleaned_data['country'] = state.country
+
         return cleaned_data
 
     def save(self, commit=True):
@@ -249,6 +274,24 @@ class RSVPForm(forms.ModelForm):
                 self.fields.pop('question2', None)
             if not getattr(self.event, 'question3_text', '').strip():
                 self.fields.pop('question3', None)
+
+    def clean(self):
+        cleaned_data = super().clean()
+        status = cleaned_data.get('status')
+        # Enforce capacity: prevent selecting 'confirmed' when capacity is reached
+        if self.event and status == 'confirmed' and self.event.capacity is not None:
+            # Count confirmed RSVPs excluding the current instance (if updating)
+            from events.models import RSVP
+            exclude_pk = getattr(self.instance, 'pk', None)
+            confirmed_count_qs = RSVP.objects.filter(event=self.event, status='confirmed')
+            if exclude_pk:
+                confirmed_count_qs = confirmed_count_qs.exclude(pk=exclude_pk)
+            confirmed_count = confirmed_count_qs.count()
+            if confirmed_count >= self.event.capacity and self.event.waitlist_enabled:
+                self.add_error('status', 'This event is currently full. If you’d like to be notified if a spot opens up, please join the waitlist`.')
+            elif self.event.capacity is not None and confirmed_count >= self.event.capacity:
+                self.add_error('status', 'This event is currently full. Please check back later to see if a spot opens up.')
+        return cleaned_data
 
     class Meta:
         model = RSVP

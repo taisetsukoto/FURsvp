@@ -1,10 +1,10 @@
 from django.shortcuts import render, get_object_or_404, redirect
-from .models import Event, RSVP, Post, Group
+from .models import Event, RSVP, Post, Group, State, Country
 from django.utils import timezone
 from datetime import timedelta, datetime
 from django.contrib.auth.decorators import login_required
 from .forms import EventForm, RSVPForm, Group
-from users.models import Profile, GroupDelegation, BannedUser, Notification, GroupRole
+from users.models import Profile, GroupDelegation, BannedUser, Notification, GroupRole, AuditLog
 from django.contrib import messages
 from django.db import models, transaction
 from django.http import JsonResponse, HttpResponseForbidden, HttpResponse
@@ -89,6 +89,7 @@ def home(request):
     
     search_query = request.GET.get('search', '').strip()
     state_filter = request.GET.get('state', '').strip()
+    country_filter = request.GET.get('country', '').strip()
     
     # Base queryset - filter out events that have already passed and cancelled events
     now = timezone.now()
@@ -112,7 +113,18 @@ def home(request):
 
     # Apply state filter
     if state_filter:
-        events = events.filter(state__iexact=state_filter)
+        events = events.filter(
+            models.Q(state__state_name__iexact=state_filter) |
+            models.Q(state__state_code__iexact=state_filter)
+        )
+
+    # Apply country filter
+    if country_filter:
+        events = events.filter(
+            models.Q(country__country_name__iexact=country_filter) |
+            models.Q(country__alpha_2_code__iexact=country_filter) |
+            models.Q(country__alpha_3_code__iexact=country_filter)
+        )
 
     events = events.annotate(
         confirmed_count=models.Count('rsvps', filter=models.Q(rsvps__status='confirmed'))
@@ -219,11 +231,13 @@ def home(request):
     else:
         calendar_data = None
     
-    # Get all unique states for the dropdown
-    all_states = Event.objects.exclude(state__isnull=True).exclude(state__exact='').values_list('state', flat=True).distinct().order_by('state')
+    # Get all unique states and countries for the dropdown
+    all_states = State.objects.select_related('country').order_by('state_name')
+    all_countries = Country.objects.order_by('country_name')
     
     context = {
         'events': events_page,
+        'all_countries': all_countries,
         'current_sort': sort_by,
         'current_order': sort_order,
         'filter_adult': filter_adult,
@@ -346,6 +360,23 @@ def event_detail(request, event_id):
             if user_rsvp: # Ensure there is an RSVP to remove
                 with transaction.atomic():
                     was_confirmed = (user_rsvp.status == 'confirmed')
+                    
+                    # Log the RSVP removal
+                    AuditLog.log_action(
+                        user=request.user,
+                        action='rsvp_deleted',
+                        description=f'Removed RSVP for {event.title}',
+                        group=event.group,
+                        event=event,
+                        target_user=request.user,
+                        ip_address=request.META.get('REMOTE_ADDR'),
+                        user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                        additional_data={
+                            'previous_status': user_rsvp.status,
+                            'was_confirmed': was_confirmed
+                        }
+                    )
+                    
                     user_rsvp.delete()
                     create_notification(request.user, f'You have removed your RSVP for {event.title}.', link=event.get_absolute_url())
                     # Telegram webhook for public RSVP removal
@@ -375,6 +406,24 @@ def event_detail(request, event_id):
         if 'delete_event' in request.POST and can_ban_user:
             event_title = event.title
             event_url = request.build_absolute_uri(event.get_absolute_url())
+            
+            # Log the event deletion before deleting
+            AuditLog.log_action(
+                user=request.user,
+                action='event_deleted',
+                description=f'Deleted event: {event_title}',
+                group=event.group,
+                event=event,
+                ip_address=request.META.get('REMOTE_ADDR'),
+                user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                additional_data={
+                    'event_title': event_title,
+                    'event_date': event.date.isoformat(),
+                    'event_group': event.group.name if event.group else None,
+                    'event_url': event_url
+                }
+            )
+            
             event.delete()
             create_notification(request.user, f'Event "{event_title}" has been deleted.', link='/') # Link to home since event is deleted
             # Telegram webhook for event deletion
@@ -394,6 +443,42 @@ def event_detail(request, event_id):
             rsvp.event = event
             rsvp.user = request.user
             rsvp.save()
+            
+            # Log the RSVP action
+            if user_rsvp:
+                # This is an update
+                AuditLog.log_action(
+                    user=request.user,
+                    action='rsvp_updated',
+                    description=f'Updated RSVP status to {rsvp.get_status_display()} for {event.title}',
+                    group=event.group,
+                    event=event,
+                    target_user=request.user,
+                    ip_address=request.META.get('REMOTE_ADDR'),
+                    user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                    additional_data={
+                        'old_status': user_rsvp.status,
+                        'new_status': new_status,
+                        'rsvp_id': rsvp.id
+                    }
+                )
+            else:
+                # This is a new RSVP
+                AuditLog.log_action(
+                    user=request.user,
+                    action='rsvp_created',
+                    description=f'Created RSVP with status {rsvp.get_status_display()} for {event.title}',
+                    group=event.group,
+                    event=event,
+                    target_user=request.user,
+                    ip_address=request.META.get('REMOTE_ADDR'),
+                    user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                    additional_data={
+                        'status': new_status,
+                        'rsvp_id': rsvp.id
+                    }
+                )
+            
             create_notification(request.user, f'Your RSVP status has been updated to {rsvp.get_status_display()!s} for {event.title}.', link=event.get_absolute_url())
             # Telegram webhook for public RSVP (any status)
             if event.attendee_list_public and event.group and getattr(event.group, 'telegram_webhook_channel', None):
@@ -434,11 +519,36 @@ def event_detail(request, event_id):
 
         try:
             rsvp_to_update = event.rsvps.get(id=rsvp_id)
-            
+            if new_status == 'confirmed' and event.capacity is not None:
+                current_confirmed = event.rsvps.filter(status='confirmed')
+                if rsvp_to_update.pk:
+                    current_confirmed = current_confirmed.exclude(pk=rsvp_to_update.pk)
+                if current_confirmed.count() >= event.capacity:
+                    response_data = {'status': 'error', 'message': 'Cannot confirm: event is at capacity.'}
+                    return JsonResponse(response_data, status=400)
+
             with transaction.atomic():
                 old_status = rsvp_to_update.status
                 rsvp_to_update.status = new_status
                 rsvp_to_update.save()
+
+                # Log the organizer RSVP status change
+                AuditLog.log_action(
+                    user=request.user,
+                    action='rsvp_status_changed',
+                    description=f'Changed {rsvp_to_update.user.username}\'s RSVP status from {old_status} to {new_status} for {event.title}',
+                    group=event.group,
+                    event=event,
+                    target_user=rsvp_to_update.user,
+                    ip_address=request.META.get('REMOTE_ADDR'),
+                    user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                    additional_data={
+                        'old_status': old_status,
+                        'new_status': new_status,
+                        'rsvp_id': rsvp_to_update.id,
+                        'changed_by': request.user.username
+                    }
+                )
 
                 message = f"{rsvp_to_update.user.username}'s RSVP for {event.title} updated to {rsvp_to_update.get_status_display()}."
                 create_notification(request.user, message, link=event.get_absolute_url())
@@ -525,7 +635,7 @@ def event_detail(request, event_id):
     if event.city:
         city_state_parts.append(event.city)
     if event.state:
-        city_state_parts.append(event.state)
+        city_state_parts.append(str(event.state))
     
     if city_state_parts:
         location_components.append(", ".join(city_state_parts))
@@ -610,6 +720,25 @@ def create_event(request):
             event = form.save(commit=False)
             event.organizer = request.user
             event.save()
+            
+            # Log the event creation
+            AuditLog.log_action(
+                user=request.user,
+                action='event_created',
+                description=f'Created new event: {event.title}',
+                group=event.group,
+                event=event,
+                ip_address=request.META.get('REMOTE_ADDR'),
+                user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                additional_data={
+                    'event_title': event.title,
+                    'event_date': event.date.isoformat(),
+                    'event_group': event.group.name,
+                    'event_capacity': event.capacity,
+                    'event_status': event.status
+                }
+            )
+            
             # Telegram webhook for new event
             group = event.group
             if group and getattr(group, 'telegram_webhook_channel', None):
@@ -647,10 +776,43 @@ def edit_event(request, event_id):
     if request.method == 'POST':
         form = EventForm(request.POST, instance=event, user=request.user)
         if form.is_valid():
+            # Store old data for comparison
+            old_data = {
+                'title': event.title,
+                'date': event.date.isoformat(),
+                'description': event.description,
+                'capacity': event.capacity,
+                'status': event.status,
+                'group': event.group.name if event.group else None
+            }
+            
             event = form.save(commit=False)
             if not event.organizer:
                 event.organizer = request.user
             event.save()
+            
+            # Log the event update
+            AuditLog.log_action(
+                user=request.user,
+                action='event_updated',
+                description=f'Updated event: {event.title}',
+                group=event.group,
+                event=event,
+                ip_address=request.META.get('REMOTE_ADDR'),
+                user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                additional_data={
+                    'old_data': old_data,
+                    'new_data': {
+                        'title': event.title,
+                        'date': event.date.isoformat(),
+                        'description': event.description,
+                        'capacity': event.capacity,
+                        'status': event.status,
+                        'group': event.group.name if event.group else None
+                    }
+                }
+            )
+            
             create_notification(request.user, f'Event for {event.title} updated successfully!', link=event.get_absolute_url())
             for rsvp in event.rsvps.select_related('user').all():
                 if rsvp.user and rsvp.user != request.user:
@@ -1075,18 +1237,32 @@ def telegram_bot_webhook(request):
                         send_telegram_message(chat_id, "You do not have an RSVP for this event.")
                     return JsonResponse({'ok': True})
                 # Set RSVP status
-                rsvp, created = RSVP.objects.get_or_create(event=event, user=user, defaults={'status': status if status != 'no' else 'not_attending'})
+                desired_status = 'not_attending' if status == 'no' else ('waitlisted' if status == 'waitlist' else ('maybe' if status == 'maybe' else 'confirmed'))
+                rsvp, created = RSVP.objects.get_or_create(event=event, user=user, defaults={'status': desired_status})
+
+                # Enforce capacity rules for confirmed status
+                if desired_status == 'confirmed':
+                    confirmed_qs = RSVP.objects.filter(event=event, status='confirmed')
+                    if rsvp.pk:
+                        confirmed_qs = confirmed_qs.exclude(pk=rsvp.pk)
+                    if event.capacity is not None and confirmed_qs.count() >= event.capacity:
+                        if event.waitlist_enabled:
+                            rsvp.status = 'waitlisted'
+                            rsvp.save()
+                            send_telegram_message(chat_id, f"Event is full — you've been added to the waitlist for <b>{event.title}</b>.", parse_mode="HTML")
+                            return JsonResponse({'ok': True})
+                        else:
+                            send_telegram_message(chat_id, f"Cannot confirm — <b>{event.title}</b> is at capacity.", parse_mode="HTML")
+                            return JsonResponse({'ok': True})
+
+                # For non-confirmed desired statuses or when capacity allows
                 if not created:
-                    if status == 'waitlist':
-                        rsvp.status = 'waitlisted'
-                    elif status == 'maybe':
-                        rsvp.status = 'maybe'
-                    elif status == 'no':
-                        rsvp.status = 'not_attending'
-                    else:
-                        rsvp.status = 'confirmed'
+                    rsvp.status = desired_status
                     rsvp.save()
-                send_telegram_message(chat_id, f"Your RSVP status for <b>{event.title}</b> is now <b>{'Waitlisted' if status == 'waitlist' else status.capitalize() if status != 'no' else 'Not Attending'}</b>.", parse_mode="HTML")
+
+                # Build the user-facing status text
+                display_text = 'Waitlisted' if desired_status == 'waitlisted' else (desired_status.capitalize() if desired_status != 'not_attending' else 'Not Attending')
+                send_telegram_message(chat_id, f"Your RSVP status for <b>{event.title}</b> is now <b>{display_text}</b>.", parse_mode="HTML")
                 return JsonResponse({'ok': True})
         # RSVP list (unchanged)
         if data_str.startswith("rsvplist_"):
