@@ -433,7 +433,14 @@ def event_detail(request, event_id):
 
         try:
             rsvp_to_update = event.rsvps.get(id=rsvp_id)
-            
+            if new_status == 'confirmed' and event.capacity is not None:
+                current_confirmed = event.rsvps.filter(status='confirmed')
+                if rsvp_to_update.pk:
+                    current_confirmed = current_confirmed.exclude(pk=rsvp_to_update.pk)
+                if current_confirmed.count() >= event.capacity:
+                    response_data = {'status': 'error', 'message': 'Cannot confirm: event is at capacity.'}
+                    return JsonResponse(response_data, status=400)
+
             with transaction.atomic():
                 old_status = rsvp_to_update.status
                 rsvp_to_update.status = new_status
@@ -1074,18 +1081,32 @@ def telegram_bot_webhook(request):
                         send_telegram_message(chat_id, "You do not have an RSVP for this event.")
                     return JsonResponse({'ok': True})
                 # Set RSVP status
-                rsvp, created = RSVP.objects.get_or_create(event=event, user=user, defaults={'status': status if status != 'no' else 'not_attending'})
+                desired_status = 'not_attending' if status == 'no' else ('waitlisted' if status == 'waitlist' else ('maybe' if status == 'maybe' else 'confirmed'))
+                rsvp, created = RSVP.objects.get_or_create(event=event, user=user, defaults={'status': desired_status})
+
+                # Enforce capacity rules for confirmed status
+                if desired_status == 'confirmed':
+                    confirmed_qs = RSVP.objects.filter(event=event, status='confirmed')
+                    if rsvp.pk:
+                        confirmed_qs = confirmed_qs.exclude(pk=rsvp.pk)
+                    if event.capacity is not None and confirmed_qs.count() >= event.capacity:
+                        if event.waitlist_enabled:
+                            rsvp.status = 'waitlisted'
+                            rsvp.save()
+                            send_telegram_message(chat_id, f"Event is full — you've been added to the waitlist for <b>{event.title}</b>.", parse_mode="HTML")
+                            return JsonResponse({'ok': True})
+                        else:
+                            send_telegram_message(chat_id, f"Cannot confirm — <b>{event.title}</b> is at capacity.", parse_mode="HTML")
+                            return JsonResponse({'ok': True})
+
+                # For non-confirmed desired statuses or when capacity allows
                 if not created:
-                    if status == 'waitlist':
-                        rsvp.status = 'waitlisted'
-                    elif status == 'maybe':
-                        rsvp.status = 'maybe'
-                    elif status == 'no':
-                        rsvp.status = 'not_attending'
-                    else:
-                        rsvp.status = 'confirmed'
+                    rsvp.status = desired_status
                     rsvp.save()
-                send_telegram_message(chat_id, f"Your RSVP status for <b>{event.title}</b> is now <b>{'Waitlisted' if status == 'waitlist' else status.capitalize() if status != 'no' else 'Not Attending'}</b>.", parse_mode="HTML")
+
+                # Build the user-facing status text
+                display_text = 'Waitlisted' if desired_status == 'waitlisted' else (desired_status.capitalize() if desired_status != 'not_attending' else 'Not Attending')
+                send_telegram_message(chat_id, f"Your RSVP status for <b>{event.title}</b> is now <b>{display_text}</b>.", parse_mode="HTML")
                 return JsonResponse({'ok': True})
         # RSVP list (unchanged)
         if data_str.startswith("rsvplist_"):

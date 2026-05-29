@@ -250,6 +250,24 @@ class RSVPForm(forms.ModelForm):
             if not getattr(self.event, 'question3_text', '').strip():
                 self.fields.pop('question3', None)
 
+    def clean(self):
+        cleaned_data = super().clean()
+        status = cleaned_data.get('status')
+        # Enforce capacity: prevent selecting 'confirmed' when capacity is reached
+        if self.event and status == 'confirmed' and self.event.capacity is not None:
+            # Count confirmed RSVPs excluding the current instance (if updating)
+            from events.models import RSVP
+            exclude_pk = getattr(self.instance, 'pk', None)
+            confirmed_count_qs = RSVP.objects.filter(event=self.event, status='confirmed')
+            if exclude_pk:
+                confirmed_count_qs = confirmed_count_qs.exclude(pk=exclude_pk)
+            confirmed_count = confirmed_count_qs.count()
+            if confirmed_count >= self.event.capacity and self.event.waitlist_enabled:
+                self.add_error('status', 'This event is currently full. If you’d like to be notified if a spot opens up, please join the waitlist`.')
+            elif self.event.capacity is not None and confirmed_count >= self.event.capacity:
+                self.add_error('status', 'This event is currently full. Please check back later to see if a spot opens up.')
+        return cleaned_data
+
     class Meta:
         model = RSVP
         fields = ['status', 'question1', 'question2', 'question3']
