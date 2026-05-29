@@ -53,5 +53,5 @@ MANIFEST
 docker-compose.override.yml
 
 # Migrations Folder
-users/migrations/*
-events/migrations/*
+users/migrations
+events/migrations
