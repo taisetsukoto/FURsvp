@@ -7,6 +7,10 @@ from django.utils import timezone
 
 # Create your models here.
 
+User._meta.get_field('email')._unique = True
+User._meta.get_field('email').blank = False
+User._meta.get_field('email').null = False
+
 class AuditLog(models.Model):
     """Audit log for tracking administrative actions and group event activities"""
     ACTION_CHOICES = [
