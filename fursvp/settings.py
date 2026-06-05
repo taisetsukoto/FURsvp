@@ -30,7 +30,7 @@ SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'D71CFE3703158C6A495D119ED73820
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG')
 
-ALLOWED_HOSTS = [os.environ.get('ALLOWED_HOST'), "fursvp.org", "127.0.0.1", "localhost"]
+ALLOWED_HOSTS = [os.environ.get('ALLOWED_HOSTS'), "fursvp.org", "127.0.0.1", "localhost"]
 
 
 # Application definition
