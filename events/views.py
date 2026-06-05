@@ -1,10 +1,10 @@
 from django.shortcuts import render, get_object_or_404, redirect
-from .models import Event, RSVP, Post, Group
+from .models import Event, RSVP, Post, Group, State, Country
 from django.utils import timezone
 from datetime import timedelta, datetime
 from django.contrib.auth.decorators import login_required
 from .forms import EventForm, RSVPForm, Group
-from users.models import Profile, GroupDelegation, BannedUser, Notification, GroupRole
+from users.models import Profile, GroupDelegation, BannedUser, Notification, GroupRole, AuditLog
 from django.contrib import messages
 from django.db import models, transaction
 from django.http import JsonResponse, HttpResponseForbidden, HttpResponse
@@ -20,6 +20,7 @@ import calendar
 from django.forms.utils import ErrorList
 from events.utils import post_to_telegram_channel
 from django.urls import reverse
+from django.conf import settings
 import os
 import json
 import requests
@@ -88,6 +89,7 @@ def home(request):
     
     search_query = request.GET.get('search', '').strip()
     state_filter = request.GET.get('state', '').strip()
+    country_filter = request.GET.get('country', '').strip()
     
     # Base queryset - filter out events that have already passed and cancelled events
     now = timezone.now()
@@ -111,7 +113,18 @@ def home(request):
 
     # Apply state filter
     if state_filter:
-        events = events.filter(state__iexact=state_filter)
+        events = events.filter(
+            models.Q(state__state_name__iexact=state_filter) |
+            models.Q(state__state_code__iexact=state_filter)
+        )
+
+    # Apply country filter
+    if country_filter:
+        events = events.filter(
+            models.Q(country__country_name__iexact=country_filter) |
+            models.Q(country__alpha_2_code__iexact=country_filter) |
+            models.Q(country__alpha_3_code__iexact=country_filter)
+        )
 
     events = events.annotate(
         confirmed_count=models.Count('rsvps', filter=models.Q(rsvps__status='confirmed'))
@@ -218,11 +231,13 @@ def home(request):
     else:
         calendar_data = None
     
-    # Get all unique states for the dropdown
-    all_states = Event.objects.exclude(state__isnull=True).exclude(state__exact='').values_list('state', flat=True).distinct().order_by('state')
+    # Get all unique states and countries for the dropdown
+    all_states = State.objects.select_related('country').order_by('state_name')
+    all_countries = Country.objects.order_by('country_name')
     
     context = {
         'events': events_page,
+        'all_countries': all_countries,
         'current_sort': sort_by,
         'current_order': sort_order,
         'filter_adult': filter_adult,
@@ -345,6 +360,23 @@ def event_detail(request, event_id):
             if user_rsvp: # Ensure there is an RSVP to remove
                 with transaction.atomic():
                     was_confirmed = (user_rsvp.status == 'confirmed')
+                    
+                    # Log the RSVP removal
+                    AuditLog.log_action(
+                        user=request.user,
+                        action='rsvp_deleted',
+                        description=f'Removed RSVP for {event.title}',
+                        group=event.group,
+                        event=event,
+                        target_user=request.user,
+                        ip_address=request.META.get('REMOTE_ADDR'),
+                        user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                        additional_data={
+                            'previous_status': user_rsvp.status,
+                            'was_confirmed': was_confirmed
+                        }
+                    )
+                    
                     user_rsvp.delete()
                     create_notification(request.user, f'You have removed your RSVP for {event.title}.', link=event.get_absolute_url())
                     # Telegram webhook for public RSVP removal
@@ -374,6 +406,24 @@ def event_detail(request, event_id):
         if 'delete_event' in request.POST and can_ban_user:
             event_title = event.title
             event_url = request.build_absolute_uri(event.get_absolute_url())
+            
+            # Log the event deletion before deleting
+            AuditLog.log_action(
+                user=request.user,
+                action='event_deleted',
+                description=f'Deleted event: {event_title}',
+                group=event.group,
+                event=event,
+                ip_address=request.META.get('REMOTE_ADDR'),
+                user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                additional_data={
+                    'event_title': event_title,
+                    'event_date': event.date.isoformat(),
+                    'event_group': event.group.name if event.group else None,
+                    'event_url': event_url
+                }
+            )
+            
             event.delete()
             create_notification(request.user, f'Event "{event_title}" has been deleted.', link='/') # Link to home since event is deleted
             # Telegram webhook for event deletion
@@ -393,6 +443,42 @@ def event_detail(request, event_id):
             rsvp.event = event
             rsvp.user = request.user
             rsvp.save()
+            
+            # Log the RSVP action
+            if user_rsvp:
+                # This is an update
+                AuditLog.log_action(
+                    user=request.user,
+                    action='rsvp_updated',
+                    description=f'Updated RSVP status to {rsvp.get_status_display()} for {event.title}',
+                    group=event.group,
+                    event=event,
+                    target_user=request.user,
+                    ip_address=request.META.get('REMOTE_ADDR'),
+                    user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                    additional_data={
+                        'old_status': user_rsvp.status,
+                        'new_status': new_status,
+                        'rsvp_id': rsvp.id
+                    }
+                )
+            else:
+                # This is a new RSVP
+                AuditLog.log_action(
+                    user=request.user,
+                    action='rsvp_created',
+                    description=f'Created RSVP with status {rsvp.get_status_display()} for {event.title}',
+                    group=event.group,
+                    event=event,
+                    target_user=request.user,
+                    ip_address=request.META.get('REMOTE_ADDR'),
+                    user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                    additional_data={
+                        'status': new_status,
+                        'rsvp_id': rsvp.id
+                    }
+                )
+            
             create_notification(request.user, f'Your RSVP status has been updated to {rsvp.get_status_display()!s} for {event.title}.', link=event.get_absolute_url())
             # Telegram webhook for public RSVP (any status)
             if event.attendee_list_public and event.group and getattr(event.group, 'telegram_webhook_channel', None):
@@ -433,11 +519,36 @@ def event_detail(request, event_id):
 
         try:
             rsvp_to_update = event.rsvps.get(id=rsvp_id)
-            
+            if new_status == 'confirmed' and event.capacity is not None:
+                current_confirmed = event.rsvps.filter(status='confirmed')
+                if rsvp_to_update.pk:
+                    current_confirmed = current_confirmed.exclude(pk=rsvp_to_update.pk)
+                if current_confirmed.count() >= event.capacity:
+                    response_data = {'status': 'error', 'message': 'Cannot confirm: event is at capacity.'}
+                    return JsonResponse(response_data, status=400)
+
             with transaction.atomic():
                 old_status = rsvp_to_update.status
                 rsvp_to_update.status = new_status
                 rsvp_to_update.save()
+
+                # Log the organizer RSVP status change
+                AuditLog.log_action(
+                    user=request.user,
+                    action='rsvp_status_changed',
+                    description=f'Changed {rsvp_to_update.user.username}\'s RSVP status from {old_status} to {new_status} for {event.title}',
+                    group=event.group,
+                    event=event,
+                    target_user=rsvp_to_update.user,
+                    ip_address=request.META.get('REMOTE_ADDR'),
+                    user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                    additional_data={
+                        'old_status': old_status,
+                        'new_status': new_status,
+                        'rsvp_id': rsvp_to_update.id,
+                        'changed_by': request.user.username
+                    }
+                )
 
                 message = f"{rsvp_to_update.user.username}'s RSVP for {event.title} updated to {rsvp_to_update.get_status_display()}."
                 create_notification(request.user, message, link=event.get_absolute_url())
@@ -524,7 +635,7 @@ def event_detail(request, event_id):
     if event.city:
         city_state_parts.append(event.city)
     if event.state:
-        city_state_parts.append(event.state)
+        city_state_parts.append(str(event.state))
     
     if city_state_parts:
         location_components.append(", ".join(city_state_parts))
@@ -609,6 +720,25 @@ def create_event(request):
             event = form.save(commit=False)
             event.organizer = request.user
             event.save()
+            
+            # Log the event creation
+            AuditLog.log_action(
+                user=request.user,
+                action='event_created',
+                description=f'Created new event: {event.title}',
+                group=event.group,
+                event=event,
+                ip_address=request.META.get('REMOTE_ADDR'),
+                user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                additional_data={
+                    'event_title': event.title,
+                    'event_date': event.date.isoformat(),
+                    'event_group': event.group.name,
+                    'event_capacity': event.capacity,
+                    'event_status': event.status
+                }
+            )
+            
             # Telegram webhook for new event
             group = event.group
             if group and getattr(group, 'telegram_webhook_channel', None):
@@ -646,10 +776,43 @@ def edit_event(request, event_id):
     if request.method == 'POST':
         form = EventForm(request.POST, instance=event, user=request.user)
         if form.is_valid():
+            # Store old data for comparison
+            old_data = {
+                'title': event.title,
+                'date': event.date.isoformat(),
+                'description': event.description,
+                'capacity': event.capacity,
+                'status': event.status,
+                'group': event.group.name if event.group else None
+            }
+            
             event = form.save(commit=False)
             if not event.organizer:
                 event.organizer = request.user
             event.save()
+            
+            # Log the event update
+            AuditLog.log_action(
+                user=request.user,
+                action='event_updated',
+                description=f'Updated event: {event.title}',
+                group=event.group,
+                event=event,
+                ip_address=request.META.get('REMOTE_ADDR'),
+                user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                additional_data={
+                    'old_data': old_data,
+                    'new_data': {
+                        'title': event.title,
+                        'date': event.date.isoformat(),
+                        'description': event.description,
+                        'capacity': event.capacity,
+                        'status': event.status,
+                        'group': event.group.name if event.group else None
+                    }
+                }
+            )
+            
             create_notification(request.user, f'Event for {event.title} updated successfully!', link=event.get_absolute_url())
             for rsvp in event.rsvps.select_related('user').all():
                 if rsvp.user and rsvp.user != request.user:
@@ -1074,18 +1237,32 @@ def telegram_bot_webhook(request):
                         send_telegram_message(chat_id, "You do not have an RSVP for this event.")
                     return JsonResponse({'ok': True})
                 # Set RSVP status
-                rsvp, created = RSVP.objects.get_or_create(event=event, user=user, defaults={'status': status if status != 'no' else 'not_attending'})
+                desired_status = 'not_attending' if status == 'no' else ('waitlisted' if status == 'waitlist' else ('maybe' if status == 'maybe' else 'confirmed'))
+                rsvp, created = RSVP.objects.get_or_create(event=event, user=user, defaults={'status': desired_status})
+
+                # Enforce capacity rules for confirmed status
+                if desired_status == 'confirmed':
+                    confirmed_qs = RSVP.objects.filter(event=event, status='confirmed')
+                    if rsvp.pk:
+                        confirmed_qs = confirmed_qs.exclude(pk=rsvp.pk)
+                    if event.capacity is not None and confirmed_qs.count() >= event.capacity:
+                        if event.waitlist_enabled:
+                            rsvp.status = 'waitlisted'
+                            rsvp.save()
+                            send_telegram_message(chat_id, f"Event is full — you've been added to the waitlist for <b>{event.title}</b>.", parse_mode="HTML")
+                            return JsonResponse({'ok': True})
+                        else:
+                            send_telegram_message(chat_id, f"Cannot confirm — <b>{event.title}</b> is at capacity.", parse_mode="HTML")
+                            return JsonResponse({'ok': True})
+
+                # For non-confirmed desired statuses or when capacity allows
                 if not created:
-                    if status == 'waitlist':
-                        rsvp.status = 'waitlisted'
-                    elif status == 'maybe':
-                        rsvp.status = 'maybe'
-                    elif status == 'no':
-                        rsvp.status = 'not_attending'
-                    else:
-                        rsvp.status = 'confirmed'
+                    rsvp.status = desired_status
                     rsvp.save()
-                send_telegram_message(chat_id, f"Your RSVP status for <b>{event.title}</b> is now <b>{'Waitlisted' if status == 'waitlist' else status.capitalize() if status != 'no' else 'Not Attending'}</b>.", parse_mode="HTML")
+
+                # Build the user-facing status text
+                display_text = 'Waitlisted' if desired_status == 'waitlisted' else (desired_status.capitalize() if desired_status != 'not_attending' else 'Not Attending')
+                send_telegram_message(chat_id, f"Your RSVP status for <b>{event.title}</b> is now <b>{display_text}</b>.", parse_mode="HTML")
                 return JsonResponse({'ok': True})
         # RSVP list (unchanged)
         if data_str.startswith("rsvplist_"):
@@ -1179,3 +1356,470 @@ def blog(request):
         'bluesky_profile': profile,
     }
     return render(request, 'events/blog.html', context)
+
+@login_required
+def export_attendees_csv(request, event_id):
+    """Export attendee data as CSV"""
+    import csv
+    
+    event = get_object_or_404(Event, pk=event_id)
+    
+    # Check permissions
+    is_organizer = request.user == event.organizer or request.user.is_superuser
+    can_access_group = False
+    if event.group:
+        can_access_group = GroupRole.objects.filter(user=request.user, group=event.group).exists()
+        if not can_access_group:
+            can_access_group = GroupDelegation.objects.filter(delegated_user=request.user, group=event.group).exists()
+    
+    if not (is_organizer or can_access_group):
+        return HttpResponseForbidden("You don't have permission to export attendees.")
+    
+    # Create CSV response
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = f'attachment; filename="attendees_{event.title.replace(" ", "_")}_{event.date}.csv"'
+    
+    writer = csv.writer(response)
+    writer.writerow(['Badge Number', 'Name', 'Username', 'Status', 'Email', 'Telegram', 'Discord', 'RSVP Date', 'Question 1', 'Question 2', 'Question 3'])
+    
+    # Get all RSVPs ordered by timestamp (first come, first served)
+    rsvps = event.rsvps.filter(status__in=['confirmed', 'waitlisted']).order_by('timestamp').select_related('user__profile')
+    
+    for idx, rsvp in enumerate(rsvps, start=1):
+        if rsvp.user:
+            profile = rsvp.user.profile if hasattr(rsvp.user, 'profile') else None
+            name = profile.get_display_name() if profile else rsvp.user.username
+            email = rsvp.user.email
+            telegram = profile.telegram_username if profile else ''
+            discord = profile.discord_username if profile else ''
+        else:
+            name = rsvp.name or 'Anonymous'
+            email = ''
+            telegram = ''
+            discord = ''
+        
+        writer.writerow([
+            idx,  # Badge number
+            name,
+            rsvp.user.username if rsvp.user else '',
+            rsvp.get_status_display(),
+            email,
+            telegram,
+            discord,
+            rsvp.timestamp.strftime('%Y-%m-%d %H:%M') if rsvp.timestamp else '',
+            rsvp.question1 or '',
+            rsvp.question2 or '',
+            rsvp.question3 or '',
+        ])
+    
+    return response
+
+@login_required
+def generate_badges(request, event_id):
+    """Generate printable Avery 5162 badges with QR codes (no border)."""
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.units import inch
+    from reportlab.pdfgen import canvas
+    from reportlab.lib.utils import ImageReader
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    from io import BytesIO
+    import qrcode
+
+    try:
+        fonts_dir = os.path.join(settings.BASE_DIR, 'static', 'fonts')
+        baloo2_bold_path = os.path.join(fonts_dir, 'Baloo2-Bold.ttf')
+        baloo2_extrabold_path = os.path.join(fonts_dir, 'Baloo2-ExtraBold.ttf')
+
+        if os.path.exists(baloo2_bold_path):
+            pdfmetrics.registerFont(TTFont('Baloo2-Bold', baloo2_bold_path))
+        if os.path.exists(baloo2_extrabold_path):
+            pdfmetrics.registerFont(TTFont('Baloo2-ExtraBold', baloo2_extrabold_path))
+            name_font = 'Baloo2-ExtraBold'
+        else:
+            name_font = 'Baloo2-Bold'
+
+        font_name = 'Baloo2-Bold'
+        if not os.path.exists(baloo2_bold_path):
+            font_name = 'Helvetica-Bold'
+            name_font = 'Helvetica-Bold'
+    except Exception:
+        font_name = 'Helvetica-Bold'
+        name_font = 'Helvetica-Bold'
+
+    event = get_object_or_404(Event, pk=event_id)
+
+    is_organizer = request.user == event.organizer or request.user.is_superuser
+    can_access_group = False
+    if event.group:
+        can_access_group = GroupRole.objects.filter(user=request.user, group=event.group).exists()
+        if not can_access_group:
+            can_access_group = GroupDelegation.objects.filter(delegated_user=request.user, group=event.group).exists()
+
+    if not (is_organizer or can_access_group):
+        return HttpResponseForbidden("You don't have permission to generate badges.")
+
+    rsvps = event.rsvps.filter(status__in=['confirmed', 'waitlisted']).order_by('timestamp').select_related('user__profile')
+
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="badge_labels_{event.title.replace(" ", "_")}.pdf"'
+
+    p = canvas.Canvas(response, pagesize=letter)
+    width, height = letter
+
+    labels_per_row = 2
+    labels_per_col = 5
+    badge_width = 4.0 * inch
+    badge_height = 2.0 * inch
+    horizontal_pitch = 4.25 * inch
+    vertical_pitch = 2.3 * inch
+    left_margin = 0.25 * inch
+    top_margin = 0.5 * inch
+
+    if width < (left_margin + labels_per_row * horizontal_pitch) or height < (top_margin + labels_per_col * vertical_pitch):
+        labels_per_row = 2
+        labels_per_col = 8
+        badge_width = (width - 60) / labels_per_row
+        badge_height = (height - 80) / labels_per_col
+        horizontal_pitch = badge_width + 0.25 * inch
+        vertical_pitch = badge_height + 0.25 * inch
+        left_margin = 0.5 * inch
+        top_margin = 0.5 * inch
+
+    for idx, rsvp in enumerate(rsvps):
+        if idx > 0 and idx % (labels_per_row * labels_per_col) == 0:
+            p.showPage()
+
+        col = idx % labels_per_row
+        row = (idx // labels_per_row) % labels_per_col
+        x = left_margin + col * horizontal_pitch
+        y = height - top_margin - (row * vertical_pitch) - badge_height
+
+        # No border per request
+
+        if rsvp.user:
+            profile = rsvp.user.profile if hasattr(rsvp.user, 'profile') else None
+            name = profile.get_display_name() if profile else rsvp.user.username
+        else:
+            name = rsvp.name or 'Anonymous'
+
+        badge_num = idx + 1
+
+        check_in_url = request.build_absolute_uri(reverse('checkin_attendee', kwargs={'event_id': event.id, 'rsvp_id': rsvp.id}))
+        qr = qrcode.QRCode(version=1, box_size=3, border=1)
+        qr.add_data(check_in_url)
+        qr.make(fit=True)
+        qr_img = qr.make_image(fill_color='black', back_color='white')
+
+        qr_buffer = BytesIO()
+        qr_img.save(qr_buffer, format='PNG')
+        qr_buffer.seek(0)
+        qr_reader = ImageReader(qr_buffer)
+
+        qr_size = 0.30 * inch
+        # Keep original QR position for consistency
+        p.drawImage(qr_reader, x + 12, y + badge_height - qr_size - 10, qr_size, qr_size)
+
+        # Draw accessibility indicator if needed (same as prior behavior)
+        if rsvp.accessibility_needs:
+            from svglib.svglib import svg2rlg
+            from reportlab.graphics import renderPDF
+            icon_size = 0.30 * inch
+            icon_x = x + 12 + qr_size + 6
+            icon_y = y + badge_height - qr_size - 10
+
+            # Draw black background
+            p.setFillColorRGB(0, 0, 0)
+            p.rect(icon_x, icon_y, icon_size, icon_size, fill=1, stroke=0)
+
+            try:
+                svg_path = os.path.join(settings.BASE_DIR, 'static', 'accessible.svg')
+                if os.path.exists(svg_path):
+                    drawing = svg2rlg(svg_path)
+                    if drawing:
+                        from reportlab.graphics.shapes import Path
+                        from reportlab.lib import colors
+
+                        def make_white(group):
+                            for item in group.contents:
+                                if hasattr(item, 'fillColor'):
+                                    item.fillColor = colors.white
+                                if hasattr(item, 'strokeColor'):
+                                    item.strokeColor = colors.white
+                                if hasattr(item, 'contents'):
+                                    make_white(item)
+
+                        make_white(drawing)
+
+                        target_size = icon_size * 1.25
+                        scale_factor = target_size / max(drawing.width, drawing.height)
+                        scaled_width = drawing.width * scale_factor
+                        scaled_height = drawing.height * scale_factor
+                        offset_x = (icon_size - scaled_width) / 2
+                        offset_y = (icon_size - scaled_height) / 2
+
+                        drawing.width = scaled_width
+                        drawing.height = scaled_height
+                        drawing.scale(scale_factor, scale_factor)
+                        renderPDF.draw(drawing, p, icon_x + offset_x, icon_y + offset_y)
+                else:
+                    p.saveState()
+                    p.setFillColorRGB(1, 1, 1)
+                    center_x = icon_x + icon_size / 2
+                    center_y = icon_y + icon_size / 2
+                    p.circle(center_x + icon_size * 0.12, center_y + icon_size * 0.25, icon_size * 0.13, fill=1)
+                    p.setLineWidth(icon_size * 0.10)
+                    p.line(center_x - icon_size * 0.20, center_y + icon_size * 0.08,
+                           center_x + icon_size * 0.30, center_y + icon_size * 0.08)
+                    p.circle(center_x + icon_size * 0.02, center_y - icon_size * 0.08, icon_size * 0.24, fill=0, stroke=1)
+                    p.restoreState()
+            except Exception as e:
+                p.saveState()
+                p.setFillColorRGB(1, 1, 1)
+                center_x = icon_x + icon_size / 2
+                center_y = icon_y + icon_size / 2
+                p.circle(center_x + icon_size * 0.12, center_y + icon_size * 0.25, icon_size * 0.13, fill=1)
+                p.setLineWidth(icon_size * 0.10)
+                p.line(center_x - icon_size * 0.20, center_y + icon_size * 0.08,
+                       center_x + icon_size * 0.30, center_y + icon_size * 0.08)
+                p.circle(center_x + icon_size * 0.02, center_y - icon_size * 0.08, icon_size * 0.24, fill=0, stroke=1)
+                p.restoreState()
+
+        font_size = 28
+        p.setFont(name_font, font_size)
+        text_width = p.stringWidth(name, name_font, font_size)
+
+        # Downsize name if too wide
+        if text_width > badge_width - 0.4 * inch:
+            font_size = 20
+            p.setFont(name_font, font_size)
+            text_width = p.stringWidth(name, name_font, font_size)
+        if text_width > badge_width - 0.4 * inch:
+            font_size = 16
+            p.setFont(name_font, font_size)
+            text_width = p.stringWidth(name, name_font, font_size)
+
+        # Truncate with ellipsis if still too wide
+        if text_width > badge_width - 0.4 * inch:
+            available = badge_width - 0.4 * inch
+            truncated = name
+            while truncated and p.stringWidth(truncated + '...', name_font, font_size) > available:
+                truncated = truncated[:-1]
+            name = truncated + '...' if truncated else '...'
+            text_width = p.stringWidth(name, name_font, font_size)
+
+        name_x = x + (badge_width / 2)
+        name_y = y + (badge_height / 2) - (font_size * 0.3)
+        p.drawCentredString(name_x, name_y, name)
+
+        p.setFont(font_name, 12)
+        status_label = rsvp.get_status_display().upper()
+        p.drawString(x + 0.12 * inch, y + 0.12 * inch, f'{badge_num}')
+        p.drawString(x + badge_width - p.stringWidth(status_label, font_name, 10) - 0.12 * inch, y + 0.12 * inch, status_label)
+
+    p.save()
+    return response
+
+@login_required
+def checkin_attendee(request, event_id, rsvp_id):
+    """Check-in page accessible via QR code on badges"""
+    event = get_object_or_404(Event, pk=event_id)
+    rsvp = get_object_or_404(RSVP, pk=rsvp_id, event=event)
+    
+    # Check permissions
+    is_organizer = request.user == event.organizer or request.user.is_superuser
+    can_access_group = False
+    if event.group:
+        can_access_group = GroupRole.objects.filter(user=request.user, group=event.group).exists()
+        if not can_access_group:
+            can_access_group = GroupDelegation.objects.filter(delegated_user=request.user, group=event.group).exists()
+    
+    if not (is_organizer or can_access_group):
+        return HttpResponseForbidden("You don't have permission to check in attendees.")
+    
+    if request.method == 'POST':
+        # Mark as checked in (we'll add a checked_in field to RSVP model)
+        # For now, just show success message
+        messages.success(request, f'Successfully checked in {rsvp.user.profile.get_display_name() if rsvp.user and hasattr(rsvp.user, "profile") else rsvp.name}')
+        return redirect('event_detail', event_id=event.id)
+    
+    context = {
+        'event': event,
+        'rsvp': rsvp,
+        'attendee_name': rsvp.user.profile.get_display_name() if rsvp.user and hasattr(rsvp.user, 'profile') else (rsvp.name or 'Anonymous'),
+    }
+    return render(request, 'events/checkin.html', context)
+
+@login_required
+def generate_checkin_sheet(request, event_id):
+    """Generate a printable check-in sheet with names and checkboxes"""
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.units import inch
+    from reportlab.pdfgen import canvas
+    from reportlab.lib import colors
+    
+    event = get_object_or_404(Event, pk=event_id)
+    
+    # Check permissions
+    is_organizer = request.user == event.organizer or request.user.is_superuser
+    can_access_group = False
+    if event.group:
+        can_access_group = GroupRole.objects.filter(user=request.user, group=event.group).exists()
+        if not can_access_group:
+            can_access_group = GroupDelegation.objects.filter(delegated_user=request.user, group=event.group).exists()
+    
+    if not (is_organizer or can_access_group):
+        return HttpResponseForbidden("You don't have permission to generate check-in sheets.")
+    
+    # Get all confirmed RSVPs
+    rsvps = event.rsvps.filter(status__in=['confirmed', 'waitlisted']).order_by('timestamp').select_related('user__profile')
+    
+    # Create PDF
+    response = HttpResponse(content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="checkin_sheet_{event.title.replace(" ", "_")}.pdf"'
+    
+    p = canvas.Canvas(response, pagesize=letter)
+    width, height = letter
+    
+    # Header
+    p.setFont("Helvetica-Bold", 18)
+    p.drawString(50, height - 50, f"Check-in Sheet: {event.title}")
+    
+    p.setFont("Helvetica", 12)
+    p.drawString(50, height - 75, f"Date: {event.date.strftime('%B %d, %Y')}")
+    p.drawString(50, height - 95, f"Total Attendees: {rsvps.count()}")
+    
+    # Draw line
+    p.line(50, height - 105, width - 50, height - 105)
+    
+    # Starting position for attendee list
+    y_position = height - 135
+    line_height = 45  # Increased to accommodate more info
+    checkbox_size = 18
+    
+    for idx, rsvp in enumerate(rsvps, start=1):
+        # Check if we need a new page
+        if y_position < 100:
+            p.showPage()
+            # Repeat header on new page
+            p.setFont("Helvetica-Bold", 18)
+            p.drawString(50, height - 50, f"Check-in Sheet: {event.title} (cont.)")
+            p.line(50, height - 65, width - 50, height - 65)
+            y_position = height - 95
+        
+        # Draw checkbox
+        p.rect(50, y_position - checkbox_size + 4, checkbox_size, checkbox_size)
+        
+        # Get attendee info
+        if rsvp.user:
+            profile = rsvp.user.profile if hasattr(rsvp.user, 'profile') else None
+            name = profile.get_display_name() if profile else rsvp.user.username
+            email = rsvp.user.email
+            discord = profile.discord_username if profile else None
+            telegram = profile.telegram_username if profile else None
+        else:
+            name = rsvp.name or 'Anonymous'
+            email = ''
+            discord = None
+            telegram = None
+        
+        # Draw badge number
+        p.setFont("Helvetica-Bold", 12)
+        p.drawString(80, y_position, f"#{idx}")
+        
+        # Draw name
+        p.setFont("Helvetica-Bold", 14)
+        name_display = name[:45]  # Truncate if too long
+        
+        # Add custom rank badge if present
+        if rsvp.custom_rank:
+            name_display += f"  [{rsvp.custom_rank}]"
+        
+        p.drawString(120, y_position, name_display[:55])
+        
+        # Draw status and email on second line
+        p.setFont("Helvetica", 10)
+        status_text = f"Status: {rsvp.get_status_display()}"
+        if email:
+            status_text += f"  |  {email[:35]}"
+        p.drawString(120, y_position - 12, status_text)
+        
+        # Draw additional info on third line
+        info_parts = []
+        if rsvp.accessibility_needs:
+            info_parts.append("♿ Accessibility")
+        if discord:
+            info_parts.append(f"Discord: {discord[:20]}")
+        if telegram:
+            info_parts.append(f"TG: @{telegram[:15]}")
+        
+        if info_parts:
+            p.setFont("Helvetica", 9)
+            p.drawString(120, y_position - 24, "  |  ".join(info_parts)[:70])
+        
+        y_position -= line_height
+    
+    p.save()
+    return response
+
+@login_required
+def update_badge_settings(request, event_id, rsvp_id):
+    """AJAX endpoint to update badge settings for an attendee"""
+    if request.method != 'POST':
+        return JsonResponse({'status': 'error', 'message': 'POST required'}, status=400)
+    
+    event = get_object_or_404(Event, pk=event_id)
+    rsvp = get_object_or_404(RSVP, pk=rsvp_id, event=event)
+    
+    # Check permissions
+    is_organizer = request.user == event.organizer or request.user.is_superuser
+    can_access_group = False
+    if event.group:
+        can_access_group = GroupRole.objects.filter(user=request.user, group=event.group).exists()
+        if not can_access_group:
+            can_access_group = GroupDelegation.objects.filter(delegated_user=request.user, group=event.group).exists()
+    
+    if not (is_organizer or can_access_group):
+        return JsonResponse({'status': 'error', 'message': 'Permission denied'}, status=403)
+    
+    # Update fields
+    if 'accessibility_needs' in request.POST:
+        rsvp.accessibility_needs = request.POST.get('accessibility_needs') == 'true'
+    
+    if 'custom_rank' in request.POST:
+        custom_rank = request.POST.get('custom_rank', '').strip()
+        rsvp.custom_rank = custom_rank if custom_rank else None
+    
+    rsvp.save()
+    
+    return JsonResponse({
+        'status': 'success',
+        'message': 'Badge settings updated',
+        'accessibility_needs': rsvp.accessibility_needs,
+        'custom_rank': rsvp.custom_rank or ''
+    })
+
+@login_required
+def organizer_tools(request, event_id):
+    """Organizer tools page for managing badges and exports"""
+    event = get_object_or_404(Event, pk=event_id)
+    
+    # Check permissions
+    is_organizer = request.user == event.organizer or request.user.is_superuser
+    can_access_group = False
+    if event.group:
+        can_access_group = GroupRole.objects.filter(user=request.user, group=event.group).exists()
+        if not can_access_group:
+            can_access_group = GroupDelegation.objects.filter(delegated_user=request.user, group=event.group).exists()
+    
+    if not (is_organizer or can_access_group):
+        return HttpResponseForbidden("You don't have permission to access organizer tools.")
+    
+    # Get all confirmed RSVPs ordered by timestamp
+    rsvps = event.rsvps.filter(status__in=['confirmed', 'waitlisted']).order_by('timestamp').select_related('user__profile')
+    
+    context = {
+        'event': event,
+        'rsvps': rsvps,
+    }
+    return render(request, 'events/organizer_tools.html', context)

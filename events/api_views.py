@@ -228,8 +228,19 @@ class EventViewSet(viewsets.ReadOnlyModelViewSet):
         
         state = self.request.query_params.get('state', None)
         if state:
-            queryset = queryset.filter(state__icontains=state)
-        
+            queryset = queryset.filter(
+                Q(state__state_name__icontains=state) |
+                Q(state__state_code__iexact=state)
+            )
+
+        country = self.request.query_params.get('country', None)
+        if country:
+            queryset = queryset.filter(
+                Q(country__country_name__icontains=country) |
+                Q(country__alpha_2_code__iexact=country) |
+                Q(country__alpha_3_code__iexact=country)
+            )
+
         # Filter by age restriction
         age_restriction = self.request.query_params.get('age_restriction', None)
         if age_restriction:
@@ -243,7 +254,7 @@ class EventViewSet(viewsets.ReadOnlyModelViewSet):
         event = self.get_object()
         
         # Check if attendee list is public
-        if not event.attendee_list_public and not request.user.is_authenticated:
+        if not event.attendee_list_public and not request.user.is_staff:
             return Response(
                 {'error': 'Attendee list is not public for this event'},
                 status=status.HTTP_403_FORBIDDEN
@@ -259,7 +270,7 @@ class EventViewSet(viewsets.ReadOnlyModelViewSet):
         event = self.get_object()
         
         # Check if attendee list is public
-        if not event.attendee_list_public and not request.user.is_authenticated:
+        if not event.attendee_list_public and not request.user.is_staff:
             return Response(
                 {'error': 'Attendee list is not public for this event'},
                 status=status.HTTP_403_FORBIDDEN
@@ -289,7 +300,6 @@ class EventViewSet(viewsets.ReadOnlyModelViewSet):
         
         serializer = self.get_serializer(events, many=True)
         return Response(serializer.data)
-
 
 class CustomAPIRootView(APIView):
     api_root_dict = None
