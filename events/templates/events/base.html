@@ -108,40 +108,6 @@
             color: var(--primary-color);
         }
 
-        .footer-btn-modern {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5em;
-            padding: 0.7em 1.4em;
-            border-radius: 1.2em;
-            border: none;
-            background: #e0edff;
-            color: #2563eb;
-            font-weight: 600;
-            font-size: 1.08rem;
-            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.07);
-            transition: background 0.18s, color 0.18s, box-shadow 0.18s, transform 0.12s;
-            margin: 0.3em 0.4em 0.3em 0;
-            outline: none;
-            cursor: pointer;
-            text-decoration: none;
-        }
-
-        .footer-btn-modern:hover,
-        .footer-btn-modern.active {
-            background: linear-gradient(90deg, #2563eb 0%, #6366f1 100%);
-            color: #fff;
-            box-shadow: 0 4px 18px rgba(59, 130, 246, 0.13);
-            transform: translateY(-2px) scale(1.04);
-            text-decoration: none;
-        }
-
-        .footer-btn-modern i,
-        .footer-btn-modern .material-icons {
-            font-size: 1.25em;
-            vertical-align: middle;
-        }
-
         .footer {
             background-color: var(--secondary-color);
             padding: 3.5rem 0;
@@ -1631,8 +1597,9 @@
             color: #fff !important;
         }
 
-        /* Gradient Footer */
-        .gradient-footer {
+        /* Site footer */
+        .gradient-footer,
+        .site-footer {
             background: linear-gradient(90deg, #a7c7f9 0%, #b4e0fa 100%);
             border-top-left-radius: 1.5rem;
             border-top-right-radius: 1.5rem;
@@ -1642,11 +1609,38 @@
             color: #234;
         }
 
-        @media (max-width: 768px) {
-            .gradient-footer {
-                border-radius: 0;
-                padding: 1.5rem 0.5rem 1rem 0.5rem;
-            }
+        .footer-btn-modern {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5em;
+            padding: 0.7em 1.4em;
+            border-radius: 1.2em;
+            border: none;
+            background: #e0edff;
+            color: #2563eb;
+            font-weight: 600;
+            font-size: 1.08rem;
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.07);
+            transition: background 0.18s, color 0.18s, box-shadow 0.18s, transform 0.12s;
+            margin: 0.3em 0.4em 0.3em 0;
+            outline: none;
+            cursor: pointer;
+            text-decoration: none;
+        }
+
+        .footer-btn-modern:hover,
+        .footer-btn-modern:focus-visible {
+            background: linear-gradient(90deg, #2563eb 0%, #6366f1 100%);
+            color: #fff;
+            box-shadow: 0 4px 18px rgba(59, 130, 246, 0.13);
+            transform: translateY(-2px) scale(1.04);
+            text-decoration: none;
+        }
+
+        .footer-btn-modern i,
+        .footer-btn-modern .material-icons {
+            font-size: 1.25em;
+            vertical-align: middle;
         }
 
         .footer-meta {
@@ -1666,7 +1660,8 @@
             display: block;
         }
 
-        .footer-meta .footer-madeby {
+        .footer-meta .footer-madeby,
+        .footer-meta .footer-credit {
             font-weight: 400;
             font-size: 1.04em;
             color: #355b8c;
@@ -1675,11 +1670,66 @@
             display: block;
         }
 
+        .footer-meta .footer-credit a {
+            color: #29486d;
+            font-weight: 600;
+            text-decoration: none;
+        }
+
+        .footer-meta .footer-credit a:hover {
+            color: var(--primary-color);
+            text-decoration: underline;
+        }
+
         .footer-meta .footer-heart {
             color: #355b8c;
             font-size: 1.2em;
             vertical-align: middle;
             margin: 0 0.18em;
+        }
+
+        .footer-version {
+            margin-top: 0.5rem;
+            font-size: 1.125rem;
+            font-weight: 500;
+            color: #355b8c;
+        }
+
+        .footer-version a {
+            color: #355b8c;
+            font-weight: 600;
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+
+        .footer-version a:hover {
+            color: #2563eb;
+        }
+
+        .footer-version .material-icons {
+            font-size: 1rem;
+            vertical-align: middle;
+        }
+
+        @media (max-width: 768px) {
+            .gradient-footer,
+            .site-footer {
+                border-radius: 0;
+                padding: 1.5rem 0.5rem 1rem 0.5rem;
+                margin-bottom: 4.5rem;
+            }
+
+            .footer-btn-modern {
+                padding: 0.4em 0.8em;
+                font-size: 0.8rem;
+                margin: 0.2em 0.2em 0.2em 0;
+                gap: 0.3em;
+            }
+
+            .footer-btn-modern i,
+            .footer-btn-modern .material-icons {
+                font-size: 1em;
+            }
         }
 
         /* --- Enhanced Notifications Dropdown --- */
@@ -2176,9 +2226,25 @@
             }
         }
 
-        .dark-mode .gradient-footer {
+        .dark-mode .gradient-footer,
+        .dark-mode .site-footer {
             background: linear-gradient(90deg, #22335a 0%, #1a233a 100%) !important;
             color: #e0e7ef !important;
+        }
+
+        .dark-mode .footer-btn-modern {
+            background: rgba(255, 255, 255, 0.1) !important;
+            color: #e0e7ef !important;
+        }
+
+        .dark-mode .footer-btn-modern:hover,
+        .dark-mode .footer-btn-modern:focus-visible {
+            background: linear-gradient(90deg, #2563eb 0%, #6366f1 100%) !important;
+            color: #fff !important;
+        }
+
+        .dark-mode .footer-version a:hover {
+            color: #93b4f7 !important;
         }
 
         .dark-mode .notification-bell-icon,
@@ -2378,29 +2444,6 @@
             box-shadow: none;
         }
 
-        /* Mobile footer button adjustments */
-        @media (max-width: 768px) {
-            .footer-btn-modern {
-                padding: 0.4em 0.8em;
-                font-size: 0.8rem;
-                margin: 0.2em 0.2em 0.2em 0;
-                gap: 0.3em;
-            }
-            
-            .footer-btn-modern i,
-            .footer-btn-modern .material-icons {
-                font-size: 1em;
-            }
-            
-            .footer .d-flex.gap-2 {
-                gap: 0.3rem !important;
-            }
-            
-            .footer .btn-sm {
-                padding: 0.3rem 0.6rem;
-                font-size: 0.75rem;
-            }
-        }
     </style>
     <!-- TomSelect CSS -->
     <link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.css" rel="stylesheet">
@@ -2733,24 +2776,25 @@
 
     <footer class="gradient-footer mt-auto">
         <div class="container text-center">
-            <img src="{% static 'fursvp-logo2025.png' %}" style="height: 125px;" alt="FURsvp Logo">
-            <div class="d-flex gap-2 justify-content-center mb-2">
+            <a href="{% url 'home' %}">
+                <img src="{% static 'fursvp-logo2025.png' %}" style="height: 125px;" alt="FURsvp Logo">
+            </a>
+            <div class="d-flex flex-wrap gap-2 justify-content-center mb-2">
                 <a href="mailto:info@fursvp.org"
                     class="btn btn-outline-primary btn-sm d-flex align-items-center footer-btn-modern">
                     <i class="material-icons me-1">email</i> Contact Us
                 </a>
-                <a href="https://github.com/FURsvp/fursvp" target="_blank"
+                <a href="https://github.com/FURsvp/fursvp" target="_blank" rel="noopener noreferrer"
                     class="btn btn-outline-primary btn-sm d-flex align-items-center footer-btn-modern">
                     <i class="material-icons me-1">code</i> GitHub
                 </a>
                 <button id="darkModeToggle"
-                    class="btn btn-outline-primary btn-sm d-flex align-items-center footer-btn-modern" type="button"
-                    style="gap: 0.5rem;">
-                    <span id="darkModeIcon" class="material-icons">dark_mode</span>
+                    class="btn btn-outline-primary btn-sm d-flex align-items-center footer-btn-modern" type="button">
+                    <span id="darkModeIcon" class="material-icons me-1">dark_mode</span>
                     <span id="darkModeText">Dark Mode</span>
                 </button>
             </div>
-            <div class="d-flex gap-2 justify-content-center mb-4">
+            <div class="d-flex flex-wrap gap-2 justify-content-center mb-4">
                 <a href="{% url 'terms' %}"
                     class="btn btn-outline-primary btn-sm d-flex align-items-center footer-btn-modern">
                     <i class="material-icons me-1">gavel</i> Terms of Service
@@ -2768,18 +2812,20 @@
                     <i class="material-icons me-1">privacy_tip</i> Privacy
                 </a>
             </div>
-            <div class="footer-meta footer-copyright"
-                style="color: #335588 !important; font-size: 1.1rem; font-weight: 600; text-align: center;">
-                <div>© 2010-{% now "Y" %} FURsvp. All rights reserved.</div>
+            <div class="footer-meta">
+                <div class="footer-copyright">© 2010-{% now "Y" %} FURsvp. All rights reserved.</div>
                 <span class="footer-madeby">
                     Made with <i class="material-icons footer-heart">favorite</i> by the FURsvp Team
                 </span>
+                <span class="footer-credit">
+                    Logo design by <a href="https://alexcoblentz.com/" target="_blank" rel="noopener noreferrer">Alex Coblentz</a>
+                </span>
                 {% load git_extras %}
-                <div class="footer-version" style="margin-top: 0.5rem; font-size: 1.125rem;">
+                <div class="footer-version">
                     <i class="material-icons" style="font-size: 1rem; vertical-align: middle;">code</i>
                     {% get_git_version_link as git_data %}
                     {% if git_data and git_data.commit_url %}
-                        <a href="{{ git_data.commit_url }}" target="_blank" rel="noopener noreferrer" style="text-decoration: none; transition: color 0.2s ease;" onmouseover="this.style.color='#2563eb'" onmouseout="this.style.color='#355b8c'">
+                        <a href="{{ git_data.commit_url }}" target="_blank" rel="noopener noreferrer">
                             {{ git_data.version_info.commit_hash }}{% if git_data.version_info.has_uncommitted %}+{% endif %}
                         </a>
                         {% if git_data.commit_date %}
