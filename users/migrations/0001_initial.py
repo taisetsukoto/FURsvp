@@ -1,0 +1,127 @@
+import django.db.models.deletion
+from django.conf import settings
+from django.db import migrations, models
+
+
+class Migration(migrations.Migration):
+
+    initial = True
+
+    dependencies = [
+        ('events', '0001_initial'),
+        migrations.swappable_dependency(settings.AUTH_USER_MODEL),
+    ]
+
+    operations = [
+        migrations.CreateModel(
+            name='Notification',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('message', models.TextField()),
+                ('is_read', models.BooleanField(default=False)),
+                ('timestamp', models.DateTimeField(auto_now_add=True)),
+                ('link', models.CharField(blank=True, max_length=255, null=True)),
+                ('event_name', models.CharField(blank=True, max_length=255, null=True)),
+                ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='notifications', to=settings.AUTH_USER_MODEL)),
+            ],
+            options={
+                'verbose_name': 'Notification',
+                'verbose_name_plural': 'Notifications',
+                'ordering': ['-timestamp'],
+            },
+        ),
+        migrations.CreateModel(
+            name='Profile',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('profile_picture_base64', models.TextField(blank=True, null=True)),
+                ('display_name', models.CharField(blank=True, max_length=50, null=True)),
+                ('discord_username', models.CharField(blank=True, max_length=50, null=True)),
+                ('telegram_username', models.CharField(blank=True, max_length=50, null=True)),
+                ('telegram_id', models.BigIntegerField(blank=True, help_text='Telegram user ID for authentication', null=True, unique=True)),
+                ('can_post_blog', models.BooleanField(default=False, help_text='Can post blog posts')),
+                ('is_verified', models.BooleanField(default=False, help_text='Has the user verified their email?')),
+                ('verification_token', models.CharField(blank=True, help_text='Email verification token', max_length=64, null=True)),
+                ('user', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL)),
+            ],
+            options={
+                'permissions': [('can_post_blog', 'Can post blog posts')],
+            },
+        ),
+        migrations.CreateModel(
+            name='AuditLog',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('action', models.CharField(choices=[('user_promoted', 'User Promoted'), ('user_demoted', 'User Demoted'), ('user_banned', 'User Banned'), ('user_unbanned', 'User Unbanned'), ('user_profile_updated', 'User Profile Updated'), ('group_created', 'Group Created'), ('group_updated', 'Group Updated'), ('group_deleted', 'Group Deleted'), ('group_renamed', 'Group Renamed'), ('event_created', 'Event Created'), ('event_updated', 'Event Updated'), ('event_deleted', 'Event Deleted'), ('event_cancelled', 'Event Cancelled'), ('event_activated', 'Event Activated'), ('rsvp_created', 'RSVP Created'), ('rsvp_updated', 'RSVP Updated'), ('rsvp_deleted', 'RSVP Deleted'), ('rsvp_status_changed', 'RSVP Status Changed'), ('notification_sent', 'Notification Sent'), ('bulk_notification_sent', 'Bulk Notification Sent'), ('banner_updated', 'Site Banner Updated'), ('banner_disabled', 'Site Banner Disabled'), ('blog_post_created', 'Blog Post Created'), ('blog_post_deleted', 'Blog Post Deleted'), ('admin_login', 'Admin Login'), ('admin_logout', 'Admin Logout'), ('other', 'Other')], max_length=50)),
+                ('description', models.TextField(help_text='Detailed description of the action')),
+                ('ip_address', models.GenericIPAddressField(blank=True, help_text='IP address of the user who performed the action', null=True)),
+                ('user_agent', models.TextField(blank=True, help_text='User agent string')),
+                ('timestamp', models.DateTimeField(auto_now_add=True, help_text='When the action occurred')),
+                ('additional_data', models.JSONField(blank=True, default=dict, help_text='Additional data related to the action')),
+                ('event', models.ForeignKey(blank=True, help_text='Event involved in the action', null=True, on_delete=django.db.models.deletion.SET_NULL, to='events.event')),
+                ('group', models.ForeignKey(blank=True, help_text='Group involved in the action', null=True, on_delete=django.db.models.deletion.SET_NULL, to='events.group')),
+                ('target_user', models.ForeignKey(blank=True, help_text='User who was affected by the action', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='targeted_audit_logs', to=settings.AUTH_USER_MODEL)),
+                ('user', models.ForeignKey(blank=True, help_text='User who performed the action', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='audit_logs', to=settings.AUTH_USER_MODEL)),
+            ],
+            options={
+                'verbose_name': 'Audit Log Entry',
+                'verbose_name_plural': 'Audit Log Entries',
+                'ordering': ['-timestamp'],
+                'indexes': [
+                    models.Index(fields=['user', 'timestamp'], name='users_audit_user_id_4b4ca5_idx'),
+                    models.Index(fields=['action', 'timestamp'], name='users_audit_action_962101_idx'),
+                    models.Index(fields=['group', 'timestamp'], name='users_audit_group_i_90ab75_idx'),
+                    models.Index(fields=['target_user', 'timestamp'], name='users_audit_target__511392_idx'),
+                ],
+            },
+        ),
+        migrations.CreateModel(
+            name='BannedUser',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('reason', models.TextField(blank=True, null=True)),
+                ('banned_at', models.DateTimeField(auto_now_add=True)),
+                ('banned_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='initiated_group_bans', to=settings.AUTH_USER_MODEL)),
+                ('group', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, to='events.group')),
+                ('organizer', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='initiated_all_bans', to=settings.AUTH_USER_MODEL)),
+                ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='banned_entries', to=settings.AUTH_USER_MODEL)),
+            ],
+            options={
+                'verbose_name': 'Banned User',
+                'verbose_name_plural': 'Banned Users',
+                'unique_together': {('user', 'group')},
+            },
+        ),
+        migrations.CreateModel(
+            name='GroupDelegation',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('delegated_user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='delegated_groups_as_delegate', to=settings.AUTH_USER_MODEL)),
+                ('group', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='events.group')),
+                ('organizer', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='delegated_groups_as_organizer', to=settings.AUTH_USER_MODEL)),
+            ],
+            options={
+                'verbose_name': 'Assistant Assignment',
+                'verbose_name_plural': 'Assistant Assignments',
+                'unique_together': {('organizer', 'delegated_user', 'group')},
+            },
+        ),
+        migrations.CreateModel(
+            name='GroupRole',
+            fields=[
+                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                ('assigned_at', models.DateTimeField(auto_now_add=True)),
+                ('custom_label', models.CharField(blank=True, max_length=64, null=True)),
+                ('can_post', models.BooleanField(default=False)),
+                ('can_manage_leadership', models.BooleanField(default=False)),
+                ('group', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='group_roles', to='events.group')),
+                ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='group_roles', to=settings.AUTH_USER_MODEL)),
+            ],
+            options={
+                'verbose_name': 'Group Role',
+                'verbose_name_plural': 'Group Roles',
+                'ordering': ['assigned_at'],
+                'unique_together': {('group', 'user')},
+            },
+        ),
+    ]
