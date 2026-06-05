@@ -1,5 +1,6 @@
 *.pyc
 .env
+.env.dev
 *.sqlite3
 staticfiles/
 event/migrations/
@@ -46,3 +47,11 @@ wheels/
 .installed.cfg
 *.egg
 MANIFEST
+
+# Docker
+.dockerignore
+docker-compose.override.yml
+
+# Migrations Folder
+users/migrations/*
+events/migrations/*
