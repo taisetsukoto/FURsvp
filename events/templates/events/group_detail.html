@@ -6,367 +6,251 @@
 {% block title %}{{ group.name }} - FURsvp{% endblock %}
 
 {% block content %}
-<nav aria-label="breadcrumb" class="mb-4">
-    <div class="modern-breadcrumbs">
-        <a href="/" class="d-flex align-items-center">
-            <i class="material-icons me-1">home</i> Home
-        </a>
-        <span class="breadcrumb-chevron">›</span>
-        <a href="/group/" class="d-flex align-items-center">Groups</a>
-        <span class="breadcrumb-chevron">›</span>
-        <span class="breadcrumb-current">{{ group.name }}</span>
-    </div>
-</nav>
-<div class="container py-4">
-    <!-- Hero Section -->
-    <div class="row align-items-center mb-4">
-        <div class="col-md-2 text-center mb-3 mb-md-0">
-                            {% if group.logo_base64 %}
-                <img src="data:image/png;base64,{{ group.logo_base64 }}" alt="{{ group.name }} Logo" class="img-fluid rounded-circle shadow" style="width: 140px; height: 140px; object-fit: cover; border: 4px solid #fff;">
-                            {% else %}
-                <div class="bg-secondary rounded-circle d-inline-flex align-items-center justify-content-center shadow" style="width: 140px; height: 140px;">
-                                    <i class="material-icons text-white" style="font-size: 4rem;">group</i>
-                                </div>
-                            {% endif %}
-                        </div>
-        <div class="col-md-10">
-            <div class="d-flex align-items-center flex-wrap group-title-row mb-2">
-                <h1 class="display-4 fw-bold text-primary mb-0 me-3">{{ group.name }}</h1>
-                                {% if can_edit_group %}
-                    <a href="#" class="edit-group-btn ms-2" data-bs-toggle="modal" data-bs-target="#editGroupModal" title="Edit this group's info">
-                                        <i class="material-icons me-1">edit</i> Edit Group
-                                    </a>
-                    <a href="#" class="edit-group-btn ms-2" data-bs-toggle="modal" data-bs-target="#leadershipModal" title="Manage group leadership">
-                                        <i class="material-icons me-1">groups</i> Manage Leadership
-                                    </a>
-                                {% endif %}
-                            </div>
-            <div class="group-action-btn-row mb-2">
-                {% if group.website %}
-                    <a href="{{ group.website }}" target="_blank" class="group-action-btn website"><i class="material-icons">language</i> Website</a>
+<div class="container py-4 group-page">
+    <div class="group-hero-card profile-page-card mb-4">
+        <div class="group-hero-inner">
+            <div class="group-hero-logo">
+                {% if group.logo_base64 %}
+                <img src="data:image/png;base64,{{ group.logo_base64 }}" alt="{{ group.name }} logo">
+                {% else %}
+                <div class="group-hero-logo-placeholder">
+                    <i class="material-icons">groups</i>
+                </div>
                 {% endif %}
-                {% if group.telegram_channel %}
-                    <a href="https://t.me/{{ group.telegram_channel }}" target="_blank" class="group-action-btn telegram"><i class="material-icons">telegram</i> Telegram</a>
+            </div>
+            <div class="group-hero-content">
+                <h1 class="group-hero-title">{{ group.name }}</h1>
+                {% if group.website or group.telegram_channel or group.contact_email %}
+                <div class="group-hero-links">
+                    {% if group.website %}
+                    <a href="{{ group.website }}" target="_blank" rel="noopener" class="group-link-chip">
+                        <i class="material-icons">language</i> Website
+                    </a>
+                    {% endif %}
+                    {% if group.telegram_channel %}
+                    <a href="https://t.me/{{ group.telegram_channel }}" target="_blank" rel="noopener" class="group-link-chip">
+                        <i class="material-icons">telegram</i> Telegram
+                    </a>
+                    {% endif %}
+                    {% if group.contact_email %}
+                    <a href="mailto:{{ group.contact_email }}" class="group-link-chip">
+                        <i class="material-icons">email</i> Contact
+                    </a>
+                    {% endif %}
+                </div>
                 {% endif %}
-                {% if group.contact_email %}
-                    <a href="mailto:{{ group.contact_email }}" class="group-action-btn contact"><i class="material-icons">email</i> Contact</a>
-                                {% endif %}
-                            </div>
-                        </div>
+                {% if can_edit_group %}
+                <div class="group-hero-actions">
+                    <button type="button" class="group-toolbar-btn" data-bs-toggle="modal" data-bs-target="#editGroupModal">
+                        <i class="material-icons">edit</i> Edit Group
+                    </button>
+                    <button type="button" class="group-toolbar-btn group-toolbar-btn--secondary" data-bs-toggle="modal" data-bs-target="#leadershipModal">
+                        <i class="material-icons">admin_panel_settings</i> Manage Leadership
+                    </button>
+                    {% if can_manage_bans %}
+                    <button type="button" class="group-toolbar-btn group-toolbar-btn--secondary" data-bs-toggle="modal" data-bs-target="#groupBansModal">
+                        <i class="material-icons">block</i> View Bans
+                        {% if group_banned_users %}
+                        <span class="group-hero-ban-count">{{ group_banned_users|length }}</span>
+                        {% endif %}
+                    </button>
+                    {% endif %}
+                </div>
+                {% elif can_manage_bans %}
+                <div class="group-hero-actions">
+                    <button type="button" class="group-toolbar-btn group-toolbar-btn--secondary" data-bs-toggle="modal" data-bs-target="#groupBansModal">
+                        <i class="material-icons">block</i> View Bans
+                        {% if group_banned_users %}
+                        <span class="group-hero-ban-count">{{ group_banned_users|length }}</span>
+                        {% endif %}
+                    </button>
+                </div>
+                {% endif %}
+            </div>
+        </div>
     </div>
 
     <!-- Description Section -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="modern-card">
-                <div class="modern-card-header about">
-                    <i class="material-icons me-2">info</i> About This Group
-                </div>
-                <div class="modern-card-body">
-                    {% if group.description %}
-                        <div class="group-description-html" style="font-size:1.1rem;">{{ group.description|safe }}</div>
-                    {% else %}
-                        <div class="text-muted fst-italic">No description provided yet.</div>
-                    {% endif %}
-                    </div>
-                </div>
+    <div class="group-section-card profile-page-card mb-4">
+        <div class="group-section-header">
+            <div class="group-section-icon group-section-icon--about">
+                <i class="material-icons">info</i>
             </div>
+            <h2 class="group-section-title">About This Group</h2>
         </div>
+        <div class="group-section-body">
+            {% if group.description %}
+            <div class="group-description-html">{{ group.description|safe }}</div>
+            {% else %}
+            <div class="group-section-empty">
+                <i class="material-icons">description</i>
+                <p>No description provided yet.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
 
     <!-- Leadership Section -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="modern-card">
-                <div class="modern-card-header leadership">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <div>
-                            <i class="material-icons me-2">people</i> Group Leadership
-                        </div>
-                    </div>
-                </div>
-                <div class="modern-card-body">
-                    {% if leadership_roles %}
-                        <div class="row">
-                            {% for role in leadership_roles %}
-                                <div class="col-md-6 col-lg-4 mb-3">
-                                    <div class="group-leader-card">
-                                        <div>
-                                            {% if role.user.profile.profile_picture_base64 %}
-                                                <img src="{{ role.user.profile.profile_picture_base64 }}" alt="{{ role.user.profile.get_display_name }}" class="group-leader-avatar">
-                                            {% else %}
-                                                <div class="group-leader-initials">
-                                                    {{ role.user.profile.get_initials }}
-                                                </div>
-                                            {% endif %}
-                                        </div>
-                                        <div class="group-leader-name">{{ role.user.profile.get_display_name }}</div>
-                                        {% if role.custom_label %}
-                                            <div class="group-leader-label">{{ role.custom_label }}</div>
-                                        {% endif %}
-                                        <div class="group-leader-btn-row mt-auto">
-                                            {% if role.user.profile.telegram_username %}
-                                            <a href="https://t.me/{{ role.user.profile.telegram_username }}" target="_blank" class="group-leader-btn telegram">
-                                                <i class="material-icons me-1">send</i> Telegram
-                                            </a>
-                                            {% endif %}
-                                            {% if role.user.profile.discord_username %}
-                                            <button type="button" class="group-leader-btn discord" data-bs-toggle="modal" data-bs-target="#discordModal" data-discord="{{ role.user.profile.discord_username }}" data-display-name="{{ role.user.profile.get_display_name }}">
-                                                <i class="material-icons me-1">chat</i> Discord
-                                            </button>
-                                            {% endif %}
-                                        </div>
-                                    </div>
-                                </div>
-                            {% endfor %}
-                        </div>
-                    {% else %}
-                        <div class="text-muted text-center py-4">
-                            <i class="material-icons mb-2" style="font-size: 3rem; opacity: 0.5;">people_outline</i>
-                            <p>No leaders assigned to this group yet.</p>
-                        </div>
-                    {% endif %}
-                </div>
-                </div>
+    <div class="group-section-card profile-page-card mb-4">
+        <div class="group-section-header">
+            <div class="group-section-icon group-section-icon--leadership">
+                <i class="material-icons">people</i>
+            </div>
+            <div class="group-section-heading">
+                <h2 class="group-section-title">Group Leadership</h2>
+                {% if leadership_roles %}
+                <span class="group-section-meta">{{ leadership_roles|length }} leader{{ leadership_roles|length|pluralize }}</span>
+                {% endif %}
             </div>
         </div>
+        <div class="group-section-body">
+            {% if leadership_roles %}
+            <div class="group-leader-grid">
+                {% for role in leadership_roles %}
+                <article class="group-leader-tile">
+                    <div class="group-leader-tile-main">
+                        {% if role.user.profile.profile_picture_base64 %}
+                        <img src="{{ role.user.profile.profile_picture_base64 }}" alt="{{ role.user.profile.get_display_name }}" class="group-leader-tile-avatar">
+                        {% else %}
+                        <div class="group-leader-tile-avatar group-leader-tile-avatar--initials">{{ role.user.profile.get_initials }}</div>
+                        {% endif %}
+                        <div class="group-leader-tile-info">
+                            <div class="group-leader-tile-name">{{ role.user.profile.get_display_name }}</div>
+                            {% if role.custom_label %}
+                            <span class="group-leader-tile-role">{{ role.custom_label }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% if role.user.profile.telegram_username or role.user.profile.discord_username %}
+                    <div class="group-leader-tile-actions">
+                        {% if role.user.profile.telegram_username %}
+                        <a href="https://t.me/{{ role.user.profile.telegram_username }}" target="_blank" rel="noopener" class="group-contact-chip group-contact-chip--telegram">
+                            <i class="material-icons">send</i> Telegram
+                        </a>
+                        {% endif %}
+                        {% if role.user.profile.discord_username %}
+                        <button type="button" class="group-contact-chip group-contact-chip--discord" data-bs-toggle="modal" data-bs-target="#discordModal" data-discord="{{ role.user.profile.discord_username }}" data-display-name="{{ role.user.profile.get_display_name }}">
+                            <i class="material-icons">chat</i> Discord
+                        </button>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </article>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="group-section-empty">
+                <i class="material-icons">people_outline</i>
+                <p>No leaders assigned to this group yet.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
 
     <!-- Upcoming Events Section -->
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="modern-card">
-                <div class="modern-card-header events">
-                        <i class="material-icons me-2">event</i> Upcoming Events
-                </div>
-                <div class="modern-card-body">
-                    {% if upcoming_events %}
-                        <div class="d-flex justify-content-end mb-3">
-                            <button id="groupCardViewBtn" class="pretty-toggle-btn active">Cards</button>
-                            <button id="groupListViewBtn" class="pretty-toggle-btn outline">List</button>
-                        </div>
-                        <div id="groupEventsCardView" class="row">
-                            {% for event in upcoming_events %}
-                                <div class="col-md-6 col-lg-4 mb-4">
-                                    <div class="fancy-post-card shadow-sm rounded-4 p-4 bg-white h-100 d-flex flex-column">
-                                        <a href="{% url 'event_detail' event.id %}" class="fw-bold h5 mb-2 text-primary text-decoration-none">
-                                                    {{ event.title }}
-                                                </a>
-                                        <div class="text-muted small mb-2 d-flex align-items-center">
-                                            <i class="material-icons me-1" style="font-size: 18px; vertical-align: middle; color: #6366f1;">calendar_month</i>
-                                            <span>{{ event.date }}</span>
-                                                    {% if event.start_time %}
-                                                <i class="material-icons ms-3 me-1" style="font-size: 18px; vertical-align: middle; color: #06b6d4;">schedule</i>
-                                                <span>{{ event.start_time|time:"g:i A" }}</span>
-                                            {% endif %}
-                                        </div>
-                                        {% if event.capacity %}
-                                        <div class="text-muted small mb-2 d-flex align-items-center">
-                                            <i class="material-icons me-1" style="font-size: 18px; vertical-align: middle; color: #f59e42;">groups</i>
-                                            <span>{{ event.confirmed_count|default:0 }} / {{ event.capacity }} RSVPs</span>
-                                        </div>
-                                        {% endif %}
-                                        <div class="mt-auto">
-                                            <a href="{% url 'event_detail' event.id %}" class="read-more-link2">View Event</a>
-                                        </div>
-                                    </div>
-                                </div>
-                            {% endfor %}
-                        </div>
-                        <div id="groupEventsListView" style="display:none;">
-                            <ul class="list-group list-group-flush">
-                                {% for event in upcoming_events %}
-                                <li class="list-group-item py-3" style="background: transparent;">
-                                    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center">
-                                        <div>
-                                            <a href="{% url 'event_detail' event.id %}" class="fw-bold h5 mb-1 text-primary text-decoration-none">
-                                                {{ event.title }}
-                                            </a>
-                                            <div class="text-muted small mb-2 d-flex align-items-center">
-                                                <i class="material-icons me-1" style="font-size: 18px; vertical-align: middle; color: #6366f1;">calendar_month</i>
-                                                <span>{{ event.date }}</span>
-                                                {% if event.start_time %}
-                                                    <i class="material-icons ms-3 me-1" style="font-size: 18px; vertical-align: middle; color: #06b6d4;">schedule</i>
-                                                    <span>{{ event.start_time|time:"g:i A" }}</span>
-                                                {% endif %}
-                                            </div>
-                                            {% if event.capacity %}
-                                            <div class="text-muted small mb-2 d-flex align-items-center">
-                                                <i class="material-icons me-1" style="font-size: 18px; vertical-align: middle; color: #f59e42;">groups</i>
-                                                <span>{{ event.confirmed_count|default:0 }} / {{ event.capacity }} RSVPs</span>
-                                            </div>
-                                            {% endif %}
-                                        </div>
-                                        <div class="d-flex flex-column align-items-end ms-md-3 mt-2 mt-md-0">
-                                            <a href="{% url 'event_detail' event.id %}" class="read-more-link2">View Event</a>
-                                        </div>
-                                    </div>
-                                </li>
-                                {% endfor %}
-                            </ul>
-                        </div>
-                    {% else %}
-                        <div class="text-muted">No upcoming events scheduled.</div>
-                    {% endif %}
-                </div>
-                </div>
+    <div class="group-section-card profile-page-card mb-4">
+        <div class="group-section-header">
+            <div class="group-section-icon group-section-icon--events">
+                <i class="material-icons">event</i>
+            </div>
+            <div class="group-section-heading">
+                <h2 class="group-section-title">Upcoming Events</h2>
+                {% if upcoming_events %}
+                <span class="group-section-meta">{{ upcoming_events|length }} scheduled</span>
+                {% endif %}
             </div>
         </div>
+        <div class="group-section-body group-section-body--flush">
+            {% include 'events/group_events_partial.html' with events=upcoming_events prefix='group' empty_message='No upcoming events scheduled.' %}
+        </div>
+    </div>
 
     <!-- Past Events Section -->
-        {% if past_events %}
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="modern-card">
-                <div class="modern-card-header past">
-                        <i class="material-icons me-2">history</i> Recent Past Events
-                </div>
-                <div class="modern-card-body">
-                    <div class="d-flex justify-content-end mb-3">
-                        <button id="pastCardViewBtn" class="pretty-toggle-btn active">Cards</button>
-                        <button id="pastListViewBtn" class="pretty-toggle-btn outline">List</button>
-                    </div>
-                    <div id="pastEventsCardView" class="row">
-                        {% for event in past_events %}
-                            <div class="col-md-6 col-lg-4 mb-3">
-                                <div class="modern-event-card">
-                                    <h5 class="card-title mb-2">
-                                            <a href="{% url 'event_detail' event.id %}" class="text-decoration-none">
-                                                {{ event.title }}
-                                            </a>
-                                        </h5>
-                                    <p class="card-text mb-1">
-                                            <small class="text-muted">
-                                                <i class="material-icons me-1" style="font-size: 16px;">calendar_today</i>
-                                                {{ event.date }}
-                                                {% if event.start_time %}
-                                                    at {{ event.start_time|time:"g:i A" }}
-                                                {% endif %}
-                                            </small>
-                                        </p>
-                                        {% if event.capacity %}
-                                        <p class="card-text mb-0">
-                                                <small class="text-muted">
-                                                    <i class="material-icons me-1" style="font-size: 16px;">people</i>
-                                                    {{ event.confirmed_count|default:0 }} / {{ event.capacity }} RSVPs
-                                                </small>
-                                            </p>
-                                        {% endif %}
-                                </div>
-                            </div>
-                        {% endfor %}
-                    </div>
-                    <div id="pastEventsListView" style="display:none;">
-                        <ul class="list-group list-group-flush">
-                            {% for event in past_events %}
-                            <li class="list-group-item py-3" style="background: transparent;">
-                                <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center">
-                                    <div>
-                                        <a href="{% url 'event_detail' event.id %}" class="fw-bold h5 mb-1 text-primary text-decoration-none">
-                                            {{ event.title }}
-                                        </a>
-                                        <div class="text-muted small mb-2 d-flex align-items-center">
-                                            <i class="material-icons me-1" style="font-size: 18px; vertical-align: middle; color: #6366f1;">calendar_month</i>
-                                            <span>{{ event.date }}</span>
-                                            {% if event.start_time %}
-                                                <i class="material-icons ms-3 me-1" style="font-size: 18px; vertical-align: middle; color: #06b6d4;">schedule</i>
-                                                <span>{{ event.start_time|time:"g:i A" }}</span>
-                                            {% endif %}
-                                        </div>
-                                        {% if event.capacity %}
-                                        <div class="text-muted small mb-2 d-flex align-items-center">
-                                            <i class="material-icons me-1" style="font-size: 18px; vertical-align: middle; color: #f59e42;">groups</i>
-                                            <span>{{ event.confirmed_count|default:0 }} / {{ event.capacity }} RSVPs</span>
-                                        </div>
-                                        {% endif %}
-                                    </div>
-                                    <div class="d-flex flex-column align-items-end ms-md-3 mt-2 mt-md-0">
-                                        <a href="{% url 'event_detail' event.id %}" class="read-more-link2">View Event</a>
-                                    </div>
-                                </div>
-                            </li>
-                            {% endfor %}
-                        </ul>
-                    </div>
-                </div>
+    {% if past_events %}
+    <div class="group-section-card profile-page-card mb-4">
+        <div class="group-section-header">
+            <div class="group-section-icon group-section-icon--past">
+                <i class="material-icons">history</i>
             </div>
+            <div class="group-section-heading">
+                <h2 class="group-section-title">Recent Past Events</h2>
+                <span class="group-section-meta">{{ past_events|length }} recent</span>
+            </div>
+        </div>
+        <div class="group-section-body group-section-body--flush">
+            {% include 'events/group_events_partial.html' with events=past_events prefix='past' empty_message='No past events yet.' %}
         </div>
     </div>
     {% endif %}
 
     <!-- Telegram Feed Section -->
     {% if telegram_feed %}
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="modern-card">
-                <div class="modern-card-header tg">
-                    <i class="material-icons me-2">rss_feed</i> Latest from Telegram
+    <div class="group-section-card profile-page-card mb-4">
+        <div class="group-section-header">
+            <div class="group-section-icon group-section-icon--telegram">
+                <i class="material-icons">rss_feed</i>
+            </div>
+            <div class="group-section-heading">
+                <h2 class="group-section-title">Latest from Telegram</h2>
+                <span class="group-section-meta">{{ telegram_feed|length }} post{{ telegram_feed|length|pluralize }}</span>
+            </div>
+        </div>
+        <div class="group-section-body group-section-body--flush">
+            <div class="group-events-toolbar">
+                <span class="group-events-count">Updates from the group channel</span>
+                <div class="group-events-view-toggle">
+                    <button type="button" id="telegramCardViewBtn" class="pretty-toggle-btn active">Cards</button>
+                    <button type="button" id="telegramListViewBtn" class="pretty-toggle-btn outline">List</button>
                 </div>
-                <div class="modern-card-body">
-                    <div class="d-flex justify-content-end mb-3">
-                        <button id="telegramCardViewBtn" class="pretty-toggle-btn active">Cards</button>
-                        <button id="telegramListViewBtn" class="pretty-toggle-btn outline">List</button>
-                    </div>
-                    <!-- Card View -->
-                    <div id="telegramCardView" class="row">
-                        {% for entry in telegram_feed %}
-                            <div class="col-md-6 col-lg-4 mb-4">
-                                <div class="fancy-post-card shadow-sm rounded-4 p-4 bg-white h-100 d-flex flex-column">
-                                    <a href="#" class="fw-bold h5 mb-2 text-primary text-decoration-none open-modal-link" data-index="{{ forloop.counter0 }}">
-                                        {{ entry.title|default:"Telegram Post" }}
-                                    </a>
-                                    <div class="text-muted small mb-2 telegram-feed-time d-flex align-items-center">
-                                        <i class="material-icons me-1" style="font-size: 18px; vertical-align: middle; color: #6366f1;">calendar_today</i>
-                                        {% if entry.est_datetime %}
-                                            <span class="me-3">{{ entry.est_datetime|date:'F j, Y' }}</span>
-                                            <i class="material-icons me-1" style="font-size: 18px; vertical-align: middle; color: #06b6d4;">schedule</i>
-                                            <span>{{ entry.est_datetime|date:'g:i A' }}</span>
-                                        {% else %}
-                                            Date unavailable
-                                        {% endif %}
-                                    </div>
-                                    <div class="mb-3 flex-grow-1" style="font-size: 1.05rem;">
-                                        {{ entry.summary|striptags|truncatechars:200 }}
-                                    </div>
-                                    <div class="d-flex justify-content-end align-items-end mt-auto">
-                                        <a href="#" class="read-more-link ms-2" data-index="{{ forloop.counter0 }}">Read more…</a>
-                                    </div>
-                                    <div class="d-none telegram-full-content" id="telegram-full-{{ forloop.counter0 }}">{{ entry.summary|safe }}</div>
-                                </div>
+            </div>
+            <div id="telegramCardView" class="row">
+                {% for entry in telegram_feed %}
+                <div class="col-md-6 col-lg-4 mb-4">
+                    <article class="group-post-card">
+                        <button type="button" class="group-post-card-title open-modal-link" data-index="{{ forloop.counter0 }}">
+                            {{ entry.title|default:"Telegram Post" }}
+                        </button>
+                        <div class="group-post-card-meta">
+                            <i class="material-icons">schedule</i>
+                            {% if entry.est_datetime %}
+                            {{ entry.est_datetime|date:'M j, Y · g:i A' }}
+                            {% else %}
+                            Date unavailable
+                            {% endif %}
+                        </div>
+                        <p class="group-post-card-excerpt">{{ entry.summary|striptags|truncatechars:180 }}</p>
+                        <button type="button" class="group-post-card-link read-more-link open-modal-link" data-index="{{ forloop.counter0 }}">
+                            Read more <i class="material-icons">arrow_forward</i>
+                        </button>
+                        <div class="d-none telegram-full-content" id="telegram-full-{{ forloop.counter0 }}">{{ entry.summary|safe }}</div>
+                    </article>
+                </div>
+                {% endfor %}
+            </div>
+            <div id="telegramListView" style="display:none;">
+                <div class="group-post-list">
+                    {% for entry in telegram_feed %}
+                    <article class="group-post-list-item">
+                        <div class="group-post-list-body">
+                            <button type="button" class="group-post-card-title open-modal-link" data-index="{{ forloop.counter0 }}">
+                                {{ entry.title|default:"Telegram Post" }}
+                            </button>
+                            <div class="group-post-card-meta">
+                                <i class="material-icons">schedule</i>
+                                {% if entry.est_datetime %}
+                                {{ entry.est_datetime|date:'M j, Y · g:i A' }}
+                                {% else %}
+                                Date unavailable
+                                {% endif %}
                             </div>
-                        {% endfor %}
-                    </div>
-                    <!-- List View -->
-                    <div id="telegramListView" style="display:none;">
-                        <ul class="list-group list-group-flush">
-                            {% for entry in telegram_feed %}
-                                <li class="list-group-item py-3" style="background: transparent;">
-                                    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center">
-                                        <div>
-                                            <a href="#" class="fw-bold h5 mb-1 text-primary text-decoration-none open-modal-link" data-index="{{ forloop.counter0 }}">
-                                                {{ entry.title|default:"Telegram Post" }}
-                                            </a>
-                                            <div class="text-muted small mb-2 telegram-feed-time d-flex align-items-center">
-                                                <i class="material-icons me-1" style="font-size: 18px; vertical-align: middle; color: #6366f1;">calendar_today</i>
-                                                {% if entry.est_datetime %}
-                                                    <span class="me-3">{{ entry.est_datetime|date:'F j, Y' }}</span>
-                                                    <i class="material-icons me-1" style="font-size: 18px; vertical-align: middle; color: #06b6d4;">schedule</i>
-                                                    <span>{{ entry.est_datetime|date:'g:i A' }}</span>
-                                                {% else %}
-                                                    Date unavailable
-                                                {% endif %}
-                                            </div>
-                                            <div class="mb-2" style="font-size: 1.05rem;">
-                                                {{ entry.summary|striptags|truncatechars:200 }}
-                                            </div>
-                                        </div>
-                                        <div class="d-flex flex-column align-items-end ms-md-3 mt-2 mt-md-0">
-                                            <a href="#" class="read-more-link" data-index="{{ forloop.counter0 }}">Read more…</a>
-                                            <div class="d-none telegram-full-content" id="telegram-full-list-{{ forloop.counter0 }}">{{ entry.summary|safe }}</div>
-                                        </div>
-                                    </div>
-                                </li>
-                            {% endfor %}
-                        </ul>
-                    </div>
+                            <p class="group-post-card-excerpt mb-0">{{ entry.summary|striptags|truncatechars:220 }}</p>
+                        </div>
+                        <button type="button" class="group-post-card-link read-more-link open-modal-link" data-index="{{ forloop.counter0 }}">
+                            Read more
+                        </button>
+                        <div class="d-none telegram-full-content" id="telegram-full-list-{{ forloop.counter0 }}">{{ entry.summary|safe }}</div>
+                    </article>
+                    {% endfor %}
                 </div>
             </div>
         </div>
@@ -386,198 +270,33 @@
             </div>
         </div>
     </div>
-    <style>
-    .fancy-post-card {
-      transition: box-shadow 0.18s, transform 0.12s;
-      border: none;
-    }
-    .fancy-post-card:hover {
-      box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.18);
-      transform: translateY(-2px) scale(1.02);
-    }
-    .read-more-link {
-      color: #3b82f6;
-      font-weight: 600;
-      text-decoration: none;
-      transition: color 0.15s;
-      cursor: pointer;
-      display: inline-block;
-      margin-top: 0.2rem;
-      padding-right: 1.2rem;
-      white-space: nowrap;
-    }
-    .read-more-link:hover {
-      color: #8b5cf6;
-      text-decoration: underline;
-    }
-    .modern-modal-content {
-        border-radius: 1.25rem;
-        box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.18);
-        border: none;
-        overflow: hidden;
-    }
-    .modern-modal-header {
-        background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 100%);
-        color: #fff;
-        border-bottom: none;
-        padding-top: 2rem;
-        padding-bottom: 2rem;
-        align-items: center;
-    }
-    .modern-modal-header .modal-title {
-        font-size: 1.5rem;
-        font-weight: 600;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-    }
-    .modern-modal-header .material-icons {
-        font-size: 2rem;
-        vertical-align: middle;
-    }
-    .modern-modal-header .btn-close {
-        filter: invert(1);
-        opacity: 0.8;
-    }
-    .modern-modal-header .btn-close:hover {
-        opacity: 1;
-    }
-    .modern-modal-body {
-        padding: 2rem 2.5rem 1.5rem 2.5rem;
-        background: #f8fafc;
-        color: #222;
-        font-size: 1.13rem;
-        border-radius: 0 0 1.25rem 1.25rem;
-    }
-    .modern-modal-body img {
-        display: block;
-        margin: 2rem auto 2rem auto;
-        max-width: 90%;
-        height: auto;
-        border-radius: 1rem;
-        box-shadow: 0 2px 12px rgba(59,130,246,0.10);
-    }
-    @media (max-width: 600px) {
-        .modern-modal-body {
-            padding: 1.2rem 0.7rem 1rem 0.7rem;
-        }
-        .modern-modal-body img {
-            margin: 1rem auto;
-            max-width: 100%;
-            border-radius: 0.7rem;
-        }
-    }
-    .group-description-html img {
-      display: block;
-      margin: 2rem auto;
-      max-width: 100%;
-      max-height: 350px;
-      height: auto;
-      border-radius: 1.2rem;
-      box-shadow: 0 2px 12px rgba(59,130,246,0.10);
-    }
-    /* Force TinyMCE toolbar horizontal and at the top */
-    .tox-editor-header, .tox-toolbar, .tox-toolbar-overlord {
-      flex-direction: row !important;
-      flex-wrap: wrap !important;
-      display: flex !important;
-      top: 0 !important;
-      left: 0 !important;
-      right: 0 !important;
-      width: 100% !important;
-      position: relative !important;
-      min-width: 0 !important;
-      max-width: 100% !important;
-      z-index: 1000 !important;
-    }
-    .tox-sidebar-wrap {
-      margin-top: 0 !important;
-    }
-    .pretty-toggle-btn {
-      border: none;
-      border-radius: 1.2rem;
-      padding: 0.7rem 2.2rem;
-      font-size: 1.13rem;
-      font-weight: 600;
-      background: linear-gradient(90deg, #3b82f6 0%, #06b6d4 100%);
-      color: #fff;
-      box-shadow: 0 2px 12px rgba(59,130,246,0.10);
-      transition: background 0.18s, box-shadow 0.18s, transform 0.12s;
-      margin-right: 0.7rem;
-      outline: none;
-      cursor: pointer;
-    }
-    .pretty-toggle-btn.active, .pretty-toggle-btn:focus {
-      background: linear-gradient(90deg, #2563eb 0%, #0ea5e9 100%);
-      color: #fff;
-      box-shadow: 0 4px 18px rgba(59,130,246,0.18);
-      transform: translateY(-2px) scale(1.04);
-    }
-    .pretty-toggle-btn.outline {
-      background: #f8fafc;
-      color: #2563eb;
-      border: 2px solid #3b82f6;
-      box-shadow: none;
-    }
-    .pretty-toggle-btn.outline.active, .pretty-toggle-btn.outline:focus {
-      background: linear-gradient(90deg, #2563eb 0%, #0ea5e9 100%);
-      color: #fff;
-      border: none;
-      box-shadow: 0 4px 18px rgba(59,130,246,0.18);
-    }
-    #editGroupModal .modal-dialog {
-        min-width: 600px;
-        max-width: 900px;
-    }
-    </style>
-    <script>
+    {% endif %}
+<script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Toggle card/list view for upcoming events
-        const evCardBtn = document.getElementById('groupCardViewBtn');
-        const evListBtn = document.getElementById('groupListViewBtn');
-        const evCardView = document.getElementById('groupEventsCardView');
-        const evListView = document.getElementById('groupEventsListView');
-        if (evCardBtn && evListBtn && evCardView && evListView) {
-            evCardBtn.addEventListener('click', function() {
-                evCardBtn.classList.add('active');
-                evCardBtn.classList.remove('outline');
-                evListBtn.classList.remove('active');
-                evListBtn.classList.add('outline');
-                evCardView.style.display = '';
-                evListView.style.display = 'none';
-            });
-            evListBtn.addEventListener('click', function() {
-                evListBtn.classList.add('active');
-                evListBtn.classList.remove('outline');
-                evCardBtn.classList.remove('active');
-                evCardBtn.classList.add('outline');
-                evCardView.style.display = 'none';
-                evListView.style.display = '';
-            });
+        function initGroupEventViewToggle(prefix) {
+            const cardBtn = document.getElementById(prefix + 'CardViewBtn');
+            const listBtn = document.getElementById(prefix + 'ListViewBtn');
+            const cardView = document.getElementById(prefix + 'EventsCardView');
+            const listView = document.getElementById(prefix + 'EventsListView');
+            if (!cardBtn || !listBtn || !cardView || !listView) return;
+
+            function showView(mode) {
+                const isList = mode === 'list';
+                cardBtn.classList.toggle('active', !isList);
+                cardBtn.classList.toggle('outline', isList);
+                cardBtn.setAttribute('aria-pressed', String(!isList));
+                listBtn.classList.toggle('active', isList);
+                listBtn.classList.toggle('outline', !isList);
+                listBtn.setAttribute('aria-pressed', String(isList));
+                cardView.style.display = isList ? 'none' : '';
+                listView.style.display = isList ? 'block' : 'none';
+            }
+
+            cardBtn.addEventListener('click', function() { showView('cards'); });
+            listBtn.addEventListener('click', function() { showView('list'); });
         }
-        // Toggle card/list view for past events
-        const pastCardBtn = document.getElementById('pastCardViewBtn');
-        const pastListBtn = document.getElementById('pastListViewBtn');
-        const pastCardView = document.getElementById('pastEventsCardView');
-        const pastListView = document.getElementById('pastEventsListView');
-        if (pastCardBtn && pastListBtn && pastCardView && pastListView) {
-            pastCardBtn.addEventListener('click', function() {
-                pastCardBtn.classList.add('active');
-                pastCardBtn.classList.remove('outline');
-                pastListBtn.classList.remove('active');
-                pastListBtn.classList.add('outline');
-                pastCardView.style.display = '';
-                pastListView.style.display = 'none';
-            });
-            pastListBtn.addEventListener('click', function() {
-                pastListBtn.classList.add('active');
-                pastListBtn.classList.remove('outline');
-                pastCardBtn.classList.remove('active');
-                pastCardBtn.classList.add('outline');
-                pastCardView.style.display = 'none';
-                pastListView.style.display = '';
-            });
-        }
+        initGroupEventViewToggle('group');
+        initGroupEventViewToggle('past');
         // Telegram feed toggle
         const tgCardBtn = document.getElementById('telegramCardViewBtn');
         const tgListBtn = document.getElementById('telegramListViewBtn');
@@ -647,6 +366,158 @@
                 }
             });
         }
+        // Leadership modal: searchable user picker
+        const leadershipModalEl = document.getElementById('leadershipModal');
+        if (leadershipModalEl && window.TomSelect) {
+            leadershipModalEl.addEventListener('shown.bs.modal', function() {
+                const userSelect = document.querySelector('#add-leader-form select.leadership-user-select');
+                if (userSelect && !userSelect.tomselect) {
+                    new TomSelect(userSelect, {
+                        create: false,
+                        maxItems: 1,
+                        placeholder: 'Search for a user…',
+                        dropdownParent: 'body',
+                        allowEmptyOption: true,
+                    });
+                }
+            });
+        }
+
+        {% if can_manage_bans %}
+        const groupId = {{ group.id }};
+
+        function getCsrfToken() {
+            const match = document.cookie.match(/csrftoken=([^;]+)/);
+            return match ? decodeURIComponent(match[1]) : '';
+        }
+
+        function showGroupBanToast(message, type) {
+            const toast = document.createElement('div');
+            toast.className = 'alert alert-' + (type === 'success' ? 'success' : 'danger') + ' position-fixed top-0 end-0 m-3';
+            toast.style.zIndex = '9999';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(function() { toast.remove(); }, 3200);
+        }
+
+        function setGroupBanUsernameError(message) {
+            const usernameInput = document.getElementById('groupBanUsername');
+            const errorEl = document.getElementById('groupBanUsernameError');
+            if (usernameInput) {
+                usernameInput.classList.add('is-invalid');
+                usernameInput.setAttribute('aria-invalid', 'true');
+            }
+            if (errorEl) {
+                errorEl.textContent = message;
+                errorEl.hidden = false;
+            }
+        }
+
+        function clearGroupBanUsernameError() {
+            const usernameInput = document.getElementById('groupBanUsername');
+            const errorEl = document.getElementById('groupBanUsernameError');
+            if (usernameInput) {
+                usernameInput.classList.remove('is-invalid');
+                usernameInput.removeAttribute('aria-invalid');
+            }
+            if (errorEl) {
+                errorEl.textContent = '';
+                errorEl.hidden = true;
+            }
+        }
+
+        const groupBanUsernameInput = document.getElementById('groupBanUsername');
+        if (groupBanUsernameInput) {
+            groupBanUsernameInput.addEventListener('input', clearGroupBanUsernameError);
+        }
+
+        async function unbanGroupUser(userId, displayName) {
+            if (!confirm('Unban ' + displayName + ' from this group?')) {
+                return;
+            }
+            const formData = new FormData();
+            formData.append('action', 'unban');
+            formData.append('ban_type', 'group');
+            formData.append('group_id', groupId);
+            try {
+                const response = await fetch('/users/' + userId + '/ban/', {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': getCsrfToken() },
+                    body: formData
+                });
+                const data = await response.json();
+                if (data.status === 'success') {
+                    showGroupBanToast(data.message, 'success');
+                    window.location.reload();
+                } else {
+                    showGroupBanToast(data.message || 'Could not unban user.', 'error');
+                }
+            } catch (error) {
+                showGroupBanToast('Could not unban user.', 'error');
+            }
+        }
+
+        document.querySelectorAll('.unban-group-user-btn').forEach(function(button) {
+            button.addEventListener('click', function() {
+                unbanGroupUser(
+                    this.dataset.userId,
+                    this.dataset.displayName || 'this user'
+                );
+            });
+        });
+
+        const submitGroupBanBtn = document.getElementById('submitGroupBanBtn');
+        if (submitGroupBanBtn) {
+            submitGroupBanBtn.addEventListener('click', async function() {
+                const usernameInput = document.getElementById('groupBanUsername');
+                let username = usernameInput ? usernameInput.value.trim() : '';
+                if (username.startsWith('@')) {
+                    username = username.slice(1);
+                }
+                const reasonInput = document.getElementById('groupBanReason');
+                const reason = reasonInput ? reasonInput.value.trim() : '';
+                clearGroupBanUsernameError();
+                if (!username) {
+                    setGroupBanUsernameError('Enter the user\'s full username.');
+                    showGroupBanToast('Enter the user\'s full username.', 'error');
+                    return;
+                }
+                if (!confirm('Ban @' + username + ' from this group? They will not be able to RSVP to group events.')) {
+                    return;
+                }
+                const formData = new FormData();
+                formData.append('username', username);
+                formData.append('group_id', groupId);
+                formData.append('reason', reason);
+                try {
+                    const response = await fetch('{% url "ban_group_user" %}', {
+                        method: 'POST',
+                        headers: { 'X-CSRFToken': getCsrfToken() },
+                        body: formData
+                    });
+                    let data = {};
+                    try {
+                        data = await response.json();
+                    } catch (parseError) {
+                        data = { message: 'Could not ban user. Please try again.' };
+                    }
+                    if (response.ok && data.status === 'success') {
+                        showGroupBanToast(data.message, 'success');
+                        window.location.reload();
+                    } else {
+                        const message = data.message || 'Could not ban user.';
+                        setGroupBanUsernameError(message);
+                        showGroupBanToast(message, 'error');
+                    }
+                } catch (error) {
+                    const message = 'Could not ban user. Please try again.';
+                    setGroupBanUsernameError(message);
+                    showGroupBanToast(message, 'error');
+                }
+            });
+        }
+        {% endif %}
+
         // Handle leadership form submissions
         const addLeaderForm = document.getElementById('add-leader-form');
         if (addLeaderForm) {
@@ -724,6 +595,8 @@
                     const base64data = canvas.toDataURL('image/png');
                     logoPreview.src = base64data;
                     logoPreview.style.display = 'inline-block';
+                    const logoPlaceholder = document.getElementById('logoPreviewPlaceholder');
+                    if (logoPlaceholder) logoPlaceholder.style.display = 'none';
                     cropperContainer.style.display = 'none';
                     // Set base64 (without prefix) to hidden input
                     let hiddenInput = document.querySelector('input[name="logo_base64"]');
@@ -775,135 +648,114 @@
                 }
             };
         }
-        // Fix: Re-init TinyMCE when Edit Group modal is shown
-        document.addEventListener('DOMContentLoaded', function() {
-            var editGroupModal = document.getElementById('editGroupModal');
-            if (editGroupModal) {
-                editGroupModal.addEventListener('shown.bs.modal', function () {
-                    var editor = tinymce.get('id_description');
-                    if (editor) {
-                        editor.destroy();
-                    }
-                    setTimeout(initTinyMCE, 100);
-                });
-            }
-        });
+        // Fix: Re-init TinyMCE when Edit Group modal is shown (handled in extra_js block)
     });
     </script>
-    {% endif %}
-<script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Toggle card/list view for upcoming events
-    const evCardBtn = document.getElementById('groupCardViewBtn');
-    const evListBtn = document.getElementById('groupListViewBtn');
-    const evCardView = document.getElementById('groupEventsCardView');
-    const evListView = document.getElementById('groupEventsListView');
-    if (evCardBtn && evListBtn && evCardView && evListView) {
-        evCardBtn.addEventListener('click', function() {
-            evCardBtn.classList.add('active');
-            evCardBtn.classList.remove('outline');
-            evListBtn.classList.remove('active');
-            evListBtn.classList.add('outline');
-            evCardView.style.display = '';
-            evListView.style.display = 'none';
-        });
-        evListBtn.addEventListener('click', function() {
-            evListBtn.classList.add('active');
-            evListBtn.classList.remove('outline');
-            evCardBtn.classList.remove('active');
-            evCardBtn.classList.add('outline');
-            evCardView.style.display = 'none';
-            evListView.style.display = '';
-        });
-    }
-    // Toggle card/list view for past events
-    const pastCardBtn = document.getElementById('pastCardViewBtn');
-    const pastListBtn = document.getElementById('pastListViewBtn');
-    const pastCardView = document.getElementById('pastEventsCardView');
-    const pastListView = document.getElementById('pastEventsListView');
-    if (pastCardBtn && pastListBtn && pastCardView && pastListView) {
-        pastCardBtn.addEventListener('click', function() {
-            pastCardBtn.classList.add('active');
-            pastCardBtn.classList.remove('outline');
-            pastListBtn.classList.remove('active');
-            pastListBtn.classList.add('outline');
-            pastCardView.style.display = '';
-            pastListView.style.display = 'none';
-        });
-        pastListBtn.addEventListener('click', function() {
-            pastListBtn.classList.add('active');
-            pastListBtn.classList.remove('outline');
-            pastCardBtn.classList.remove('active');
-            pastCardBtn.classList.add('outline');
-            pastCardView.style.display = 'none';
-            pastListView.style.display = '';
-        });
-    }
-});
-</script>
 </div>
 
 <!-- Edit Group Modal -->
 {% if can_edit_group %}
 <div class="modal fade" id="editGroupModal" tabindex="-1" aria-labelledby="editGroupModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="editGroupModalLabel">
-                    <i class="material-icons me-2">edit</i> Edit Group
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <form method="post" enctype="multipart/form-data" id="editGroupForm">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content modern-modal-content group-editor-modal">
+            <form method="post" enctype="multipart/form-data" id="editGroupForm" class="group-editor-form">
+                <div class="group-editor-modal-header">
+                    <div class="group-editor-modal-header-icon">
+                        <i class="material-icons">edit</i>
+                    </div>
+                    <div class="group-editor-modal-header-text">
+                        <h5 class="group-editor-modal-title" id="editGroupModalLabel">Edit Group</h5>
+                        <p class="group-editor-modal-subtitle">Update name, logo, links, and Telegram settings</p>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
                 {% csrf_token %}
-                <div class="modal-body">
-                    <div class="mb-3">
-                        <label for="id_name" class="form-label">Group Name</label>
-                        <input type="text" class="form-control" id="id_name" name="name" value="{{ group.name|default_if_none:'' }}" required>
-                    </div>
-                    <div class="mb-3">
-                        <label for="id_logo" class="form-label">Group Logo</label>
-                        <div class="custom-file-upload">
-                            <input type="file" id="id_logo" name="logo" accept="image/*" style="display:none;">
-                            <button type="button" class="btn btn-outline-primary" id="customLogoBtn">
-                                <i class="material-icons" style="vertical-align:middle;">upload</i> Choose Logo
-                            </button>
-                            <span id="logoFileName" class="ms-2 text-muted">No file selected.</span>
+                <div class="modal-body group-editor-modal-body">
+                    <div class="group-editor-panel">
+                        <h6 class="group-editor-section-label">Basic info</h6>
+                        <div class="auth-field">
+                            <label for="id_name" class="auth-form-label">Group name</label>
+                            <div class="input-group auth-input-group">
+                                <span class="input-group-text"><i class="material-icons">groups</i></span>
+                                <input type="text" class="form-control" id="id_name" name="name" value="{{ group.name|default_if_none:'' }}" required>
+                            </div>
                         </div>
-                        <div class="form-text">Upload a new logo to replace the current one.</div>
-                        <div class="mt-3 text-center">
-                            <img id="logoPreview" src="{% if group.logo_base64 %}data:image/png;base64,{{ group.logo_base64 }}{% endif %}" alt="Logo Preview" style="width: 150px; height: 150px; border-radius: 50%; object-fit: cover; {% if group.logo_base64 %}display: inline-block;{% else %}display: none;{% endif %}">
-                        </div>
-                        <div id="cropperContainer" style="display:none; margin-top: 1em; text-align:center;">
-                            <img id="cropperImage" style="max-width:100%; max-height:300px;">
-                            <button type="button" class="btn btn-sm btn-primary mt-2" id="cropLogoBtn">Crop & Save</button>
+                        <div class="auth-field mb-0">
+                            <label for="id_description" class="auth-form-label">Description</label>
+                            <textarea class="form-control tinymce group-editor-description" id="id_description" name="description" rows="5">{{ group.description|default_if_none:'' }}</textarea>
                         </div>
                     </div>
-                    <div class="mb-3">
-                        <label for="id_description" class="form-label">Description</label>
-                        <textarea class="form-control tinymce" id="id_description" name="description" rows="4">{{ group.description|default_if_none:'' }}</textarea>
+
+                    <div class="group-editor-panel">
+                        <h6 class="group-editor-section-label">Logo</h6>
+                        <div class="group-logo-editor">
+                            <div class="group-logo-preview-wrap">
+                                <img id="logoPreview" src="{% if group.logo_base64 %}data:image/png;base64,{{ group.logo_base64 }}{% endif %}" alt="Logo preview" class="group-logo-preview" {% if not group.logo_base64 %}style="display:none;"{% endif %}>
+                                <div id="logoPreviewPlaceholder" class="group-logo-preview-placeholder" {% if group.logo_base64 %}style="display:none;"{% endif %}>
+                                    <i class="material-icons">image</i>
+                                </div>
+                            </div>
+                            <div class="group-logo-upload">
+                                <input type="file" id="id_logo" name="logo" accept="image/*" hidden>
+                                <button type="button" class="group-toolbar-btn group-toolbar-btn--secondary" id="customLogoBtn">
+                                    <i class="material-icons">upload</i> Choose logo
+                                </button>
+                                <span id="logoFileName" class="group-logo-filename">No file selected</span>
+                                <div class="auth-field-help">Square images work best. You can crop after selecting.</div>
+                                <div id="cropperContainer" class="group-logo-cropper" style="display:none;">
+                                    <img id="cropperImage" alt="Crop preview">
+                                    <button type="button" class="group-toolbar-btn mt-2" id="cropLogoBtn">
+                                        <i class="material-icons">crop</i> Crop &amp; apply
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label for="id_website" class="form-label">Website URL <span class="text-muted small">(optional)</span></label>
-                        <input type="url" class="form-control" id="id_website" name="website" value="{{ group.website|default_if_none:'' }}">
+
+                    <div class="group-editor-panel">
+                        <h6 class="group-editor-section-label">Links &amp; contact</h6>
+                        <div class="group-editor-grid">
+                            <div class="auth-field mb-0">
+                                <label for="id_website" class="auth-form-label">Website <span class="text-muted">(optional)</span></label>
+                                <div class="input-group auth-input-group">
+                                    <span class="input-group-text"><i class="material-icons">language</i></span>
+                                    <input type="url" class="form-control" id="id_website" name="website" value="{{ group.website|default_if_none:'' }}" placeholder="https://">
+                                </div>
+                            </div>
+                            <div class="auth-field mb-0">
+                                <label for="id_contact_email" class="auth-form-label">Contact email <span class="text-muted">(optional)</span></label>
+                                <div class="input-group auth-input-group">
+                                    <span class="input-group-text"><i class="material-icons">email</i></span>
+                                    <input type="email" class="form-control" id="id_contact_email" name="contact_email" value="{{ group.contact_email|default_if_none:'' }}">
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label for="id_contact_email" class="form-label">Contact Email <span class="text-muted small">(optional)</span></label>
-                        <input type="email" class="form-control" id="id_contact_email" name="contact_email" value="{{ group.contact_email|default_if_none:'' }}">
-                    </div>
-                    <div class="mb-3">
-                        <label for="id_telegram_channel" class="form-label">Telegram Announcements Channel (w/o @) <span class="text-muted small">(optional)</span></label>
-                        <input type="text" class="form-control" id="id_telegram_channel" name="telegram_channel" value="{{ group.telegram_channel|default_if_none:'' }}">
-                    </div>
-                    <div class="mb-3">
-                        <label for="id_telegram_webhook_channel" class="form-label">Telegram Webhook Channel (w/o # or @)<span class="text-muted small">(optional)</span></label>
-                        <input type="text" class="form-control" id="id_telegram_webhook_channel" name="telegram_webhook_channel" value="{{ group.telegram_webhook_channel|default_if_none:'' }}">
+
+                    <div class="group-editor-panel">
+                        <h6 class="group-editor-section-label">Telegram</h6>
+                        <div class="group-editor-grid">
+                            <div class="auth-field mb-0">
+                                <label for="id_telegram_channel" class="auth-form-label">Announcements channel <span class="text-muted">(without @)</span></label>
+                                <div class="input-group auth-input-group">
+                                    <span class="input-group-text"><i class="material-icons">campaign</i></span>
+                                    <input type="text" class="form-control" id="id_telegram_channel" name="telegram_channel" value="{{ group.telegram_channel|default_if_none:'' }}">
+                                </div>
+                            </div>
+                            <div class="auth-field mb-0">
+                                <label for="id_telegram_webhook_channel" class="auth-form-label">Webhook channel <span class="text-muted">(without # or @)</span></label>
+                                <div class="input-group auth-input-group">
+                                    <span class="input-group-text"><i class="material-icons">link</i></span>
+                                    <input type="text" class="form-control" id="id_telegram_webhook_channel" name="telegram_webhook_channel" value="{{ group.telegram_webhook_channel|default_if_none:'' }}">
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-cancel" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" name="edit_group" class="btn btn-primary">
-                        <i class="material-icons me-1">save</i> Save Changes
+                <div class="modal-footer group-modal-footer">
+                    <button type="button" class="group-toolbar-btn group-toolbar-btn--secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" name="edit_group" class="group-toolbar-btn">
+                        <i class="material-icons">save</i> Save changes
                     </button>
                 </div>
             </form>
@@ -913,88 +765,208 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <!-- Leadership Management Modal -->
 <div class="modal fade" id="leadershipModal" tabindex="-1" aria-labelledby="leadershipModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="leadershipModalLabel">
-                    <i class="material-icons me-2">groups</i> Manage Group Leadership
-                </h5>
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content modern-modal-content leadership-modal">
+            <div class="leadership-modal-header">
+                <div class="leadership-modal-header-icon">
+                    <i class="material-icons">admin_panel_settings</i>
+                </div>
+                <div class="leadership-modal-header-text">
+                    <h5 class="leadership-modal-title" id="leadershipModalLabel">Manage Leadership</h5>
+                    <p class="leadership-modal-subtitle">Add leaders and set their roles and permissions</p>
+                </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body">
-                <form method="post" action="" id="add-leader-form">
-                    {% csrf_token %}
-                    <div class="mb-3">
-                        <h6>Add New Leader</h6>
-                        {{ leadership_form.as_p }}
-                        <button type="submit" name="add_leader" class="btn btn-primary mb-3">Add Leader</button>
+            <div class="modal-body leadership-modal-body">
+                <div class="leadership-add-panel">
+                    <h6 class="leadership-section-label">Add leader</h6>
+                    <form method="post" action="" id="add-leader-form" class="group-leader-add-form">
+                        {% csrf_token %}
+                        <div class="leadership-add-grid">
+                            <div class="auth-field mb-0">
+                                <label for="{{ leadership_form.user.id_for_label }}" class="auth-form-label">User</label>
+                                <div class="input-group auth-input-group">
+                                    <span class="input-group-text"><i class="material-icons">person_search</i></span>
+                                    {{ leadership_form.user }}
+                                </div>
+                            </div>
+                            <div class="auth-field mb-0">
+                                <label for="{{ leadership_form.custom_label.id_for_label }}" class="auth-form-label">Role label</label>
+                                <div class="input-group auth-input-group">
+                                    <span class="input-group-text"><i class="material-icons">badge</i></span>
+                                    {{ leadership_form.custom_label }}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="leadership-perms">
+                            <label class="leadership-perm">
+                                {{ leadership_form.can_post }}
+                                <span>Can post events</span>
+                            </label>
+                            <label class="leadership-perm">
+                                {{ leadership_form.can_manage_leadership }}
+                                <span>Can manage leadership</span>
+                            </label>
+                        </div>
+                        <button type="submit" name="add_leader" class="group-toolbar-btn leadership-add-btn">
+                            <i class="material-icons">person_add</i> Add leader
+                        </button>
+                    </form>
+                </div>
+
+                <div class="leadership-list-section">
+                    <div class="leadership-list-header">
+                        <h6 class="leadership-section-label mb-0">Current leaders</h6>
+                        {% if leadership_roles %}
+                        <span class="leadership-list-count">{{ leadership_roles|length }}</span>
+                        {% endif %}
                     </div>
-                </form>
-                
-                <hr class="my-4">
-                
-                <div class="mb-3">
-                    <h6>Current Leaders</h6>
-                    <table class="table table-bordered align-middle">
-                        <thead>
-                            <tr>
-                                <th>User</th>
-                                <th>Role</th>
-                                <th>Can Post</th>
-                                <th>Can Manage Leadership</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% if leadership_roles %}
-                                {% for role in leadership_roles %}
-                                <tr data-role-id="{{ role.id }}">
-                                    <td class="d-flex align-items-center gap-2">
+                    {% if leadership_roles %}
+                    <div class="leadership-list">
+                        {% for role in leadership_roles %}
+                        <article class="leadership-row" data-role-id="{{ role.id }}">
+                            <form method="post" class="group-leader-admin-form edit-leader-form">
+                                {% csrf_token %}
+                                <input type="hidden" name="role_id" value="{{ role.id }}">
+                                <div class="leadership-row-top">
+                                    <div class="leadership-row-user">
                                         {% if role.user.profile.profile_picture_base64 %}
-                                            <img src="{{ role.user.profile.profile_picture_base64 }}" alt="{{ role.user.profile.get_display_name }}" class="rounded-circle" style="width: 40px; height: 40px; object-fit: cover;">
+                                        <img src="{{ role.user.profile.profile_picture_base64 }}" alt="{{ role.user.profile.get_display_name }}" class="leadership-row-avatar">
                                         {% else %}
-                                            <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 40px; height: 40px; background: #6366f1; color: #fff; font-weight: bold; font-size: 1.1rem;">
-                                                {{ role.user.profile.get_initials }}
-                                            </div>
+                                        <div class="leadership-row-avatar leadership-row-avatar--initials">{{ role.user.profile.get_initials }}</div>
                                         {% endif %}
-                                        <span>{{ role.user.profile.get_display_name }}</span>
-                                    </td>
-                                    <form method="post" class="edit-leader-form" action="">
-                                        {% csrf_token %}
-                                        <input type="hidden" name="role_id" value="{{ role.id }}">
-                                        <td>
-                                            <input type="text" name="custom_label" value="{{ role.custom_label }}" class="form-control form-control-sm" style="min-width: 100px; max-width: 160px; display: inline-block;">
-                                        </td>
-                                        <td class="text-center">
-                                            <input type="checkbox" name="can_post" value="true" {% if role.can_post %}checked{% endif %} class="form-check-input">
-                                        </td>
-                                        <td class="text-center">
-                                            <input type="checkbox" name="can_manage_leadership" value="true" {% if role.can_manage_leadership %}checked{% endif %} class="form-check-input" title="Can manage other leaders">
-                                        </td>
-                                        <td>
-                                            <button type="submit" name="edit_leader" class="btn btn-sm btn-success me-1">
-                                                <i class="material-icons" style="font-size:1.1em; vertical-align:middle;">save</i> Save
-                                            </button>
-                                    </form>
-                                    <form method="post" class="remove-leader-form d-inline" action="">
-                                        {% csrf_token %}
-                                        <input type="hidden" name="role_id" value="{{ role.id }}">
-                                        <button type="submit" name="remove_leader" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to remove this leader?');">
-                                            <i class="material-icons" style="font-size:1.1em; vertical-align:middle;">delete</i> Remove
+                                        <div>
+                                            <div class="leadership-row-name">{{ role.user.profile.get_display_name }}</div>
+                                            <div class="leadership-row-username">@{{ role.user.username }}</div>
+                                        </div>
+                                    </div>
+                                    <div class="leadership-row-actions">
+                                        <button type="submit" name="edit_leader" class="group-toolbar-btn group-toolbar-btn--compact" title="Save changes">
+                                            <i class="material-icons">save</i>
+                                            <span class="d-none d-sm-inline">Save</span>
                                         </button>
-                                    </form>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            {% else %}
-                                <tr><td colspan="5" class="text-center text-muted">No leaders assigned.</td></tr>
-                            {% endif %}
-                        </tbody>
-                    </table>
+                                        <button type="submit" name="remove_leader" class="group-toolbar-btn group-toolbar-btn--danger group-toolbar-btn--compact" title="Remove leader" onclick="return confirm('Remove this leader?');">
+                                            <i class="material-icons">person_remove</i>
+                                            <span class="d-none d-sm-inline">Remove</span>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="leadership-row-fields">
+                                    <div class="auth-field mb-0 leadership-role-field">
+                                        <label class="auth-form-label">Role</label>
+                                        <input type="text" name="custom_label" value="{{ role.custom_label }}" class="form-control" placeholder="e.g. Organizer">
+                                    </div>
+                                    <div class="leadership-perms leadership-perms--inline">
+                                        <label class="leadership-perm">
+                                            <input type="checkbox" name="can_post" value="true" {% if role.can_post %}checked{% endif %}>
+                                            <span>Can post events</span>
+                                        </label>
+                                        <label class="leadership-perm">
+                                            <input type="checkbox" name="can_manage_leadership" value="true" {% if role.can_manage_leadership %}checked{% endif %}>
+                                            <span>Can manage leadership</span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </form>
+                        </article>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="group-events-empty">
+                        <i class="material-icons">people_outline</i>
+                        <p>No leaders assigned yet.</p>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            <div class="modal-footer group-modal-footer">
+                <button type="button" class="group-toolbar-btn group-toolbar-btn--secondary" data-bs-dismiss="modal">Done</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% if can_manage_bans %}
+<div class="modal fade" id="groupBansModal" tabindex="-1" aria-labelledby="groupBansModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content modern-modal-content group-bans-modal">
+            <div class="group-bans-modal-header">
+                <div class="group-bans-modal-header-icon">
+                    <i class="material-icons">block</i>
+                </div>
+                <div class="group-bans-modal-header-text">
+                    <h5 class="group-bans-modal-title" id="groupBansModalLabel">Group Bans</h5>
+                    <p class="group-bans-modal-subtitle">View banned users or add a ban by exact username</p>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body group-bans-modal-body">
+                {% if group_banned_users %}
+                <div class="group-editor-panel">
+                    <h6 class="group-editor-section-label">Banned users ({{ group_banned_users|length }})</h6>
+                    <div class="group-ban-list group-ban-list--modal">
+                        {% for banned_entry in group_banned_users %}
+                        <article class="group-ban-row group-ban-row--compact" data-user-id="{{ banned_entry.user.id }}">
+                            <div class="group-ban-row-main">
+                                {% if banned_entry.user.profile.profile_picture_base64 %}
+                                <img src="{{ banned_entry.user.profile.profile_picture_base64 }}" alt="{{ banned_entry.user.profile.get_display_name }}" class="group-ban-row-avatar group-ban-row-avatar--sm">
+                                {% else %}
+                                <div class="group-ban-row-avatar group-ban-row-avatar--sm group-ban-row-avatar--initials">{{ banned_entry.user.profile.get_initials }}</div>
+                                {% endif %}
+                                <div class="group-ban-row-info">
+                                    <div class="group-ban-row-name">@{{ banned_entry.user.username }}</div>
+                                    <div class="group-ban-row-meta">
+                                        <span class="group-ban-meta-chip">{{ banned_entry.banned_at|date:"M j, Y" }}</span>
+                                        {% if banned_entry.reason %}
+                                        <span class="group-ban-meta-chip">{{ banned_entry.reason|truncatechars:60 }}</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                            <button type="button"
+                                    class="group-toolbar-btn group-toolbar-btn--danger group-toolbar-btn--compact unban-group-user-btn"
+                                    data-user-id="{{ banned_entry.user.id }}"
+                                    data-group-id="{{ group.id }}"
+                                    data-display-name="@{{ banned_entry.user.username }}">
+                                <i class="material-icons">lock_open</i> Unban
+                            </button>
+                        </article>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% else %}
+                <div class="group-editor-panel mb-0">
+                    <h6 class="group-editor-section-label">Banned users</h6>
+                    <div class="group-section-empty group-section-empty--compact">
+                        <i class="material-icons">verified_user</i>
+                        <p>No users are banned from this group.</p>
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="group-editor-panel mb-0">
+                    <h6 class="group-editor-section-label">Add ban</h6>
+                    <div class="auth-field">
+                        <label for="groupBanUsername" class="auth-form-label">Username</label>
+                        <div class="input-group auth-input-group">
+                            <span class="input-group-text"><i class="material-icons">alternate_email</i></span>
+                            <input type="text" class="form-control" id="groupBanUsername" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Enter exact username" aria-describedby="groupBanUsernameError">
+                        </div>
+                        <div id="groupBanUsernameError" class="group-ban-field-error" hidden></div>
+                        <p class="group-ban-username-hint">You must know the user&apos;s full username. Display names cannot be used to look up accounts.</p>
+                    </div>
+                    <div class="auth-field mb-0">
+                        <label for="groupBanReason" class="auth-form-label">Reason <span class="text-muted">(optional)</span></label>
+                        <textarea id="groupBanReason" class="form-control group-ban-reason-input" rows="3" placeholder="Why is this user being banned?"></textarea>
+                    </div>
+                    <button type="button" class="group-toolbar-btn group-toolbar-btn--danger group-ban-submit-btn" id="submitGroupBanBtn">
+                        <i class="material-icons">gavel</i> Ban user
+                    </button>
+                </div>
+            </div>
+            <div class="modal-footer group-modal-footer">
+                <button type="button" class="group-toolbar-btn group-toolbar-btn--secondary" data-bs-dismiss="modal">Done</button>
             </div>
         </div>
     </div>
@@ -1059,625 +1031,20 @@ document.addEventListener('DOMContentLoaded', function() {
   }
 });
 </script>
-<style>
-    
-.discord-badge {
-  display: inline-flex;
-  align-items: center;
-  background: linear-gradient(90deg, #5865F2 0%, #404eed 100%);
-  color: #fff;
-  font-size: 1.25rem;
-  padding: 0.8em 1.2em;
-  border-radius: 1.2em;
-  letter-spacing: 0.03em;
-  font-weight: 600;
-  gap: 0.5em;
-}
-
-.copy-btn {
-  background: none;
-  border: none;
-  color: #fff;
-  margin-left: 0.3em;
-  cursor: pointer;
-  padding: 0;
-  display: flex;
-  align-items: center;
-}
-
-#editGroupModal .modal-content {
-    border-radius: 1.25rem;
-    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.25);
-    border: none;
-    overflow: hidden;
-}
-
-#editGroupModal .modal-header {
-    background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 100%);
-    color: #fff;
-    border-bottom: none;
-    padding-top: 2rem;
-    padding-bottom: 2rem;
-    align-items: center;
-}
-
-#editGroupModal .modal-title {
-    font-size: 1.7rem;
-    font-weight: 600;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-
-#editGroupModal .modal-header .material-icons {
-    font-size: 2.2rem;
-    vertical-align: middle;
-}
-
-#editGroupModal .modal-header .btn-close {
-    filter: invert(1);
-    opacity: 0.8;
-}
-#editGroupModal .modal-header .btn-close:hover {
-    opacity: 1;
-}
-#editGroupModal .modal-divider {
-    height: 3px;
-    background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 100%);
-    border: none;
-    margin: 0;
-}
-#editGroupModal .modal-body {
-    padding: 2rem 2.5rem 1.5rem 2.5rem;
-    background: #f8fafc;
-}
-#editGroupModal .modal-footer {
-    background: #f3f4f6;
-    border-top: none;
-    padding: 1.5rem 2.5rem;
-}
-#editGroupModal .btn-primary {
-    background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 100%);
-    border: none;
-    font-weight: 600;
-    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.10);
-    transition: background 0.2s, box-shadow 0.2s;
-}
-#editGroupModal .btn-primary:hover, #editGroupModal .btn-primary:focus {
-    background: linear-gradient(90deg, #2563eb 0%, #7c3aed 100%);
-    box-shadow: 0 4px 16px rgba(59, 130, 246, 0.18);
-}
-#editGroupModal .btn-cancel {
-    background: #fff;
-    color: #6366f1;
-    border: 2px solid #a5b4fc;
-    border-radius: 0.8rem;
-    font-weight: 600;
-    box-shadow: 0 2px 8px rgba(139, 92, 246, 0.08);
-    transition: background 0.18s, color 0.18s, border 0.18s;
-}
-#editGroupModal .btn-cancel:hover, #editGroupModal .btn-cancel:focus {
-    background: linear-gradient(90deg, #e0e7ff 0%, #f3e8ff 100%);
-    color: #4f46e5;
-    border-color: #6366f1;
-}
-#editGroupModal label.form-label {
-    font-weight: 500;
-    color: #4f46e5;
-}
-#editGroupModal input.form-control, #editGroupModal textarea.form-control {
-    border-radius: 0.75rem;
-    border: 1.5px solid #d1d5db;
-    background: #fff;
-    font-size: 1rem;
-    padding: 0.75rem 1rem;
-    margin-bottom: 0.5rem;
-}
-#editGroupModal input.form-control:focus, #editGroupModal textarea.form-control:focus {
-    border-color: #8b5cf6;
-    box-shadow: 0 0 0 2px #c7d2fe;
-}
-#editGroupModal .form-text {
-    color: #6b7280;
-    font-size: 0.95rem;
-}
-#editGroupModal .mt-3.text-center img#logoPreview {
-    box-shadow: 0 2px 8px rgba(139, 92, 246, 0.12);
-    border: 3px solid #fff;
-}
-.custom-file-upload .btn {
-    font-weight: 500;
-    border-radius: 0.75rem;
-    padding: 0.5rem 1.25rem;
-}
-.group-action-btn-row {
-    display: flex;
-    flex-wrap: nowrap;
-    gap: 1.2rem;
-    margin-bottom: 1.5rem;
-}
-.group-action-btn {
-    margin-right: 0;
-    margin-bottom: 0;
-}
-@media (max-width: 600px) {
-    .group-action-btn-row {
-        flex-direction: column;
-        gap: 0.8rem;
-        align-items: stretch;
-    }
-}
-.group-action-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-weight: 600;
-    font-size: 1.08rem;
-    border: none;
-    border-radius: 0.9rem;
-    padding: 0.7rem 1.5rem;
-    color: #fff !important;
-    box-shadow: 0 2px 12px rgba(59,130,246,0.10);
-    transition: background 0.18s, box-shadow 0.18s, transform 0.12s;
-    margin-right: 0.5rem;
-    margin-bottom: 0.5rem;
-    text-decoration: none !important;
-}
-.group-action-btn i.material-icons {
-    font-size: 1.3em;
-    vertical-align: middle;
-    margin-right: 0.3em;
-}
-.group-action-btn.website {
-    background: linear-gradient(90deg, #3b82f6 0%, #06b6d4 100%);
-}
-.group-action-btn.website:hover {
-    background: linear-gradient(90deg, #2563eb 0%, #0ea5e9 100%);
-    transform: translateY(-2px) scale(1.04);
-    box-shadow: 0 4px 18px rgba(59,130,246,0.18);
-}
-.group-action-btn.telegram {
-    background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 100%);
-}
-.group-action-btn.telegram:hover {
-    background: linear-gradient(90deg, #7c3aed 0%, #a78bfa 100%);
-    transform: translateY(-2px) scale(1.04);
-    box-shadow: 0 4px 18px rgba(139,92,246,0.18);
-}
-.group-action-btn.contact {
-    background: linear-gradient(90deg, #111827 0%, #374151 100%);
-}
-.group-action-btn.contact:hover {
-    background: linear-gradient(90deg, #374151 0%, #111827 100%);
-    transform: translateY(-2px) scale(1.04);
-    box-shadow: 0 4px 18px rgba(17,24,39,0.18);
-}
-.edit-group-btn-row {
-    margin-top: 1.2rem;
-    margin-bottom: 1.5rem;
-    text-align: center;
-}
-@media (min-width: 768px) {
-    .edit-group-btn-row {
-        text-align: left;
-    }
-}
-.edit-group-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-weight: 700;
-    font-size: 1.1rem;
-    border: none;
-    border-radius: 0.9rem;
-    padding: 0.8rem 2.1rem;
-    color: #fff !important;
-    background: linear-gradient(90deg, #f59e42 0%, #f43f5e 100%);
-    box-shadow: 0 2px 12px rgba(244,63,94,0.10);
-    transition: background 0.18s, box-shadow 0.18s, transform 0.12s;
-    text-decoration: none !important;
-}
-.edit-group-btn:hover, .edit-group-btn:focus {
-    background: linear-gradient(90deg, #f43f5e 0%, #f59e42 100%);
-    transform: translateY(-2px) scale(1.04);
-    box-shadow: 0 4px 18px rgba(244,63,94,0.18);
-}
-.edit-group-btn i.material-icons {
-    font-size: 1.3em;
-    vertical-align: middle;
-    margin-right: 0.3em;
-}
-.group-title-row {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 1rem;
-    margin-bottom: 2rem;
-}
-@media (max-width: 600px) {
-    .group-title-row {
-        flex-direction: column;
-        align-items: flex-start;
-        gap: 0.5rem;
-    }
-    .edit-group-btn {
-        margin-left: 0 !important;
-        margin-top: 0.5rem;
-    }
-}
-.modern-card {
-    border-radius: 1.25rem;
-    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.10);
-    background: #f8fafc;
-    overflow: hidden;
-    margin-bottom: 2rem;
-}
-.modern-card-header {
-    padding: 1.2rem 2rem;
-    font-size: 1.25rem;
-    font-weight: 700;
-    color: #fff;
-    display: flex;
-    align-items: center;
-    border-bottom: none;
-}
-.modern-card-header.about {
-    background: linear-gradient(90deg, #3b82f6 0%, #06b6d4 100%);
-}
-.modern-card-header.leadership {
-    background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 100%);
-}
-.modern-card-header.events {
-    background: linear-gradient(90deg, #42f56c 0%, #66f43f 100%);
-}
-.modern-card-header.tg {
-    background: linear-gradient(90deg, #f59e42 0%, #f43f5e 100%);
-}
-.modern-card-header.past {
-    background: linear-gradient(90deg, #64748b 0%, #a1a1aa 100%);
-}
-.modern-card-body {
-    padding: 2rem 2.5rem 1.5rem 2.5rem;
-    background: #f8fafc;
-    color: #222;
-    font-size: 1.08rem;
-}
-.modern-event-card {
-    border-radius: 1rem;
-    background: #fff;
-    box-shadow: 0 2px 12px rgba(59,130,246,0.08);
-    transition: box-shadow 0.18s, transform 0.12s;
-    margin-bottom: 1.2rem;
-    padding: 1.2rem 1.5rem;
-}
-.modern-event-card:hover {
-    box-shadow: 0 6px 24px rgba(59,130,246,0.16);
-    transform: translateY(-2px) scale(1.02);
-}
-.fancy-post-card {
-  transition: box-shadow 0.18s, transform 0.12s;
-  border: none;
-}
-.fancy-post-card:hover {
-  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.18);
-  transform: translateY(-2px) scale(1.02);
-}
-.read-more-link2 {
-  color: #3b82f6;
-  font-weight: 600;
-  text-decoration: none;
-  transition: color 0.15s;
-  cursor: pointer;
-}
-
-.copy-btn:hover {
-  color: #b3baff;
-}
-
-.read-more-link2:hover {
-  color: #8b5cf6;
-  text-decoration: underline;
-}
-
-/* Prettified toggle and action buttons */
-.pretty-toggle-btn {
-  border: none;
-  border-radius: 1.2rem;
-  padding: 0.7rem 2.2rem;
-  font-size: 1.13rem;
-  font-weight: 600;
-  background: linear-gradient(90deg, #3b82f6 0%, #06b6d4 100%);
-  color: #fff;
-  box-shadow: 0 2px 12px rgba(59,130,246,0.10);
-  transition: background 0.18s, box-shadow 0.18s, transform 0.12s;
-  margin-right: 0.7rem;
-  outline: none;
-  cursor: pointer;
-}
-.pretty-toggle-btn.active, .pretty-toggle-btn:focus {
-  background: linear-gradient(90deg, #2563eb 0%, #0ea5e9 100%);
-  color: #fff;
-  box-shadow: 0 4px 18px rgba(59,130,246,0.18);
-  transform: translateY(-2px) scale(1.04);
-}
-.pretty-toggle-btn.outline {
-  background: #f8fafc;
-  color: #2563eb;
-  border: 2px solid #3b82f6;
-  box-shadow: none;
-}
-.pretty-toggle-btn.outline.active, .pretty-toggle-btn.outline:focus {
-  background: linear-gradient(90deg, #2563eb 0%, #0ea5e9 100%);
-  color: #fff;
-  border: none;
-  box-shadow: 0 4px 18px rgba(59,130,246,0.18);
-}
-.pretty-action-btn {
-  border: none;
-  border-radius: 1.2rem;
-  padding: 0.7rem 2.2rem;
-  font-size: 1.13rem;
-  font-weight: 600;
-  background: linear-gradient(90deg, #ff7e5f 0%, #feb47b 100%);
-  color: #fff;
-  box-shadow: 0 2px 12px rgba(255,126,95,0.10);
-  transition: background 0.18s, box-shadow 0.18s, transform 0.12s;
-  margin-bottom: 1.2rem;
-  outline: none;
-  display: inline-block;
-}
-.pretty-action-btn:hover, .pretty-action-btn:focus {
-  background: linear-gradient(90deg, #feb47b 0%, #ff7e5f 100%);
-  color: #fff;
-  box-shadow: 0 4px 18px rgba(255,126,95,0.18);
-  transform: translateY(-2px) scale(1.04);
-}
-
-/* Leadership management button styling */
-.edit-group-btn[data-bs-target="#leadershipModal"] {
-    background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 100%);
-    box-shadow: 0 2px 12px rgba(99,102,241,0.10);
-}
-.edit-group-btn[data-bs-target="#leadershipModal"]:hover, 
-.edit-group-btn[data-bs-target="#leadershipModal"]:focus {
-    background: linear-gradient(90deg, #7c3aed 0%, #a78bfa 100%);
-    transform: translateY(-2px) scale(1.04);
-    box-shadow: 0 4px 18px rgba(99,102,241,0.18);
-}
-
-.group-leader-card {
-    background: rgba(255,255,255,0.92);
-    border-radius: 1.3rem;
-    box-shadow: 0 8px 32px rgba(99,102,241,0.13);
-    backdrop-filter: blur(4px);
-    padding: 2.1rem 1.5rem 1.5rem 1.5rem;
-    border: 1.5px solid #e0e7ef;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    transition: box-shadow 0.18s, transform 0.13s;
-    min-height: 270px;
-  }
-  .group-leader-card:hover {
-    box-shadow: 0 12px 36px rgba(99,102,241,0.18);
-    transform: translateY(-2px) scale(1.03);
-  }
-  .group-leader-avatar {
-    width: 100px;
-    height: 100px;
-    object-fit: cover;
-    border-radius: 50%;
-    box-shadow: 0 4px 24px rgba(99,102,241,0.13);
-    border: 4px solid #6366f1;
-    background: #f8fafc;
-    margin-bottom: 1.1rem;
-  }
-  .group-leader-initials {
-    width: 100px;
-    height: 100px;
-    border-radius: 50%;
-    background: #6366f1;
-    color: #fff;
-    font-weight: bold;
-    font-size: 2rem;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 4px 24px rgba(99,102,241,0.13);
-    margin-bottom: 1.1rem;
-  }
-  .group-leader-name {
-    font-size: 1.35rem;
-    font-weight: 800;
-    color: #223b7b;
-    margin-bottom: 0.2rem;
-    text-align: center;
-  }
-  .group-leader-label {
-    color: #64748b;
-    font-size: 1.02rem;
-    margin-bottom: 0.7rem;
-    text-align: center;
-  }
-  .group-leader-btn-row {
-    display: flex;
-    gap: 0.7rem;
-    margin-top: 1.1rem;
-    width: 100%;
-    justify-content: center;
-  }
-  .group-leader-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5em;
-    font-size: 1.08rem;
-    font-weight: 700;
-    border-radius: 2em;
-    padding: 0.6em 1.5em;
-    border: none;
-    outline: none;
-    box-shadow: 0 2px 8px rgba(99,102,241,0.07);
-    transition: background 0.18s, color 0.18s, box-shadow 0.18s, transform 0.13s;
-    text-decoration: none;
-    cursor: pointer;
-  }
-  .group-leader-btn.telegram {
-    background: linear-gradient(90deg, #229ED9 0%, #00B2FF 100%);
-    color: #fff;
-  }
-  .group-leader-btn.telegram:hover {
-    background: linear-gradient(90deg, #00B2FF 0%, #229ED9 100%);
-    color: #fff;
-    box-shadow: 0 4px 18px rgba(34,158,217,0.13);
-    transform: scale(1.04);
-  }
-  .group-leader-btn.discord {
-    background: #fff;
-    color: #5865F2;
-    border: 2px solid #5865F2;
-  }
-  .group-leader-btn.discord:hover {
-    background: #5865F2;
-    color: #fff;
-    box-shadow: 0 4px 18px rgba(88,101,242,0.13);
-    transform: scale(1.04);
-  }
-  @media (max-width: 600px) {
-    .group-leader-card {
-      padding: 1.1rem 0.5rem 1.1rem 0.5rem;
-      min-height: 200px;
-    }
-    .group-leader-avatar, .group-leader-initials {
-      width: 70px;
-      height: 70px;
-      font-size: 1.2rem;
-    }
-    .group-leader-name {
-      font-size: 1.1rem;
-    }
-    .group-leader-btn {
-      font-size: 0.98rem;
-      padding: 0.5em 1em;
-    }
-  }
-
-  .dark-mode .modern-card,
-  .dark-mode .modern-card-body,
-  .dark-mode .fancy-post-card,
-  .dark-mode .group-leader-card {
-      background: #23272b !important;
-      color: #e0e0e0 !important;
-      box-shadow: 0 2px 12px rgba(30, 58, 138, 0.13);
-      border: 1px solid #232b3a !important;
-  }
-  .dark-mode .modern-card-header.about {
-      background: linear-gradient(90deg, #0ea5e9 0%, #3b82f6 100%) !important;
-      color: #fff !important;
-  }
-  .dark-mode .modern-card-header.leadership {
-      background: linear-gradient(90deg, #8b5cf6 0%, #6366f1 100%) !important;
-      color: #fff !important;
-  }
-  .dark-mode .modern-card-header.events {
-      background: linear-gradient(90deg, #22d3ee 0%, #22c55e 100%) !important;
-      color: #fff !important;
-  }
-  .dark-mode .modern-card-header.past {
-      background: linear-gradient(90deg, #64748b 0%, #6366f1 100%) !important;
-      color: #fff !important;
-  }
-  .dark-mode .modern-card-header.tg {
-      background: linear-gradient(90deg, #f59e42 0%, #ef4444 100%) !important;
-      color: #fff !important;
-  }
-  .dark-mode .group-leader-card {
-      background: #23272b !important;
-      color: #e0e0e0 !important;
-      border: 1.5px solid #334155 !important;
-  }
-  .dark-mode .group-leader-name {
-      color: #38bdf8 !important;
-  }
-  .dark-mode .group-leader-btn.telegram {
-      background: linear-gradient(90deg, #0ea5e9 0%, #3b82f6 100%) !important;
-      color: #fff !important;
-  }
-  .dark-mode .group-leader-btn.discord {
-      background: linear-gradient(90deg, #8b5cf6 0%, #6366f1 100%) !important;
-      color: #fff !important;
-  }
-  .dark-mode .pretty-toggle-btn {
-      background: linear-gradient(90deg, #223a5f 0%, #0ea5e9 100%) !important;
-      color: #fff !important;
-      box-shadow: 0 2px 8px rgba(30, 58, 138, 0.18);
-  }
-  .dark-mode .pretty-toggle-btn.active, .dark-mode .pretty-toggle-btn:focus {
-      background: linear-gradient(90deg, #1e293b 0%, #0284c7 100%) !important;
-      color: #fff !important;
-      box-shadow: 0 4px 16px rgba(30, 58, 138, 0.22);
-  }
-  .dark-mode .pretty-toggle-btn.outline {
-      background: #181a1b !important;
-      color: #38bdf8 !important;
-      border: 2px solid #38bdf8 !important;
-  }
-  .dark-mode .pretty-toggle-btn.outline.active, .dark-mode .pretty-toggle-btn.outline:focus {
-      background: linear-gradient(90deg, #223a5f 0%, #0ea5e9 100%) !important;
-      color: #fff !important;
-      border: none !important;
-      box-shadow: 0 4px 16px rgba(30, 58, 138, 0.22);
-  }
-  .dark-mode .fancy-post-card {
-      background: #23272b !important;
-      color: #e0e0e0 !important;
-      border: 1px solid #334155 !important;
-  }
-  .dark-mode .fancy-post-card .read-more-link {
-      color: #38bdf8 !important;
-  }
-  .dark-mode .fancy-post-card .read-more-link:hover {
-      color: #8b5cf6 !important;
-  }
-  .dark-mode .modern-modal-content {
-      background: #23272b !important;
-      color: #e0e0e0 !important;
-      border: 1px solid #334155 !important;
-  }
-  .dark-mode .modern-modal-header {
-      background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 100%) !important;
-      color: #fff !important;
-  }
-  .dark-mode .modern-modal-body {
-      background: #181a1b !important;
-      color: #e0e0e0 !important;
-  }
-  .dark-mode .modern-breadcrumbs {
-      background: #23272b !important;
-      color: #b3d1f7 !important;
-      border: 1px solid #223a5f !important;
-  }
-  .dark-mode .modern-breadcrumbs .breadcrumb-current,
-  .dark-mode .modern-breadcrumbs .material-icons {
-      color: #38bdf8 !important;
-  }
-  .dark-mode .modern-breadcrumbs a {
-      color: #b3d1f7 !important;
-  }
-  .dark-mode .text-muted,
-  .dark-mode .text-muted * {
-      color: #b0b8c1 !important;
-  }
-</style>
-
 {% block extra_js %}
+{% if can_edit_group %}
 <script src="https://cdn.jsdelivr.net/npm/tinymce@7.9.1/tinymce.min.js" referrerpolicy="origin"></script>
 <script src="https://cdn.jsdelivr.net/npm/cropperjs@1.6.2/dist/cropper.min.js"></script>
 <script>
+    let groupTinyMCEInitialized = false;
+
     function initTinyMCE() {
+        if (!document.getElementById('id_description')) return;
+        if (tinymce.get('id_description')) return;
         const isDark = document.body.classList.contains('dark-mode');
         tinymce.init({
             selector: '#id_description',
-            height: 300,
+            height: 220,
             width: '100%',
             menubar: false,
             plugins: 'advlist autolink lists image charmap anchor searchreplace visualblocks code insertdatetime table help wordcount textcolor backcolor link',
@@ -1694,8 +1061,7 @@ document.addEventListener('DOMContentLoaded', function() {
             content_css: isDark ? '/static/tinymce-dark-content.css' : '',
             toolbar_mode: 'wrap',
             toolbar_location: 'top',
-            toolbar_sticky: true,
-            toolbar_sticky_offset: 0,
+            toolbar_sticky: false,
             content_style: 'body { font-family: -apple-system, BlinkMacSystemFont, San Francisco, Segoe UI, Roboto, Helvetica Neue, sans-serif; font-size: 14px; } img { max-width: 100%; height: auto; display: block; margin: 1em auto; } .tox-statusbar { display: none !important; }',
             auto_link: true,
             link_default_target: '_blank',
@@ -1751,48 +1117,45 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
             }
         });
+        groupTinyMCEInitialized = true;
     }
-    // Initialize TinyMCE on page load
-    initTinyMCE();
-    // Function to re-initialize TinyMCE when dark mode changes
+
     function reinitTinyMCE() {
         const editor = tinymce.get('id_description');
         if (editor) {
             editor.destroy();
         }
+        groupTinyMCEInitialized = false;
         setTimeout(initTinyMCE, 100);
     }
-    // Listen for dark mode changes
-    document.addEventListener('darkModeChanged', function (event) {
-        setTimeout(reinitTinyMCE, 200);
-    });
-    // Fix: Re-init TinyMCE when Edit Group modal is shown
+
     document.addEventListener('DOMContentLoaded', function() {
         var editGroupModal = document.getElementById('editGroupModal');
         if (editGroupModal) {
             editGroupModal.addEventListener('shown.bs.modal', function () {
-                var editor = tinymce.get('id_description');
-                if (editor) {
-                    editor.destroy();
-                }
-                setTimeout(initTinyMCE, 100);
+                initTinyMCE();
             });
         }
-    });
-    // Existing logo upload logic
-document.addEventListener('DOMContentLoaded', function() {
-    const logoInput = document.getElementById('id_logo');
+
+        document.addEventListener('darkModeChanged', function () {
+            if (groupTinyMCEInitialized) {
+                setTimeout(reinitTinyMCE, 200);
+            }
+        });
+
+        const logoInput = document.getElementById('id_logo');
         const logoPreview = document.getElementById('logoPreview');
         const cropperContainer = document.getElementById('cropperContainer');
         const cropperImage = document.getElementById('cropperImage');
         const cropLogoBtn = document.getElementById('cropLogoBtn');
         let cropper = null;
-    if (logoInput) {
-        logoInput.addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
+
+        if (logoInput) {
+            logoInput.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
                         cropperImage.src = e.target.result;
                         cropperContainer.style.display = 'block';
                         if (cropper) { cropper.destroy(); }
@@ -1814,6 +1177,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
         }
+
         if (cropLogoBtn) {
             cropLogoBtn.addEventListener('click', function() {
                 if (cropper) {
@@ -1825,8 +1189,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     const base64data = canvas.toDataURL('image/png');
                     logoPreview.src = base64data;
                     logoPreview.style.display = 'inline-block';
+                    const logoPlaceholder = document.getElementById('logoPreviewPlaceholder');
+                    if (logoPlaceholder) logoPlaceholder.style.display = 'none';
                     cropperContainer.style.display = 'none';
-                    // Set base64 (without prefix) to hidden input
                     let hiddenInput = document.querySelector('input[name="logo_base64"]');
                     if (!hiddenInput) {
                         hiddenInput = document.createElement('input');
@@ -1837,10 +1202,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     hiddenInput.value = base64data.split(',')[1];
                     cropper.destroy();
                     cropper = null;
-            }
-        });
-    }
-        // Modern file upload button logic
+                }
+            });
+        }
+
         const customBtn = document.getElementById('customLogoBtn');
         const fileNameSpan = document.getElementById('logoFileName');
         if (customBtn && logoInput) {
@@ -1849,10 +1214,11 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             logoInput.addEventListener('change', function() {
                 fileNameSpan.textContent = logoInput.files[0] ? logoInput.files[0].name : 'No file selected.';
-        });
-    }
-});
+            });
+        }
+    });
 </script>
+{% endif %}
 {{ block.super }}
 {% endblock %}
 {% endblock %}

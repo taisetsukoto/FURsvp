@@ -8,7 +8,7 @@ from users.models import Profile, GroupDelegation, BannedUser, Notification, Gro
 from django.contrib import messages
 from django.db import models, transaction
 from django.http import JsonResponse, HttpResponseForbidden, HttpResponse
-from users.utils import create_notification
+from users.utils import create_notification, user_is_banned_from_event, user_event_ban_message, user_is_banned_from_group
 import feedparser
 from django.views.generic import ListView, DetailView
 import pytz
@@ -30,9 +30,9 @@ from django.views.decorators.http import require_GET
 # Create your views here.
 
 def get_telegram_feed(channel='', limit=5):
+    if not channel or not str(channel).strip():
+        return []
     url = f"https://rss.tabithahanegan.com/telegram/channel/{channel}"
-    if url == "https://rss.tabithahanegan.com/telegram/channel/None":
-        url = ""
     feed = feedparser.parse(url)
     entries = feed.entries[:limit]
     eastern = pytz.timezone('America/New_York')
@@ -79,7 +79,7 @@ def home(request):
     # Get sort parameters from request
     sort_by = request.GET.get('sort', 'date')  # Default sort by date
     sort_order = request.GET.get('order', 'asc')  # Default ascending order
-    filter_adult = request.GET.get('adult', 'true') # Default to show adult events
+    filter_adult = request.GET.get('adult', 'false')
     view_type = request.GET.get('view', 'list')  # Default to list view
     page = request.GET.get('page', 1)  # Default to first page
     
@@ -277,18 +277,18 @@ def event_detail(request, event_id):
         user_rsvp = event.rsvps.filter(user=request.user).first()
 
     can_ban_user = is_organizer_of_this_event or is_site_admin
+    if not can_ban_user and request.user.is_authenticated and event.group:
+        can_ban_user = GroupRole.objects.filter(user=request.user, group=event.group).exists()
     can_view_contact_info = is_organizer_of_this_event or is_site_admin or can_access_group_contact_info
     can_cancel_event = is_organizer_of_this_event or is_site_admin
 
-    # Check if the user is banned by this event's organizer (for any group)
-    is_banned_by_organizer = False
-    if request.user.is_authenticated and event.organizer:
-        is_banned_by_organizer = BannedUser.objects.filter(user=request.user, organizer=event.organizer).exists()
-
-    # Check if the user is banned from this specific group
-    is_banned_from_group = False
-    if request.user.is_authenticated and event.group:
-        is_banned_from_group = BannedUser.objects.filter(user=request.user, group=event.group).exists()
+    # Check if the current user is banned from this event (group, organizer, or sitewide)
+    is_banned_from_event = False
+    ban_message = None
+    if request.user.is_authenticated:
+        is_banned_from_event = user_is_banned_from_event(request.user, event)
+        if is_banned_from_event:
+            ban_message = user_event_ban_message(request.user, event)
 
     # Calculate confirmed RSVPs and waitlisted RSVPs
     confirmed_rsvps_count = event.rsvps.filter(status='confirmed').count()
@@ -321,11 +321,6 @@ def event_detail(request, event_id):
                         )
 
     if request.method == 'POST' and request.user.is_authenticated:
-        # Prevent banned users from RSVPing
-        if is_banned_by_organizer or is_banned_from_group:
-            messages.error(request, 'You are banned from RSVPing to events by this organizer or group.', extra_tags='admin_notification')
-            return redirect('event_detail', event_id=event.id)
-
         if 'cancel_event' in request.POST and can_cancel_event:
             with transaction.atomic():
                 event.status = 'cancelled'
@@ -422,6 +417,14 @@ def event_detail(request, event_id):
                 post_to_telegram_channel(event.group.telegram_webhook_channel, msg, parse_mode="Markdown")
             return redirect('home')
             
+        if is_banned_from_event:
+            messages.error(
+                request,
+                ban_message or 'You are banned from RSVPing to this event.',
+                extra_tags='admin_notification',
+            )
+            return redirect('event_detail', event_id=event.id)
+
         form = RSVPForm(request.POST, instance=user_rsvp, event=event)
         if form.is_valid():
             new_status = form.cleaned_data['status']
@@ -593,17 +596,7 @@ def event_detail(request, event_id):
     rsvps_queryset = event.rsvps.all().select_related('user__profile').order_by('timestamp')
 
     for rsvp in rsvps_queryset:
-        is_banned = False
-        # Check for group ban first
-        if event.group:
-            is_banned = BannedUser.objects.filter(user=rsvp.user, group=event.group).exists()
-        # If not group banned, check for organizer ban (if event has an organizer)
-        if not is_banned and event.organizer:
-            is_banned = BannedUser.objects.filter(user=rsvp.user, organizer=event.organizer).exists()
-        # If not group or organizer banned, check for site-wide ban
-        if not is_banned:
-            is_banned = BannedUser.objects.filter(user=rsvp.user, group__isnull=True, organizer__isnull=True).exists()
-
+        is_banned = user_is_banned_from_event(rsvp.user, event) if rsvp.user else False
         all_rsvps_data.append({'rsvp': rsvp, 'is_banned': is_banned})
 
     # Group RSVPs by status for template display
@@ -633,8 +626,11 @@ def event_detail(request, event_id):
     # (is_organizer is already calculated above)
 
     # Determine if the RSVP form should be displayed
-    show_rsvp_form = (not is_event_full or can_join_waitlist) or \
-                     (user_rsvp is not None and user_rsvp.status != 'confirmed')
+    show_rsvp_form = (
+        not is_banned_from_event and
+        ((not is_event_full or can_join_waitlist) or
+         (user_rsvp is not None and user_rsvp.status != 'confirmed'))
+    )
 
     # Determine attendee list visibility
     can_view_attendee_list = (
@@ -687,6 +683,8 @@ def event_detail(request, event_id):
         'can_view_attendee_list': can_view_attendee_list,
         'edit_event_errors': edit_event_errors,
         'edit_event_post': edit_event_post,
+        'is_banned_from_event': is_banned_from_event,
+        'ban_message': ban_message,
     }
     return render(request, 'events/event_detail.html', context)
 
@@ -863,17 +861,40 @@ def group_detail(request, group_id):
     assistants = []
     
     # Get upcoming and past events
-    upcoming_events = group.get_upcoming_events()
-    past_events = group.get_past_events()[:10]  # Limit to 10 most recent past events
+    upcoming_events = list(group.get_upcoming_events().annotate(
+        confirmed_count=models.Count('rsvps', filter=models.Q(rsvps__status='confirmed'))
+    ))
+    past_events = list(group.get_past_events()[:10].annotate(
+        confirmed_count=models.Count('rsvps', filter=models.Q(rsvps__status='confirmed'))
+    ))
+
+    all_group_events = upcoming_events + past_events
+    if request.user.is_authenticated and all_group_events:
+        user_rsvps = RSVP.objects.filter(
+            event_id__in=[event.id for event in all_group_events],
+            user=request.user,
+        )
+        rsvp_by_event = {rsvp.event_id: rsvp for rsvp in user_rsvps}
+        for event in all_group_events:
+            rsvp = rsvp_by_event.get(event.id)
+            event.user_rsvp_list = [rsvp] if rsvp else []
+    else:
+        for event in all_group_events:
+            event.user_rsvp_list = []
     
     # Check if user can edit this group
     can_edit_group = False
+    can_manage_bans = False
     if request.user.is_authenticated:
         can_edit_group = (
             request.user.is_superuser or 
             GroupRole.objects.filter(user=request.user, group=group).filter(
                 Q(can_post=True) | Q(can_manage_leadership=True)
             ).exists()
+        )
+        can_manage_bans = (
+            request.user.is_superuser or
+            GroupRole.objects.filter(user=request.user, group=group).exists()
         )
     
     # Handle POST requests
@@ -922,6 +943,7 @@ def group_detail(request, group_id):
             try:
                 role = GroupRole.objects.get(pk=role_id, group=group)
                 role.custom_label = request.POST.get('custom_label', role.custom_label)
+                role.can_post = bool(request.POST.get('can_post'))
                 role.can_manage_leadership = bool(request.POST.get('can_manage_leadership'))
                 role.save()
                 messages.success(request, 'Leader updated successfully.')
@@ -946,6 +968,19 @@ def group_detail(request, group_id):
     # Leadership roles and form
     leadership_roles = GroupRole.objects.filter(group=group).select_related('user')
     leadership_form = GroupRoleForm(group=group)
+    group_banned_users = []
+    is_banned_from_group = False
+    group_ban_message = None
+    if request.user.is_authenticated:
+        is_banned_from_group = user_is_banned_from_group(request.user, group)
+        if is_banned_from_group:
+            group_ban_message = f'You are banned from RSVPing to events hosted by {group.name}.'
+    if can_manage_bans:
+        group_banned_users = (
+            BannedUser.objects.filter(group=group)
+            .select_related('user__profile', 'banned_by__profile')
+            .order_by('-banned_at')
+        )
     
     context = {
         'group': group,
@@ -954,6 +989,10 @@ def group_detail(request, group_id):
         'upcoming_events': upcoming_events,
         'past_events': past_events,
         'can_edit_group': can_edit_group,
+        'can_manage_bans': can_manage_bans,
+        'group_banned_users': group_banned_users,
+        'is_banned_from_group': is_banned_from_group,
+        'group_ban_message': group_ban_message,
         'telegram_feed': telegram_feed,
         'leadership_roles': leadership_roles,
         'leadership_form': leadership_form,
@@ -1043,24 +1082,43 @@ def event_calendar(request):
         end_date = datetime(year + 1, 1, 1).date()
     else:
         end_date = datetime(year, month + 1, 1).date()
-    events = Event.objects.filter(
+    filter_adult = request.GET.get('adult', 'false')
+    events_qs = Event.objects.filter(
         date__gte=start_date,
         date__lt=end_date,
         status='active'
+    ).select_related('group').annotate(
+        confirmed_count=models.Count('rsvps', filter=models.Q(rsvps__status='confirmed'))
     ).order_by('date', 'start_time')
+    if filter_adult == 'false':
+        events_qs = events_qs.exclude(age_restriction__in=['adult', 'mature'])
+
+    month_events = list(events_qs)
+    if request.user.is_authenticated and month_events:
+        user_rsvps = RSVP.objects.filter(
+            user=request.user,
+            event_id__in=[event.id for event in month_events],
+        )
+        rsvp_by_event = {rsvp.event_id: rsvp for rsvp in user_rsvps}
+        for event in month_events:
+            rsvp = rsvp_by_event.get(event.id)
+            event.user_rsvp_list = [rsvp] if rsvp else []
+    else:
+        for event in month_events:
+            event.user_rsvp_list = []
+
     # Group events by date
     events_by_date = {}
-    for event in events:
+    for event in month_events:
         date_key = event.date.strftime('%Y-%m-%d')
-        if date_key not in events_by_date:
-            events_by_date[date_key] = []
-        events_by_date[date_key].append(event)
+        events_by_date.setdefault(date_key, []).append(event)
+
     # Navigation
     prev_month = month - 1 if month > 1 else 12
     prev_year = year if month > 1 else year - 1
     next_month = month + 1 if month < 12 else 1
     next_year = year if month < 12 else year + 1
-    
+
     eastern = pytz.timezone('America/New_York')
     today = timezone.now().astimezone(eastern).date()
     context = {
@@ -1068,14 +1126,17 @@ def event_calendar(request):
         'month_name': month_name,
         'year': year,
         'month': month,
+        'month_events': month_events,
+        'month_event_count': len(month_events),
         'events_by_date': events_by_date,
         'prev_month': prev_month,
         'prev_year': prev_year,
         'next_month': next_month,
         'next_year': next_year,
         'today': today,
+        'filter_adult': filter_adult,
     }
-    
+
     return render(request, 'events/event_calendar.html', context)
 
 @login_required
@@ -1328,6 +1389,8 @@ def rsvp_telegram(request, event_id):
         event = Event.objects.get(id=event_id)
     except Event.DoesNotExist:
         return HttpResponse('Event not found.', status=404)
+    if user_is_banned_from_event(profile.user, event):
+        return HttpResponse('You are banned from RSVPing to this event.', status=403)
     from events.models import RSVP
     rsvp, created = RSVP.objects.get_or_create(event=event, user=profile.user, defaults={'status': 'confirmed'})
     if not created:
@@ -1343,61 +1406,105 @@ def blog(request):
     }
     return render(request, 'events/blog.html', context)
 
+
+def _user_can_manage_event(user, event):
+    if user == event.organizer or user.is_superuser:
+        return True
+    if not event.group:
+        return False
+    if GroupRole.objects.filter(user=user, group=event.group).exists():
+        return True
+    return GroupDelegation.objects.filter(delegated_user=user, group=event.group).exists()
+
+
+def _ordered_organizer_rsvps(event, order_param=None):
+    """Return confirmed/waitlisted RSVPs in badge order (custom or RSVP timestamp)."""
+    base_qs = (
+        event.rsvps.filter(status__in=['confirmed', 'waitlisted'])
+        .select_related('user__profile')
+    )
+    if not order_param:
+        return list(base_qs.order_by('timestamp'))
+
+    try:
+        ids = [int(x) for x in order_param.split(',') if x.strip()]
+    except ValueError:
+        return list(base_qs.order_by('timestamp'))
+
+    rsvp_map = {rsvp.id: rsvp for rsvp in base_qs}
+    ordered = [rsvp_map[rsvp_id] for rsvp_id in ids if rsvp_id in rsvp_map]
+    seen = {rsvp.id for rsvp in ordered}
+    for rsvp in base_qs.order_by('timestamp'):
+        if rsvp.id not in seen:
+            ordered.append(rsvp)
+    return ordered
+
+
+def _rsvp_attendee_name(rsvp):
+    if rsvp.user:
+        profile = rsvp.user.profile if hasattr(rsvp.user, 'profile') else None
+        return profile.get_display_name() if profile else rsvp.user.username
+    return rsvp.name or 'Anonymous'
+
+
 @login_required
 def export_attendees_csv(request, event_id):
     """Export attendee data as CSV"""
     import csv
-    
+
     event = get_object_or_404(Event, pk=event_id)
-    
-    # Check permissions
-    is_organizer = request.user == event.organizer or request.user.is_superuser
-    can_access_group = False
-    if event.group:
-        can_access_group = GroupRole.objects.filter(user=request.user, group=event.group).exists()
-        if not can_access_group:
-            can_access_group = GroupDelegation.objects.filter(delegated_user=request.user, group=event.group).exists()
-    
-    if not (is_organizer or can_access_group):
+
+    if not _user_can_manage_event(request.user, event):
         return HttpResponseForbidden("You don't have permission to export attendees.")
-    
-    # Create CSV response
+
     response = HttpResponse(content_type='text/csv')
-    response['Content-Disposition'] = f'attachment; filename="attendees_{event.title.replace(" ", "_")}_{event.date}.csv"'
-    
+    safe_title = event.title.replace(' ', '_')
+    response['Content-Disposition'] = f'attachment; filename="attendees_{safe_title}_{event.date}.csv"'
+
+    headers = [
+        'Badge Number', 'Name', 'Username', 'Status', 'Email', 'Telegram', 'Discord',
+        'Accessibility Needs', 'Rank/Role', 'RSVP Date',
+    ]
+    question_fields = []
+    for idx, text in enumerate(
+        (event.question1_text, event.question2_text, event.question3_text), start=1
+    ):
+        if text and text.strip():
+            headers.append(text.strip())
+            question_fields.append(f'question{idx}')
+
     writer = csv.writer(response)
-    writer.writerow(['Badge Number', 'Name', 'Username', 'Status', 'Email', 'Telegram', 'Discord', 'RSVP Date', 'Question 1', 'Question 2', 'Question 3'])
-    
-    # Get all RSVPs ordered by timestamp (first come, first served)
-    rsvps = event.rsvps.filter(status__in=['confirmed', 'waitlisted']).order_by('timestamp').select_related('user__profile')
-    
+    writer.writerow(headers)
+
+    rsvps = _ordered_organizer_rsvps(event, request.GET.get('order'))
+
     for idx, rsvp in enumerate(rsvps, start=1):
         if rsvp.user:
             profile = rsvp.user.profile if hasattr(rsvp.user, 'profile') else None
-            name = profile.get_display_name() if profile else rsvp.user.username
             email = rsvp.user.email
             telegram = profile.telegram_username if profile else ''
             discord = profile.discord_username if profile else ''
         else:
-            name = rsvp.name or 'Anonymous'
             email = ''
             telegram = ''
             discord = ''
-        
-        writer.writerow([
-            idx,  # Badge number
-            name,
+
+        row = [
+            idx,
+            _rsvp_attendee_name(rsvp),
             rsvp.user.username if rsvp.user else '',
             rsvp.get_status_display(),
             email,
             telegram,
             discord,
+            'Yes' if rsvp.accessibility_needs else 'No',
+            rsvp.custom_rank or '',
             rsvp.timestamp.strftime('%Y-%m-%d %H:%M') if rsvp.timestamp else '',
-            rsvp.question1 or '',
-            rsvp.question2 or '',
-            rsvp.question3 or '',
-        ])
-    
+        ]
+        for field in question_fields:
+            row.append(getattr(rsvp, field) or '')
+        writer.writerow(row)
+
     return response
 
 @login_required
@@ -1435,17 +1542,10 @@ def generate_badges(request, event_id):
 
     event = get_object_or_404(Event, pk=event_id)
 
-    is_organizer = request.user == event.organizer or request.user.is_superuser
-    can_access_group = False
-    if event.group:
-        can_access_group = GroupRole.objects.filter(user=request.user, group=event.group).exists()
-        if not can_access_group:
-            can_access_group = GroupDelegation.objects.filter(delegated_user=request.user, group=event.group).exists()
-
-    if not (is_organizer or can_access_group):
+    if not _user_can_manage_event(request.user, event):
         return HttpResponseForbidden("You don't have permission to generate badges.")
 
-    rsvps = event.rsvps.filter(status__in=['confirmed', 'waitlisted']).order_by('timestamp').select_related('user__profile')
+    rsvps = _ordered_organizer_rsvps(event, request.GET.get('order'))
 
     response = HttpResponse(content_type='application/pdf')
     response['Content-Disposition'] = f'attachment; filename="badge_labels_{event.title.replace(" ", "_")}.pdf"'
@@ -1453,24 +1553,15 @@ def generate_badges(request, event_id):
     p = canvas.Canvas(response, pagesize=letter)
     width, height = letter
 
+    # Avery 5162: 4" x 1-1/3" labels, 14 per sheet (2 columns x 7 rows)
     labels_per_row = 2
-    labels_per_col = 5
+    labels_per_col = 7
     badge_width = 4.0 * inch
-    badge_height = 2.0 * inch
-    horizontal_pitch = 4.25 * inch
-    vertical_pitch = 2.3 * inch
-    left_margin = 0.25 * inch
-    top_margin = 0.5 * inch
-
-    if width < (left_margin + labels_per_row * horizontal_pitch) or height < (top_margin + labels_per_col * vertical_pitch):
-        labels_per_row = 2
-        labels_per_col = 8
-        badge_width = (width - 60) / labels_per_row
-        badge_height = (height - 80) / labels_per_col
-        horizontal_pitch = badge_width + 0.25 * inch
-        vertical_pitch = badge_height + 0.25 * inch
-        left_margin = 0.5 * inch
-        top_margin = 0.5 * inch
+    badge_height = (4.0 / 3.0) * inch
+    horizontal_pitch = 4.188 * inch
+    vertical_pitch = (4.0 / 3.0) * inch
+    left_margin = 0.156 * inch
+    top_margin = 0.833 * inch
 
     for idx, rsvp in enumerate(rsvps):
         if idx > 0 and idx % (labels_per_row * labels_per_col) == 0:
@@ -1481,14 +1572,7 @@ def generate_badges(request, event_id):
         x = left_margin + col * horizontal_pitch
         y = height - top_margin - (row * vertical_pitch) - badge_height
 
-        # No border per request
-
-        if rsvp.user:
-            profile = rsvp.user.profile if hasattr(rsvp.user, 'profile') else None
-            name = profile.get_display_name() if profile else rsvp.user.username
-        else:
-            name = rsvp.name or 'Anonymous'
-
+        name = _rsvp_attendee_name(rsvp)
         badge_num = idx + 1
 
         check_in_url = request.build_absolute_uri(reverse('checkin_attendee', kwargs={'event_id': event.id, 'rsvp_id': rsvp.id}))
@@ -1596,7 +1680,19 @@ def generate_badges(request, event_id):
 
         name_x = x + (badge_width / 2)
         name_y = y + (badge_height / 2) - (font_size * 0.3)
+        if rsvp.custom_rank:
+            name_y += font_size * 0.15
         p.drawCentredString(name_x, name_y, name)
+
+        if rsvp.custom_rank:
+            rank_font_size = 11
+            p.setFont(font_name, rank_font_size)
+            rank_label = rsvp.custom_rank.upper()
+            if p.stringWidth(rank_label, font_name, rank_font_size) > badge_width - 0.4 * inch:
+                while rank_label and p.stringWidth(rank_label + '...', font_name, rank_font_size) > badge_width - 0.4 * inch:
+                    rank_label = rank_label[:-1]
+                rank_label = (rank_label + '...') if rank_label else '...'
+            p.drawCentredString(name_x, name_y - font_size * 0.55, rank_label)
 
         p.setFont(font_name, 12)
         status_label = rsvp.get_status_display().upper()
@@ -1656,9 +1752,8 @@ def generate_checkin_sheet(request, event_id):
     
     if not (is_organizer or can_access_group):
         return HttpResponseForbidden("You don't have permission to generate check-in sheets.")
-    
-    # Get all confirmed RSVPs
-    rsvps = event.rsvps.filter(status__in=['confirmed', 'waitlisted']).order_by('timestamp').select_related('user__profile')
+
+    rsvps = _ordered_organizer_rsvps(event, request.GET.get('order'))
     
     # Create PDF
     response = HttpResponse(content_type='application/pdf')
@@ -1673,7 +1768,7 @@ def generate_checkin_sheet(request, event_id):
     
     p.setFont("Helvetica", 12)
     p.drawString(50, height - 75, f"Date: {event.date.strftime('%B %d, %Y')}")
-    p.drawString(50, height - 95, f"Total Attendees: {rsvps.count()}")
+    p.drawString(50, height - 95, f"Total Attendees: {len(rsvps)}")
     
     # Draw line
     p.line(50, height - 105, width - 50, height - 105)
@@ -1800,9 +1895,8 @@ def organizer_tools(request, event_id):
     
     if not (is_organizer or can_access_group):
         return HttpResponseForbidden("You don't have permission to access organizer tools.")
-    
-    # Get all confirmed RSVPs ordered by timestamp
-    rsvps = event.rsvps.filter(status__in=['confirmed', 'waitlisted']).order_by('timestamp').select_related('user__profile')
+
+    rsvps = _ordered_organizer_rsvps(event)
     
     context = {
         'event': event,

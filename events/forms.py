@@ -283,8 +283,11 @@ class GroupRoleForm(forms.ModelForm):
         model = GroupRole
         fields = ['user', 'custom_label', 'can_post', 'can_manage_leadership']
         widgets = {
-            'user': forms.Select(attrs={'class': 'form-select tomselect-user'}),
-            'custom_label': forms.TextInput(attrs={'class': 'form-control'}),
+            'user': forms.Select(attrs={'class': 'form-select leadership-user-select'}),
+            'custom_label': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'e.g. Organizer, Co-chair',
+            }),
             'can_post': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'can_manage_leadership': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }

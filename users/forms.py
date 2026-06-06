@@ -87,7 +87,7 @@ class UserPublicProfileForm(forms.ModelForm):
     clear_profile_picture = forms.BooleanField(required=False, label="Remove Profile Picture")
     email = forms.EmailField(required=True, widget=forms.EmailInput(attrs={
         'class': 'form-control',
-        'placeholder': 'Enter your email address'
+        'placeholder': 'you@example.com'
     }))
 
     class Meta:
@@ -96,15 +96,15 @@ class UserPublicProfileForm(forms.ModelForm):
         widgets = {
             'display_name': forms.TextInput(attrs={
                 'class': 'form-control',
-                'placeholder': 'Enter your display name'
+                'placeholder': 'Your display name'
             }),
             'discord_username': forms.TextInput(attrs={
                 'class': 'form-control',
-                'placeholder': 'Enter your Discord username'
+                'placeholder': 'username'
             }),
             'telegram_username': forms.TextInput(attrs={
                 'class': 'form-control',
-                'placeholder': 'Enter your Telegram username'
+                'placeholder': '@username'
             }),
             'profile_picture_base64': forms.HiddenInput(),
         }
@@ -163,7 +163,14 @@ class GroupRoleForm(forms.ModelForm):
         fields = ['user', 'custom_label', 'can_post', 'can_manage_leadership'] 
 
 class TOTPDeviceForm(BaseTOTPDeviceForm):
-    pass 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['token'].label = 'Verification code'
+        self.fields['token'].widget.attrs.update({
+            'class': 'form-control form-control--otp',
+            'placeholder': '000000',
+            'maxlength': '6',
+        }) 
 
 class BlueskyBlogPostForm(forms.Form):
     title = forms.CharField(max_length=300, widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Title'}))

@@ -15,8 +15,10 @@ from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.db.models import Q
 from django.db import models, transaction
 import json
+from datetime import timedelta
+from django.utils import timezone
 from django.core.serializers.json import DjangoJSONEncoder
-from .utils import create_notification, get_client_ip
+from .utils import create_notification, get_client_ip, normalize_notification_link, remove_user_rsvps_for_group
 from django.contrib.auth import get_user_model
 from urllib.parse import urlparse
 import base64
@@ -367,9 +369,22 @@ def ban_user(request, user_id):
             elif ban_type == 'group' and group:
                 if not can_ban_group:
                     return JsonResponse({'status': 'error', 'message': 'Permission denied.'}, status=403)
+                if not is_admin:
+                    submitted_username = request.POST.get('username', '').strip()
+                    if submitted_username.lower() != target_user.username.lower():
+                        return JsonResponse(
+                            {'status': 'error', 'message': 'Full username is required to ban a user from a group.'},
+                            status=400,
+                        )
                 banned_entry, created = BannedUser.objects.get_or_create(user=target_user, group=group, defaults={'banned_by': request.user, 'reason': reason or 'Banned from group.'})
                 
                 if created:
+                    remove_user_rsvps_for_group(target_user, group)
+                    create_notification(
+                        target_user,
+                        f'You have been banned from {group.name} and can no longer RSVP to this group\'s events.',
+                        link=reverse('group_detail', kwargs={'group_id': group.id}),
+                    )
                     # Log the ban action
                     AuditLog.log_action(
                         user=request.user,
@@ -391,6 +406,82 @@ def ban_user(request, user_id):
 
         return JsonResponse({'status': 'error', 'message': 'Invalid request.'}, status=400)
 
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': f'An unexpected error occurred: {str(e)}'}, status=500)
+
+
+@login_required
+@require_POST
+def ban_group_user(request):
+    """Ban a user from a group by exact username (prevents display-name enumeration)."""
+    username = request.POST.get('username', '').strip().lstrip('@')
+    group_id = request.POST.get('group_id')
+    reason = request.POST.get('reason', '')
+
+    if not username:
+        return JsonResponse({'status': 'error', 'message': 'Enter the user\'s full username.'}, status=400)
+    if not group_id:
+        return JsonResponse({'status': 'error', 'message': 'Group is required.'}, status=400)
+
+    try:
+        group = Group.objects.get(pk=group_id)
+    except Group.DoesNotExist:
+        return JsonResponse({'status': 'error', 'message': 'Group not found.'}, status=400)
+
+    is_admin = request.user.is_superuser
+    is_group_leader = GroupRole.objects.filter(user=request.user, group=group).exists()
+    if not (is_admin or is_group_leader):
+        return JsonResponse({'status': 'error', 'message': 'Permission denied.'}, status=403)
+
+    target_user = get_user_model().objects.filter(username__iexact=username).select_related('profile').first()
+    if not target_user:
+        return JsonResponse(
+            {'status': 'error', 'message': f'No user found with the username @{username}.'},
+            status=400,
+        )
+
+    if request.user == target_user:
+        return JsonResponse({'status': 'error', 'message': 'You cannot ban yourself.'}, status=400)
+
+    try:
+        banned_entry, created = BannedUser.objects.get_or_create(
+            user=target_user,
+            group=group,
+            defaults={'banned_by': request.user, 'reason': reason or 'Banned from group.'},
+        )
+        if not created and reason:
+            banned_entry.reason = reason
+            banned_entry.save(update_fields=['reason'])
+
+        if created:
+            remove_user_rsvps_for_group(target_user, group)
+            create_notification(
+                target_user,
+                f'You have been banned from {group.name} and can no longer RSVP to this group\'s events.',
+                link=reverse('group_detail', kwargs={'group_id': group.id}),
+            )
+            AuditLog.log_action(
+                user=request.user,
+                action='user_banned',
+                description=f'Banned {target_user.username} from group {group.name}',
+                target_user=target_user,
+                group=group,
+                ip_address=request.META.get('REMOTE_ADDR'),
+                user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                additional_data={
+                    'ban_type': 'group',
+                    'group_name': group.name,
+                    'reason': reason or 'Banned from group',
+                    'banned_by': request.user.username,
+                },
+            )
+
+        message = (
+            f'@{target_user.username} has been banned from {group.name}.'
+            if created else
+            f'@{target_user.username} is already banned from {group.name}.'
+        )
+        return JsonResponse({'status': 'success', 'message': message})
     except Exception as e:
         return JsonResponse({'status': 'error', 'message': f'An unexpected error occurred: {str(e)}'}, status=500)
 
@@ -447,8 +538,14 @@ def administration(request):
 
     group_form = GroupForm()
     rename_group_forms = {group.id: RenameGroupForm(instance=group) for group in all_groups}
-    user_profile_forms = {user_obj.id: UserProfileForm(instance=user_obj.profile, prefix=f'profile_{user_obj.id}') for user_obj in all_users}
-    all_banned_users = BannedUser.objects.all().select_related('user', 'group', 'banned_by', 'organizer').order_by('-banned_at')
+    user_profile_forms = {
+        user_obj.id: UserProfileForm(instance=user_obj.profile, prefix=f'profile_{user_obj.id}')
+        for user_obj in users_to_promote
+    }
+    all_banned_users = BannedUser.objects.filter(
+        group__isnull=True,
+        organizer__isnull=True,
+    ).select_related('user', 'banned_by').order_by('-banned_at')
 
     # Get audit log entries with filtering
     audit_search = request.GET.get('audit_search', '').strip()
@@ -521,11 +618,15 @@ def administration(request):
                     profile_form = UserProfileForm(request.POST, instance=user_obj.profile, prefix=f'profile_{user_obj.id}')
                     if profile_form.is_valid():
                         old_data = {
-                            'admin_groups': list(user_obj.profile.admin_groups.all().values_list('name', flat=True))
+                            'admin_groups': list(
+                                GroupRole.objects.filter(user=user_obj).values_list('group__name', flat=True)
+                            )
                         }
                         profile_form.save()
                         new_data = {
-                            'admin_groups': list(user_obj.profile.admin_groups.all().values_list('name', flat=True))
+                            'admin_groups': list(
+                                GroupRole.objects.filter(user=user_obj).values_list('group__name', flat=True)
+                            )
                         }
                         
                         # Log the profile update
@@ -651,7 +752,11 @@ def administration(request):
             admin_name = request.user.profile.get_display_name() if hasattr(request.user, 'profile') else request.user.username
             full_message = f"{admin_name}: {message}"
             for user in users:
-                Notification.objects.create(user=user, message=full_message, link=link)
+                Notification.objects.create(
+                    user=user,
+                    message=full_message,
+                    link=normalize_notification_link(link),
+                )
             
             # Log the bulk notification
             AuditLog.log_action(
@@ -802,36 +907,72 @@ def send_notification(request):
         User = get_user_model()
         users = User.objects.filter(id__in=user_ids)
         for user in users:
-            create_notification(user, message, link='/users/notifications/')
+            create_notification(user, message, link=reverse('notifications_page'))
         messages.success(request, f"Notification sent to {users.count()} user(s).")
         return redirect(reverse('administration'))
     else:
         messages.error(request, "Invalid request method.")
         return redirect(reverse('administration'))
 
-# New view for username suggestions
-@user_passes_test(lambda u: u.is_superuser)
+# Username suggestions for admins and group leaders
+@login_required
 def user_search_autocomplete(request):
     query = request.GET.get('q', '')
     exclude_current = request.GET.get('exclude_current', 'false').lower() == 'true'
     is_organizer_filter = request.GET.get('is_organizer', 'false').lower() == 'true'
+    group_id = request.GET.get('group_id')
+    exclude_banned_group = request.GET.get('exclude_banned_group')
+
+    if not request.user.is_superuser:
+        if not group_id:
+            return JsonResponse({'results': []}, status=403)
+        try:
+            group = Group.objects.get(id=group_id)
+        except Group.DoesNotExist:
+            return JsonResponse({'results': []}, status=404)
+        if not GroupRole.objects.filter(user=request.user, group=group).exists():
+            return JsonResponse({'results': []}, status=403)
 
     if query:
-        users_query = User.objects.filter(
-            Q(username__icontains=query) | 
+        users_query = User.objects.select_related('profile')
+
+        if group_id and not request.user.is_superuser:
+            # Group leaders may only resolve an exact username (no display-name search).
+            user = users_query.filter(username__iexact=query).first()
+            if not user:
+                return JsonResponse({'results': []})
+            if exclude_current and user.id == request.user.id:
+                return JsonResponse({'results': []})
+            if exclude_banned_group and BannedUser.objects.filter(
+                group_id=exclude_banned_group, user_id=user.id
+            ).exists():
+                return JsonResponse({'results': []})
+            return JsonResponse({'results': [{
+                'id': user.id,
+                'text': user.username,
+                'username': user.username,
+            }]})
+
+        users_query = users_query.filter(
+            Q(username__icontains=query) |
             Q(profile__display_name__icontains=query)
-        ).select_related('profile')
+        )
 
         if exclude_current:
             users_query = users_query.exclude(id=request.user.id)
 
         if is_organizer_filter:
-            # Only include users who are a leader of any group
             users_query = users_query.filter(grouprole__isnull=False).distinct()
+
+        if exclude_banned_group:
+            banned_ids = BannedUser.objects.filter(
+                group_id=exclude_banned_group
+            ).values_list('user_id', flat=True)
+            users_query = users_query.exclude(id__in=banned_ids)
 
         users = users_query[:10]
         results = [{
-            'id': user.id, 
+            'id': user.id,
             'text': f"{user.profile.get_display_name()} ({user.username})",
             'username': user.username,
             'display_name': user.profile.get_display_name()
@@ -851,7 +992,8 @@ def get_notifications(request):
             'message': notification.message,
             'is_read': notification.is_read,
             'timestamp': notification.timestamp.isoformat(), # ISO format for easy JS parsing
-            'link': notification.link
+            'link': normalize_notification_link(notification.link),
+            'event_name': notification.event_name,
         })
     return JsonResponse({'notifications': notification_list, 'unread_count': unread_count})
 
@@ -893,8 +1035,35 @@ def purge_read_notifications(request):
 @login_required
 @ensure_csrf_cookie
 def notifications_page(request):
-    notifications = Notification.objects.filter(user=request.user).order_by('-timestamp')
-    return render(request, 'users/notifications.html', {'notifications': notifications})
+    notifications = list(
+        Notification.objects.filter(user=request.user).order_by('-timestamp')
+    )
+    today = timezone.localdate()
+    yesterday = today - timedelta(days=1)
+    unread_count = sum(1 for n in notifications if not n.is_read)
+
+    notification_groups = []
+    current_date = None
+    current_items = []
+    for notification in notifications:
+        notification_date = timezone.localtime(notification.timestamp).date()
+        if notification_date != current_date:
+            if current_date is not None:
+                notification_groups.append({'date': current_date, 'items': current_items})
+            current_date = notification_date
+            current_items = [notification]
+        else:
+            current_items.append(notification)
+    if current_date is not None:
+        notification_groups.append({'date': current_date, 'items': current_items})
+
+    return render(request, 'users/notifications.html', {
+        'notification_groups': notification_groups,
+        'unread_count': unread_count,
+        'total_count': len(notifications),
+        'today': today,
+        'yesterday': yesterday,
+    })
 
 @login_required
 @user_passes_test(lambda u: u.is_superuser)
@@ -910,7 +1079,11 @@ def send_bulk_notification(request):
         admin_name = request.user.profile.get_display_name() if hasattr(request.user, 'profile') else request.user.username
         full_message = f"{admin_name}: {message}"
         for user in users:
-            Notification.objects.create(user=user, message=full_message, link=link)
+            Notification.objects.create(
+                user=user,
+                message=full_message,
+                link=normalize_notification_link(link),
+            )
         messages.success(request, f'Notification sent to {users.count()} users.')
         return redirect('administration')
     else:
@@ -1208,7 +1381,7 @@ def twofa_enable(request):
 def twofa_disable(request):
     if request.method == 'POST':
         TOTPDevice.objects.filter(user=request.user).delete()
-        return redirect('twofa_settings')
+        return redirect('profile')
     return render(request, 'users/2fa_disable.html')
 
 @csrf_protect

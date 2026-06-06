@@ -1,144 +1,135 @@
 {% extends "events/base.html" %}
 {% load static %}
 
-{% block title %}Organizer Tools - {{ event.title }} - FURsvp{% endblock %}
+{% block title %}Badges &amp; Exporting - {{ event.title }} - FURsvp{% endblock %}
 
 {% block content %}
-<div class="container">
-    <div class="row mb-4">
-        <div class="col-12">
-            <h1 class="mb-3">
-                <i class="material-icons" style="vertical-align: middle;">build</i>
-                Organizer Tools
-            </h1>
-            <h3 class="text-muted">{{ event.title }}</h3>
-            <p class="text-muted">{{ event.date|date:"F d, Y" }}</p>
-            <a href="{% url 'event_detail' event.id %}" class="btn btn-secondary mb-3">
-                <i class="material-icons" style="vertical-align: middle;">arrow_back</i>
-                Back to Event
+<div class="container py-4">
+    <div class="organizer-tools-page">
+        <div class="organizer-tools-header">
+            <div class="organizer-tools-header-main">
+                <div class="organizer-tools-header-icon">
+                    <i class="material-icons">badge</i>
+                </div>
+                <div>
+                    <h1 class="organizer-tools-title">Badges &amp; Exporting</h1>
+                    <p class="organizer-tools-subtitle">{{ event.title }} · {{ event.date|date:"F j, Y" }}</p>
+                </div>
+            </div>
+            <a href="{% url 'event_detail' event.id %}" class="organizer-tools-btn organizer-tools-btn--secondary" style="width: auto;">
+                <i class="material-icons">arrow_back</i> Back to Event
             </a>
         </div>
-    </div>
 
-    <div class="row mb-4">
-        <div class="col-md-4 mb-3">
-            <div class="card h-100">
-                <div class="card-body">
-                    <h4 class="card-title">
-                        <i class="material-icons text-primary" style="vertical-align: middle;">file_download</i>
-                        Export Attendees
-                    </h4>
-                    <p class="card-text">Download a CSV file with all attendee information including badge numbers, contact details, and RSVP questions.</p>
-                    <a href="{% url 'export_attendees_csv' event.id %}" class="btn btn-primary">
-                        <i class="material-icons" style="vertical-align: middle;">download</i>
-                        Download CSV
-                    </a>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-4 mb-3">
-            <div class="card h-100">
-                <div class="card-body">
-                    <h4 class="card-title">
-                        <i class="material-icons text-primary" style="vertical-align: middle;">badge</i>
-                        Generate Badge Stickers
-                    </h4>
-                    <p class="card-text">Create printable badge stickers for Avery 5162 sheets with names, badge numbers, QR codes for organizer check-in, and accessibility icons where needed.</p>
-                    <p class="text-muted small"><i class="material-icons" style="font-size: 14px; vertical-align: middle;">info</i> Configure accessibility and rank per attendee below</p>
-                    <a href="{% url 'generate_badges' event.id %}" class="btn btn-primary" id="generateBadgesBtn">
-                        <i class="material-icons" style="vertical-align: middle;">print</i>
-                        Generate Badge Stickers
-                    </a>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-md-4 mb-3">
-            <div class="card h-100">
-                <div class="card-body">
-                    <h4 class="card-title">
-                        <i class="material-icons text-primary" style="vertical-align: middle;">checklist</i>
-                        Check-in Sheet
-                    </h4>
-                    <p class="card-text">Generate a simple printable sheet with attendee names and checkboxes for manual check-in at the event.</p>
-                    <a href="{% url 'generate_checkin_sheet' event.id %}" class="btn btn-primary">
-                        <i class="material-icons" style="vertical-align: middle;">print</i>
-                        Generate Check-in Sheet
-                    </a>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="row">
-        <div class="col-12">
-            <div class="card">
-                <div class="card-body">
-                    <h4 class="card-title">
-                        <i class="material-icons text-primary" style="vertical-align: middle;">reorder</i>
-                        Attendee List & Badge Order
-                    </h4>
-                    <p class="card-text mb-3">By default, badge numbers are assigned based on RSVP timestamp (first come, first served). Drag and drop to reorder attendees and customize badge numbers.</p>
-                    
-                    <div class="alert alert-info">
-                        <i class="material-icons" style="vertical-align: middle;">info</i>
-                        Total Attendees: <strong>{{ rsvps.count }}</strong>
+        <div class="organizer-tools-body">
+            <div class="organizer-tools-actions-grid mb-3">
+                <div class="organizer-tools-action-card">
+                    <div class="organizer-tools-action-icon organizer-tools-action-icon--export">
+                        <i class="material-icons">file_download</i>
                     </div>
+                    <h3 class="organizer-tools-action-title">Export Attendees</h3>
+                    <p class="organizer-tools-action-text">Download a CSV with badge numbers, contact info, accessibility flags, ranks, and RSVP question answers.</p>
+                    <a href="{% url 'export_attendees_csv' event.id %}" class="organizer-tools-btn organizer-export-link">
+                        <i class="material-icons">download</i> Download CSV
+                    </a>
+                </div>
 
-                    <div id="attendee-list" class="list-group mb-3">
-                        {% for rsvp in rsvps %}
-                        <div class="list-group-item" data-rsvp-id="{{ rsvp.id }}" draggable="true">
-                            <div class="d-flex align-items-center gap-3">
-                                <span class="badge bg-primary badge-number" style="font-size: 1.2rem; min-width: 50px;">
-                                    #{{ forloop.counter }}
-                                </span>
-                                <i class="material-icons text-muted" style="cursor: move;">drag_indicator</i>
-                                <div style="min-width: 200px;">
-                                    <strong>
-                                        {% if rsvp.user and rsvp.user.profile %}
-                                            {{ rsvp.user.profile.get_display_name }}
-                                        {% elif rsvp.user %}
-                                            {{ rsvp.user.username }}
-                                        {% else %}
-                                            {{ rsvp.name|default:"Anonymous" }}
-                                        {% endif %}
-                                    </strong>
-                                    <span class="text-muted">
-                                        ({{ rsvp.get_status_display }})
-                                    </span>
-                                </div>
-                                <div class="form-check mb-0" style="min-width: 180px;">
-                                    <input class="form-check-input accessibility-checkbox" type="checkbox" 
-                                           id="accessibility-{{ rsvp.id }}" 
-                                           data-rsvp-id="{{ rsvp.id }}"
-                                           {% if rsvp.accessibility_needs %}checked{% endif %}>
-                                    <label class="form-check-label" for="accessibility-{{ rsvp.id }}">
-                                        ♿ Accessibility Needs
-                                    </label>
-                                </div>
-                                <div class="input-group input-group-sm" style="max-width: 350px;">
-                                    <span class="input-group-text">Rank/Role:</span>
-                                    <input type="text" class="form-control rank-input" 
-                                           placeholder="e.g., Sponsor, VIP, Staff" 
-                                           data-rsvp-id="{{ rsvp.id }}"
-                                           value="{{ rsvp.custom_rank|default:'' }}">
-                                    <button class="btn btn-outline-secondary save-rank-btn" type="button" data-rsvp-id="{{ rsvp.id }}" title="Save">
-                                        <i class="material-icons" style="font-size: 18px;">save</i>
-                                    </button>
-                                </div>
+                <div class="organizer-tools-action-card">
+                    <div class="organizer-tools-action-icon organizer-tools-action-icon--badges">
+                        <i class="material-icons">badge</i>
+                    </div>
+                    <h3 class="organizer-tools-action-title">Badge Stickers</h3>
+                    <p class="organizer-tools-action-text">Print Avery 5162 labels with names, badge numbers, QR check-in codes, ranks, and accessibility icons.</p>
+                    <a href="{% url 'generate_badges' event.id %}" class="organizer-tools-btn organizer-order-link">
+                        <i class="material-icons">print</i> Generate Badges
+                    </a>
+                </div>
+
+                <div class="organizer-tools-action-card">
+                    <div class="organizer-tools-action-icon organizer-tools-action-icon--checkin">
+                        <i class="material-icons">checklist</i>
+                    </div>
+                    <h3 class="organizer-tools-action-title">Check-in Sheet</h3>
+                    <p class="organizer-tools-action-text">Print a manual check-in list with badge numbers, names, and checkboxes for door staff.</p>
+                    <a href="{% url 'generate_checkin_sheet' event.id %}" class="organizer-tools-btn organizer-order-link">
+                        <i class="material-icons">print</i> Generate Sheet
+                    </a>
+                </div>
+            </div>
+
+            <div class="organizer-tools-panel">
+                <h6 class="organizer-tools-section-label">Attendee list &amp; badge order</h6>
+                <p class="organizer-tools-hint mb-3">Badge numbers follow RSVP order by default. Drag rows to reorder — exports and printouts use the order shown below.</p>
+
+                <div class="organizer-tools-stats">
+                    <span class="organizer-tools-stat">
+                        <i class="material-icons">groups</i>
+                        {{ rsvps|length }} attendee{{ rsvps|length|pluralize }}
+                    </span>
+                    <span class="organizer-tools-stat">
+                        <i class="material-icons">drag_indicator</i>
+                        Drag to reorder
+                    </span>
+                </div>
+
+                <div id="attendee-list" class="organizer-attendee-list">
+                    {% for rsvp in rsvps %}
+                    <div class="organizer-attendee-row" data-rsvp-id="{{ rsvp.id }}" draggable="true">
+                        <span class="organizer-badge-num badge-number">#{{ forloop.counter }}</span>
+                        <span class="organizer-drag-handle" aria-hidden="true"><i class="material-icons">drag_indicator</i></span>
+                        <div class="organizer-attendee-main">
+                            <p class="organizer-attendee-name">
+                                {% if rsvp.user and rsvp.user.profile %}
+                                    {{ rsvp.user.profile.get_display_name }}
+                                {% elif rsvp.user %}
+                                    {{ rsvp.user.username }}
+                                {% else %}
+                                    {{ rsvp.name|default:"Anonymous" }}
+                                {% endif %}
+                            </p>
+                            <div class="organizer-attendee-meta">
+                                {% if rsvp.status == 'confirmed' %}
+                                <span class="organizer-status-chip organizer-status-chip--confirmed">Confirmed</span>
+                                {% else %}
+                                <span class="organizer-status-chip organizer-status-chip--waitlisted">Waitlisted</span>
+                                {% endif %}
+                                {% if rsvp.custom_rank %}
+                                <span class="organizer-status-chip organizer-status-chip--confirmed">{{ rsvp.custom_rank }}</span>
+                                {% endif %}
                             </div>
                         </div>
-                        {% empty %}
-                        <div class="list-group-item text-center text-muted">
-                            No attendees yet
+                        <div class="organizer-attendee-controls">
+                            <label class="organizer-access-pill">
+                                <input class="accessibility-checkbox" type="checkbox"
+                                       id="accessibility-{{ rsvp.id }}"
+                                       data-rsvp-id="{{ rsvp.id }}"
+                                       {% if rsvp.accessibility_needs %}checked{% endif %}>
+                                Accessibility
+                            </label>
+                            <div class="organizer-rank-field">
+                                <span class="organizer-rank-label">Rank</span>
+                                <input type="text" class="organizer-rank-input rank-input"
+                                       placeholder="Sponsor, VIP, Staff…"
+                                       data-rsvp-id="{{ rsvp.id }}"
+                                       value="{{ rsvp.custom_rank|default:'' }}"
+                                       aria-label="Rank or role">
+                                <button class="organizer-rank-save save-rank-btn" type="button" data-rsvp-id="{{ rsvp.id }}" title="Save rank">
+                                    <i class="material-icons">save</i>
+                                </button>
+                            </div>
                         </div>
-                        {% endfor %}
                     </div>
+                    {% empty %}
+                    <div class="organizer-attendee-empty">No confirmed or waitlisted attendees yet.</div>
+                    {% endfor %}
+                </div>
 
-                    <button class="btn btn-secondary" id="resetOrder">
-                        <i class="material-icons" style="vertical-align: middle;">refresh</i>
-                        Reset to Default Order
+                <div class="organizer-tools-footer-actions">
+                    <a href="{% url 'generate_badges' event.id %}" class="organizer-tools-btn organizer-order-link">
+                        <i class="material-icons">print</i> Generate Badges (this order)
+                    </a>
+                    <button type="button" class="organizer-tools-btn organizer-tools-btn--secondary" id="resetOrder">
+                        <i class="material-icons">refresh</i> Reset to RSVP order
                     </button>
                 </div>
             </div>
@@ -149,54 +140,9 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const eventId = {{ event.id }};
-    
-    // Handle individual accessibility checkboxes
-    document.querySelectorAll('.accessibility-checkbox').forEach(checkbox => {
-        checkbox.addEventListener('change', function() {
-            const rsvpId = this.getAttribute('data-rsvp-id');
-            updateBadgeSettings(rsvpId, {
-                accessibility_needs: this.checked ? 'true' : 'false'
-            });
-        });
-    });
-    
-    // Handle rank/role save buttons
-    document.querySelectorAll('.save-rank-btn').forEach(button => {
-        button.addEventListener('click', function() {
-            const rsvpId = this.getAttribute('data-rsvp-id');
-            const rankInput = document.querySelector(`.rank-input[data-rsvp-id="${rsvpId}"]`);
-            updateBadgeSettings(rsvpId, {
-                custom_rank: rankInput.value
-            });
-        });
-    });
-    
-    // Function to update badge settings via AJAX
-    function updateBadgeSettings(rsvpId, data) {
-        fetch(`/event/${eventId}/rsvp/${rsvpId}/update-badge-settings/`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded',
-                'X-CSRFToken': getCookie('csrftoken')
-            },
-            body: new URLSearchParams(data)
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.status === 'success') {
-                // Show success feedback
-                showToast('Badge settings updated successfully', 'success');
-            } else {
-                showToast('Error updating settings: ' + data.message, 'error');
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            showToast('Error updating settings', 'error');
-        });
-    }
-    
-    // Helper function to get CSRF token
+    const attendeeList = document.getElementById('attendee-list');
+    let draggedItem = null;
+
     function getCookie(name) {
         let cookieValue = null;
         if (document.cookie && document.cookie !== '') {
@@ -211,90 +157,137 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         return cookieValue;
     }
-    
-    // Simple toast notification function
+
     function showToast(message, type) {
         const toast = document.createElement('div');
-        toast.className = `alert alert-${type === 'success' ? 'success' : 'danger'} position-fixed top-0 end-0 m-3`;
-        toast.style.zIndex = '9999';
+        toast.className = 'organizer-tools-toast organizer-tools-toast--' + (type === 'success' ? 'success' : 'error');
         toast.textContent = message;
         document.body.appendChild(toast);
-        setTimeout(() => toast.remove(), 3000);
+        setTimeout(function() { toast.remove(); }, 3000);
     }
 
-    // Drag and drop functionality
-    const attendeeList = document.getElementById('attendee-list');
-    let draggedItem = null;
-
-    attendeeList.addEventListener('dragstart', function(e) {
-        draggedItem = e.target.closest('.list-group-item');
-        e.dataTransfer.effectAllowed = 'move';
-        draggedItem.classList.add('opacity-50');
-    });
-
-    attendeeList.addEventListener('dragend', function(e) {
-        draggedItem.classList.remove('opacity-50');
-        updateBadgeNumbers();
-    });
-
-    attendeeList.addEventListener('dragover', function(e) {
-        e.preventDefault();
-        const afterElement = getDragAfterElement(attendeeList, e.clientY);
-        const draggable = draggedItem;
-        if (afterElement == null) {
-            attendeeList.appendChild(draggable);
-        } else {
-            attendeeList.insertBefore(draggable, afterElement);
-        }
-    });
-
-    function getDragAfterElement(container, y) {
-        const draggableElements = [...container.querySelectorAll('.list-group-item:not(.opacity-50)')];
-        
-        return draggableElements.reduce((closest, child) => {
-            const box = child.getBoundingClientRect();
-            const offset = y - box.top - box.height / 2;
-            if (offset < 0 && offset > closest.offset) {
-                return { offset: offset, element: child };
+    function updateBadgeSettings(rsvpId, data) {
+        fetch('/event/' + eventId + '/rsvp/' + rsvpId + '/update-badge-settings/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                'X-CSRFToken': getCookie('csrftoken')
+            },
+            body: new URLSearchParams(data)
+        })
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            if (data.status === 'success') {
+                showToast('Saved', 'success');
             } else {
-                return closest;
+                showToast('Error: ' + data.message, 'error');
             }
-        }, { offset: Number.NEGATIVE_INFINITY }).element;
-    }
-
-    function updateBadgeNumbers() {
-        const items = attendeeList.querySelectorAll('.list-group-item');
-        items.forEach((item, index) => {
-            const badgeNumber = item.querySelector('.badge-number');
-            if (badgeNumber) {
-                badgeNumber.textContent = `#${index + 1}`;
-            }
+        })
+        .catch(function() {
+            showToast('Error saving settings', 'error');
         });
     }
 
-    function getOrderedRsvpIds() {
-        const items = attendeeList.querySelectorAll('.list-group-item');
-        const ids = [];
-        items.forEach(item => {
-            const rsvpId = item.getAttribute('data-rsvp-id');
-            if (rsvpId) {
-                ids.push(rsvpId);
+    document.querySelectorAll('.accessibility-checkbox').forEach(function(checkbox) {
+        checkbox.addEventListener('change', function() {
+            updateBadgeSettings(this.getAttribute('data-rsvp-id'), {
+                accessibility_needs: this.checked ? 'true' : 'false'
+            });
+        });
+    });
+
+    document.querySelectorAll('.save-rank-btn').forEach(function(button) {
+        button.addEventListener('click', function() {
+            const rsvpId = this.getAttribute('data-rsvp-id');
+            const rankInput = document.querySelector('.rank-input[data-rsvp-id="' + rsvpId + '"]');
+            updateBadgeSettings(rsvpId, { custom_rank: rankInput.value });
+        });
+    });
+
+    document.querySelectorAll('.rank-input').forEach(function(input) {
+        input.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                updateBadgeSettings(this.getAttribute('data-rsvp-id'), { custom_rank: this.value });
             }
+        });
+    });
+
+    function getOrderedRsvpIds() {
+        const ids = [];
+        attendeeList.querySelectorAll('.organizer-attendee-row[data-rsvp-id]').forEach(function(item) {
+            ids.push(item.getAttribute('data-rsvp-id'));
         });
         return ids.join(',');
     }
 
-    // Generate badges with custom order
-    document.getElementById('regenerateBadgesOrdered').addEventListener('click', function() {
+    function urlWithOrder(baseUrl) {
         const order = getOrderedRsvpIds();
-        window.location.href = `{% url 'generate_badges' event.id %}?order=${order}`;
+        if (!order) return baseUrl;
+        const separator = baseUrl.indexOf('?') >= 0 ? '&' : '?';
+        return baseUrl + separator + 'order=' + encodeURIComponent(order);
+    }
+
+    document.querySelectorAll('.organizer-order-link, .organizer-export-link').forEach(function(link) {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            window.location.href = urlWithOrder(this.getAttribute('href'));
+        });
     });
 
-    // Reset to default order
+    function updateBadgeNumbers() {
+        attendeeList.querySelectorAll('.organizer-attendee-row[data-rsvp-id]').forEach(function(item, index) {
+            const badgeNumber = item.querySelector('.badge-number');
+            if (badgeNumber) {
+                badgeNumber.textContent = '#' + (index + 1);
+            }
+        });
+    }
+
+    if (attendeeList) {
+        attendeeList.addEventListener('dragstart', function(e) {
+            draggedItem = e.target.closest('.organizer-attendee-row');
+            if (!draggedItem) return;
+            e.dataTransfer.effectAllowed = 'move';
+            draggedItem.classList.add('is-dragging');
+        });
+
+        attendeeList.addEventListener('dragend', function() {
+            if (draggedItem) {
+                draggedItem.classList.remove('is-dragging');
+            }
+            updateBadgeNumbers();
+        });
+
+        attendeeList.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            if (!draggedItem) return;
+            const afterElement = getDragAfterElement(attendeeList, e.clientY);
+            if (afterElement == null) {
+                attendeeList.appendChild(draggedItem);
+            } else {
+                attendeeList.insertBefore(draggedItem, afterElement);
+            }
+        });
+    }
+
+    function getDragAfterElement(container, y) {
+        const draggableElements = Array.from(
+            container.querySelectorAll('.organizer-attendee-row:not(.is-dragging)')
+        );
+        return draggableElements.reduce(function(closest, child) {
+            const box = child.getBoundingClientRect();
+            const offset = y - box.top - box.height / 2;
+            if (offset < 0 && offset > closest.offset) {
+                return { offset: offset, element: child };
+            }
+            return closest;
+        }, { offset: Number.NEGATIVE_INFINITY }).element;
+    }
+
     document.getElementById('resetOrder').addEventListener('click', function() {
         location.reload();
     });
 });
 </script>
 {% endblock %}
-
