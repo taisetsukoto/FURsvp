@@ -7,6 +7,7 @@ register = template.Library()
 ADMINISTRATION_QUERY_KEYS = (
     'user_search', 'user_page', 'group_search', 'group_page',
     'audit_search', 'audit_user_filter', 'audit_action_filter', 'audit_page',
+    'blocked_search', 'blocked_source_filter', 'blocked_page',
     'tab', 'blog_page',
 )
 

@@ -3,10 +3,10 @@ from django.contrib import messages
 from django.contrib.auth.models import User
 from django.contrib.auth import login, authenticate
 from django.contrib.auth.views import LoginView, PasswordResetView, PasswordResetDoneView, PasswordResetConfirmView, PasswordResetCompleteView
-from .forms import UserRegisterForm, UserProfileForm, AssistantAssignmentForm, UserPublicProfileForm, UserPasswordChangeForm, TurnstileVerificationForm, PasswordResetFormWithTurnstile
+from .forms import UserRegisterForm, UserProfileForm, AssistantAssignmentForm, UserPublicProfileForm, UserPasswordChangeForm, TurnstileVerificationForm, PasswordResetFormWithTurnstile, BlockedTermForm
 from events.models import Group, RSVP, Event
 from events.forms import GroupForm, RenameGroupForm
-from .models import Profile, GroupDelegation, BannedUser, Notification, GroupRole, AuditLog
+from .models import Profile, GroupDelegation, BannedUser, Notification, GroupRole, AuditLog, BlockedTerm
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST, require_GET
@@ -590,6 +590,44 @@ def administration(request):
     bluesky_posts = []
     bluesky_posts_page = []
     bluesky_posts_paginator = None
+    blocked_term_form = BlockedTermForm()
+    paginated_blocked_terms = None
+    blocked_search = ''
+    blocked_source_filter = ''
+    blocked_term_stats = {'total': 0, 'active': 0, 'manual': 0, 'cmu': 0}
+
+    if request.user.is_superuser:
+        blocked_search = request.GET.get('blocked_search', '').strip()
+        blocked_source_filter = request.GET.get('blocked_source_filter', '').strip()
+
+        blocked_terms_qs = BlockedTerm.objects.all()
+        if blocked_search:
+            blocked_terms_qs = blocked_terms_qs.filter(
+                Q(term__icontains=blocked_search) | Q(notes__icontains=blocked_search)
+            )
+        if blocked_source_filter in (BlockedTerm.SOURCE_CMU, BlockedTerm.SOURCE_MANUAL):
+            blocked_terms_qs = blocked_terms_qs.filter(source=blocked_source_filter)
+
+        blocked_term_stats = {
+            'total': BlockedTerm.objects.count(),
+            'active': BlockedTerm.objects.filter(is_active=True).count(),
+            'manual': BlockedTerm.objects.filter(source=BlockedTerm.SOURCE_MANUAL).count(),
+            'cmu': BlockedTerm.objects.filter(source=BlockedTerm.SOURCE_CMU).count(),
+        }
+
+        blocked_paginator = Paginator(blocked_terms_qs, 25)
+        blocked_page = request.GET.get('blocked_page', 1)
+        try:
+            blocked_page = int(blocked_page)
+            if blocked_page < 1:
+                blocked_page = 1
+        except (TypeError, ValueError):
+            blocked_page = 1
+        try:
+            paginated_blocked_terms = blocked_paginator.page(blocked_page)
+        except (PageNotAnInteger, EmptyPage):
+            paginated_blocked_terms = blocked_paginator.page(1)
+
     if hasattr(request.user, 'profile') and getattr(request.user.profile, 'can_post_blog', False):
         try:
             bsky_handle = os.environ.get('BLUESKY_HANDLE')
@@ -833,6 +871,83 @@ def administration(request):
             
             return redirect('administration')
 
+        elif request.user.is_superuser and 'add_blocked_term_submit' in request.POST:
+            blocked_term_form = BlockedTermForm(request.POST)
+            if blocked_term_form.is_valid():
+                term_obj = blocked_term_form.save(commit=False)
+                term_obj.source = BlockedTerm.SOURCE_MANUAL
+                term_obj.is_active = True
+                term_obj.save()
+                AuditLog.log_action(
+                    user=request.user,
+                    action='other',
+                    description=f'Added blocked term: {term_obj.term}',
+                    ip_address=get_client_ip(request),
+                    user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                    additional_data={
+                        'term': term_obj.term,
+                        'match_mode': term_obj.match_mode,
+                    },
+                )
+                messages.success(request, f'Added blocked term "{term_obj.term}".', extra_tags='admin_notification')
+            else:
+                messages.error(request, 'Could not add blocked term. Check the form and try again.', extra_tags='admin_notification')
+            return redirect(f"{reverse('administration')}?tab=moderation-tab")
+
+        elif request.user.is_superuser and request.POST.get('action') == 'toggle_blocked_term':
+            term_id = request.POST.get('term_id')
+            try:
+                term_obj = BlockedTerm.objects.get(id=term_id)
+                term_obj.is_active = not term_obj.is_active
+                term_obj.save(update_fields=['is_active', 'updated_at'])
+                state = 'enabled' if term_obj.is_active else 'disabled'
+                messages.success(
+                    request,
+                    f'Blocked term "{term_obj.term}" {state}.',
+                    extra_tags='admin_notification',
+                )
+            except BlockedTerm.DoesNotExist:
+                messages.error(request, 'Blocked term not found.', extra_tags='admin_notification')
+            return redirect(f"{reverse('administration')}?tab=moderation-tab")
+
+        elif request.user.is_superuser and request.POST.get('action') == 'delete_blocked_term':
+            term_id = request.POST.get('term_id')
+            try:
+                term_obj = BlockedTerm.objects.get(id=term_id)
+                term_label = term_obj.term
+                term_obj.delete()
+                AuditLog.log_action(
+                    user=request.user,
+                    action='other',
+                    description=f'Deleted blocked term: {term_label}',
+                    ip_address=get_client_ip(request),
+                    user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                    additional_data={'term': term_label},
+                )
+                messages.success(request, f'Deleted blocked term "{term_label}".', extra_tags='admin_notification')
+            except BlockedTerm.DoesNotExist:
+                messages.error(request, 'Blocked term not found.', extra_tags='admin_notification')
+            return redirect(f"{reverse('administration')}?tab=moderation-tab")
+
+        elif request.user.is_superuser and 'import_cmu_blocked_terms' in request.POST:
+            from django.core.management import call_command
+            from io import StringIO
+
+            output = StringIO()
+            try:
+                call_command('import_blocked_terms', '--replace-cmu', stdout=output)
+                messages.success(request, 'CMU blocked terms list re-imported.', extra_tags='admin_notification')
+                AuditLog.log_action(
+                    user=request.user,
+                    action='other',
+                    description='Re-imported CMU blocked terms list',
+                    ip_address=get_client_ip(request),
+                    user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                )
+            except Exception as exc:
+                messages.error(request, f'CMU import failed: {exc}', extra_tags='admin_notification')
+            return redirect(f"{reverse('administration')}?tab=moderation-tab")
+
         return redirect('administration')
 
     context = {
@@ -854,6 +969,13 @@ def administration(request):
         'banner_type': cache.get('banner_type', 'info'),
         'bluesky_posts': bluesky_posts_page,
         'bluesky_posts_paginator': bluesky_posts_paginator,
+        'blocked_term_form': blocked_term_form,
+        'blocked_terms': paginated_blocked_terms,
+        'blocked_search': blocked_search,
+        'blocked_source_filter': blocked_source_filter,
+        'blocked_term_stats': blocked_term_stats,
+        'blocked_term_sources': BlockedTerm.SOURCE_CHOICES,
+        'blocked_term_match_modes': BlockedTerm.MATCH_MODE_CHOICES,
     }
     
     return render(request, 'users/administration.html', context)
@@ -922,6 +1044,7 @@ def user_search_autocomplete(request):
     is_organizer_filter = request.GET.get('is_organizer', 'false').lower() == 'true'
     group_id = request.GET.get('group_id')
     exclude_banned_group = request.GET.get('exclude_banned_group')
+    exclude_group_leaders = request.GET.get('exclude_group_leaders')
 
     if not request.user.is_superuser:
         if not group_id:
@@ -947,6 +1070,10 @@ def user_search_autocomplete(request):
                 group_id=exclude_banned_group, user_id=user.id
             ).exists():
                 return JsonResponse({'results': []})
+            if exclude_group_leaders and GroupRole.objects.filter(
+                group_id=exclude_group_leaders, user_id=user.id
+            ).exists():
+                return JsonResponse({'results': []})
             return JsonResponse({'results': [{
                 'id': user.id,
                 'text': user.username,
@@ -969,6 +1096,12 @@ def user_search_autocomplete(request):
                 group_id=exclude_banned_group
             ).values_list('user_id', flat=True)
             users_query = users_query.exclude(id__in=banned_ids)
+
+        if exclude_group_leaders:
+            leader_ids = GroupRole.objects.filter(
+                group_id=exclude_group_leaders
+            ).values_list('user_id', flat=True)
+            users_query = users_query.exclude(id__in=leader_ids)
 
         users = users_query[:10]
         results = [{

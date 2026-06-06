@@ -278,12 +278,29 @@ class RSVPForm(forms.ModelForm):
             })
         }
 
+class LeaderUserChoiceField(forms.ModelChoiceField):
+    """Accept any valid user id; options are loaded client-side via autocomplete."""
+
+    def valid_value(self, value):
+        if value in self.empty_values:
+            return False
+        try:
+            return User.objects.filter(pk=value).exists()
+        except (ValueError, TypeError):
+            return False
+
+
 class GroupRoleForm(forms.ModelForm):
+    user = LeaderUserChoiceField(
+        queryset=User.objects.none(),
+        empty_label='Search for a user…',
+        widget=forms.Select(attrs={'class': 'form-select leadership-user-select'}),
+    )
+
     class Meta:
         model = GroupRole
         fields = ['user', 'custom_label', 'can_post', 'can_manage_leadership']
         widgets = {
-            'user': forms.Select(attrs={'class': 'form-select leadership-user-select'}),
             'custom_label': forms.TextInput(attrs={
                 'class': 'form-control',
                 'placeholder': 'e.g. Organizer, Co-chair',
@@ -291,11 +308,21 @@ class GroupRoleForm(forms.ModelForm):
             'can_post': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'can_manage_leadership': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
-    
+
     def __init__(self, *args, **kwargs):
         group = kwargs.pop('group', None)
         super().__init__(*args, **kwargs)
+        self.group = group
         self.fields['custom_label'].required = True
         if group:
-            existing_users = GroupRole.objects.filter(group=group).values_list('user_id', flat=True)
-            self.fields['user'].queryset = User.objects.exclude(id__in=existing_users)
+            self.existing_user_ids = set(
+                GroupRole.objects.filter(group=group).values_list('user_id', flat=True)
+            )
+        else:
+            self.existing_user_ids = set()
+
+    def clean_user(self):
+        user = self.cleaned_data.get('user')
+        if user and user.id in self.existing_user_ids:
+            raise forms.ValidationError('This user is already a leader for this group.')
+        return user

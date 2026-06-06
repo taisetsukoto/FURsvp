@@ -2,10 +2,30 @@ from django import forms
 from django.contrib.auth.forms import UserCreationForm, PasswordChangeForm, PasswordResetForm
 from django.contrib.auth.models import User
 from events.models import Event, Group
-from users.models import Profile, GroupDelegation, GroupRole
+from users.models import Profile, GroupDelegation, GroupRole, BlockedTerm
+from users.content_moderation import validate_user_display_text
 from two_factor.forms import TOTPDeviceForm as BaseTOTPDeviceForm
 from turnstile.fields import TurnstileField
 import base64
+
+
+class ModeratedProfileFieldsMixin:
+    moderated_profile_fields = ('display_name', 'discord_username', 'telegram_username')
+
+    def clean_display_name(self):
+        value = self.cleaned_data.get('display_name')
+        validate_user_display_text(value)
+        return value
+
+    def clean_discord_username(self):
+        value = self.cleaned_data.get('discord_username')
+        validate_user_display_text(value)
+        return value
+
+    def clean_telegram_username(self):
+        value = self.cleaned_data.get('telegram_username')
+        validate_user_display_text(value)
+        return value
 
 
 class TurnstileMixin:
@@ -18,6 +38,11 @@ class TurnstileMixin:
 
 
 class UserRegisterForm(TurnstileMixin, UserCreationForm):
+    def clean_username(self):
+        username = super().clean_username()
+        validate_user_display_text(username)
+        return username
+
     eula_agreement = forms.BooleanField(
         required=True,
         label="I agree to the End User License Agreement (EULA)",
@@ -34,7 +59,7 @@ class UserRegisterForm(TurnstileMixin, UserCreationForm):
         model = User
         fields = ['username', 'email']
 
-class UserProfileForm(forms.ModelForm):
+class UserProfileForm(ModeratedProfileFieldsMixin, forms.ModelForm):
     admin_groups = forms.ModelMultipleChoiceField(
         queryset=Group.objects.all(),
         required=False,
@@ -49,15 +74,15 @@ class UserProfileForm(forms.ModelForm):
         widgets = {
             'display_name': forms.TextInput(attrs={
                 'class': 'form-control',
-                'placeholder': 'Enter your display name'
+                'placeholder': 'Enter your display name',
             }),
             'discord_username': forms.TextInput(attrs={
                 'class': 'form-control',
-                'placeholder': 'Enter your Discord username'
+                'placeholder': 'Enter your Discord username',
             }),
             'telegram_username': forms.TextInput(attrs={
                 'class': 'form-control',
-                'placeholder': 'Enter your Telegram username'
+                'placeholder': 'Enter your Telegram username',
             }),
             'profile_picture_base64': forms.HiddenInput(),
         }
@@ -83,7 +108,7 @@ class UserProfileForm(forms.ModelForm):
             GroupRole.objects.filter(user=self.instance.user).exclude(group__in=selected_groups).delete()
         return instance
 
-class UserPublicProfileForm(forms.ModelForm):
+class UserPublicProfileForm(ModeratedProfileFieldsMixin, forms.ModelForm):
     clear_profile_picture = forms.BooleanField(required=False, label="Remove Profile Picture")
     email = forms.EmailField(required=True, widget=forms.EmailInput(attrs={
         'class': 'form-control',
@@ -96,15 +121,15 @@ class UserPublicProfileForm(forms.ModelForm):
         widgets = {
             'display_name': forms.TextInput(attrs={
                 'class': 'form-control',
-                'placeholder': 'Your display name'
+                'placeholder': 'Your display name',
             }),
             'discord_username': forms.TextInput(attrs={
                 'class': 'form-control',
-                'placeholder': 'username'
+                'placeholder': 'username',
             }),
             'telegram_username': forms.TextInput(attrs={
                 'class': 'form-control',
-                'placeholder': '@username'
+                'placeholder': '@username',
             }),
             'profile_picture_base64': forms.HiddenInput(),
         }
@@ -160,7 +185,12 @@ class UserPasswordChangeForm(PasswordChangeForm):
 class GroupRoleForm(forms.ModelForm):
     class Meta:
         model = GroupRole
-        fields = ['user', 'custom_label', 'can_post', 'can_manage_leadership'] 
+        fields = ['user', 'custom_label', 'can_post', 'can_manage_leadership']
+
+    def clean_custom_label(self):
+        value = self.cleaned_data.get('custom_label')
+        validate_user_display_text(value)
+        return value
 
 class TOTPDeviceForm(BaseTOTPDeviceForm):
     def __init__(self, *args, **kwargs):
@@ -183,3 +213,36 @@ class TurnstileVerificationForm(TurnstileMixin, forms.Form):
 
 class PasswordResetFormWithTurnstile(TurnstileMixin, PasswordResetForm):
     pass
+
+
+class BlockedTermForm(forms.ModelForm):
+    class Meta:
+        model = BlockedTerm
+        fields = ['term', 'match_mode', 'notes']
+        widgets = {
+            'term': forms.TextInput(attrs={
+                'class': 'form-control admin-input',
+                'placeholder': 'e.g. impostor_admin',
+            }),
+            'match_mode': forms.Select(attrs={'class': 'form-select admin-select'}),
+            'notes': forms.TextInput(attrs={
+                'class': 'form-control admin-input',
+                'placeholder': 'Optional note',
+            }),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not self.instance.pk:
+            self.fields['match_mode'].initial = BlockedTerm.MATCH_EXACT
+
+    def clean_term(self):
+        term = self.cleaned_data.get('term', '').strip().lower()
+        if not term:
+            raise forms.ValidationError('Term is required.')
+        duplicate_qs = BlockedTerm.objects.filter(term__iexact=term)
+        if self.instance.pk:
+            duplicate_qs = duplicate_qs.exclude(pk=self.instance.pk)
+        if duplicate_qs.exists():
+            raise forms.ValidationError('This term is already in the blocked list.')
+        return term

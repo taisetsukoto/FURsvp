@@ -373,11 +373,28 @@
                 const userSelect = document.querySelector('#add-leader-form select.leadership-user-select');
                 if (userSelect && !userSelect.tomselect) {
                     new TomSelect(userSelect, {
+                        valueField: 'id',
+                        labelField: 'text',
+                        searchField: 'text',
                         create: false,
                         maxItems: 1,
                         placeholder: 'Search for a user…',
                         dropdownParent: 'body',
                         allowEmptyOption: true,
+                        load: function(query, callback) {
+                            if (!query.length) {
+                                return callback();
+                            }
+                            const params = new URLSearchParams({
+                                q: query,
+                                group_id: String({{ group.id }}),
+                                exclude_group_leaders: String({{ group.id }}),
+                            });
+                            fetch('{% url "user_search_autocomplete" %}?' + params.toString())
+                                .then(function(response) { return response.json(); })
+                                .then(function(data) { callback(data.results || []); })
+                                .catch(function() { callback(); });
+                        },
                     });
                 }
             });

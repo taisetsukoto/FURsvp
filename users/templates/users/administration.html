@@ -54,6 +54,14 @@
                         <span>Audit</span>
                     </button>
                 </li>
+                {% if user.is_superuser %}
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="moderation-tab" data-bs-toggle="tab" data-bs-target="#moderation" type="button" role="tab" aria-controls="moderation" aria-selected="false">
+                        <i class="material-icons">block</i>
+                        <span>Moderation</span>
+                    </button>
+                </li>
+                {% endif %}
                 {% if user.profile.can_post_blog %}
                 <li class="nav-item" role="presentation">
                     <button class="nav-link" id="blogmgmt-tab" data-bs-toggle="tab" data-bs-target="#blogmgmt" type="button" role="tab" aria-controls="blogmgmt" aria-selected="false">
@@ -685,6 +693,244 @@
                     </nav>
                     {% endif %}
                 </div>
+                {% if user.is_superuser %}
+                <div class="tab-pane fade" id="moderation" role="tabpanel" aria-labelledby="moderation-tab">
+                    <div class="moderation-header mb-4">
+                        <div class="moderation-header-copy">
+                            <h3 class="auth-tab-title mb-2">
+                                <i class="material-icons">block</i> Blocked names
+                            </h3>
+                            <p class="moderation-help mb-0">
+                                Checked against usernames, display names, and similar fields.
+                                <strong>Exact</strong> for reserved handles;
+                                <strong>Contains</strong> for substring matches.
+                            </p>
+                        </div>
+                        <div class="moderation-stats" aria-label="Blocked term statistics">
+                            <div class="moderation-stat">
+                                <span class="moderation-stat-value">{{ blocked_term_stats.total }}</span>
+                                <span class="moderation-stat-label">Total</span>
+                            </div>
+                            <div class="moderation-stat">
+                                <span class="moderation-stat-value">{{ blocked_term_stats.active }}</span>
+                                <span class="moderation-stat-label">Active</span>
+                            </div>
+                            <div class="moderation-stat">
+                                <span class="moderation-stat-value">{{ blocked_term_stats.manual }}</span>
+                                <span class="moderation-stat-label">Manual</span>
+                            </div>
+                            <div class="moderation-stat">
+                                <span class="moderation-stat-value">{{ blocked_term_stats.cmu }}</span>
+                                <span class="moderation-stat-label">CMU</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="profile-section-card moderation-toolbar mb-4">
+                        <form method="get" class="row g-3 align-items-end">
+                            {% admin_state_fields exclude="blocked_search,blocked_source_filter,blocked_page,tab" %}
+                            <input type="hidden" name="tab" value="moderation-tab">
+                            <div class="col-lg-5">
+                                <label for="blocked_search" class="auth-form-label">Search</label>
+                                <div class="input-group auth-input-group auth-input-group--search">
+                                    <span class="input-group-text"><i class="material-icons">search</i></span>
+                                    <input type="text" name="blocked_search" id="blocked_search" value="{{ blocked_search }}" class="form-control admin-input" placeholder="Term or note..." autocomplete="off">
+                                    {% if blocked_search %}
+                                    <a href="{% administration_url blocked_search='' blocked_page='' tab='moderation-tab' %}" class="admin-search-clear" aria-label="Clear search">
+                                        <i class="material-icons">close</i>
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="col-lg-4">
+                                <label for="blocked_source_filter" class="auth-form-label">Source</label>
+                                <select name="blocked_source_filter" id="blocked_source_filter" class="form-select admin-select">
+                                    <option value="">All sources</option>
+                                    {% for value, label in blocked_term_sources %}
+                                    <option value="{{ value }}" {% if blocked_source_filter == value %}selected{% endif %}>{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-lg-3">
+                                <button type="submit" class="profile-btn-primary admin-btn-inline moderation-filter-btn w-100">
+                                    <i class="material-icons">filter_list</i> Apply filters
+                                </button>
+                            </div>
+                        </form>
+                        {% if blocked_terms %}
+                        <p class="moderation-results-meta mb-0">
+                            Showing {{ blocked_terms.start_index }}–{{ blocked_terms.end_index }} of {{ blocked_terms.paginator.count }} term{{ blocked_terms.paginator.count|pluralize }}
+                            {% if blocked_search %} matching <strong>"{{ blocked_search }}"</strong>{% endif %}
+                        </p>
+                        {% endif %}
+                    </div>
+
+                    <details class="moderation-add-panel profile-section-card mb-4">
+                        <summary class="moderation-add-summary">
+                            <span class="moderation-add-summary-label">
+                                <i class="material-icons">add_circle_outline</i>
+                                Add blocked term
+                            </span>
+                            <span class="moderation-add-summary-hint">For trolling or reserved handles</span>
+                        </summary>
+                        <form method="post" class="moderation-add-form">
+                            {% csrf_token %}
+                            {% admin_state_fields %}
+                            <input type="hidden" name="tab" value="moderation-tab">
+                            <div class="row g-3 align-items-end">
+                                <div class="col-md-4">
+                                    <label for="{{ blocked_term_form.term.id_for_label }}" class="auth-form-label">Term</label>
+                                    {{ blocked_term_form.term }}
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="{{ blocked_term_form.match_mode.id_for_label }}" class="auth-form-label">Match mode</label>
+                                    {{ blocked_term_form.match_mode }}
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="{{ blocked_term_form.notes.id_for_label }}" class="auth-form-label">Notes</label>
+                                    {{ blocked_term_form.notes }}
+                                </div>
+                                <div class="col-md-2">
+                                    <button type="submit" name="add_blocked_term_submit" class="profile-btn-primary admin-btn-inline moderation-add-btn w-100">
+                                        <i class="material-icons">add</i> Add
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </details>
+
+                    <div class="table-responsive admin-table-wrap moderation-table-wrap">
+                        <table class="table admin-table moderation-table align-middle mb-0" id="blockedTermsTable">
+                            <thead>
+                                <tr>
+                                    <th scope="col">Term</th>
+                                    <th scope="col">Match</th>
+                                    <th scope="col">Source</th>
+                                    <th scope="col" class="d-none d-lg-table-cell">Notes</th>
+                                    <th scope="col">Status</th>
+                                    <th scope="col" class="text-end">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for term_obj in blocked_terms %}
+                                <tr class="{% if not term_obj.is_active %}moderation-row--inactive{% endif %}">
+                                    <td><span class="moderation-term">{{ term_obj.term }}</span></td>
+                                    <td>
+                                        <span class="moderation-pill moderation-pill--match">
+                                            {% if term_obj.match_mode == 'exact' %}Exact{% else %}Contains{% endif %}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span class="moderation-pill moderation-pill--source">
+                                            {% if term_obj.source == 'manual' %}Manual{% else %}CMU{% endif %}
+                                        </span>
+                                    </td>
+                                    <td class="text-muted small d-none d-lg-table-cell">{{ term_obj.notes|default:"" }}</td>
+                                    <td>
+                                        <span class="moderation-status {% if term_obj.is_active %}moderation-status--active{% else %}moderation-status--inactive{% endif %}">
+                                            <span class="moderation-status-dot" aria-hidden="true"></span>
+                                            {{ term_obj.is_active|yesno:"Active,Disabled" }}
+                                        </span>
+                                    </td>
+                                    <td class="text-end">
+                                        <div class="moderation-actions">
+                                            <form method="post" class="d-inline">
+                                                {% csrf_token %}
+                                                {% admin_state_fields %}
+                                                <input type="hidden" name="tab" value="moderation-tab">
+                                                <input type="hidden" name="action" value="toggle_blocked_term">
+                                                <input type="hidden" name="term_id" value="{{ term_obj.id }}">
+                                                <button type="submit" class="moderation-action-btn" title="{% if term_obj.is_active %}Disable term{% else %}Enable term{% endif %}">
+                                                    <i class="material-icons">{% if term_obj.is_active %}toggle_on{% else %}toggle_off{% endif %}</i>
+                                                    <span>{% if term_obj.is_active %}Disable{% else %}Enable{% endif %}</span>
+                                                </button>
+                                            </form>
+                                            {% if term_obj.source == 'manual' %}
+                                            <form method="post" class="d-inline" onsubmit="return confirm('Delete blocked term \'{{ term_obj.term|escapejs }}\'?');">
+                                                {% csrf_token %}
+                                                {% admin_state_fields %}
+                                                <input type="hidden" name="tab" value="moderation-tab">
+                                                <input type="hidden" name="action" value="delete_blocked_term">
+                                                <input type="hidden" name="term_id" value="{{ term_obj.id }}">
+                                                <button type="submit" class="moderation-action-btn moderation-action-btn--danger" title="Delete term">
+                                                    <i class="material-icons">delete_outline</i>
+                                                    <span>Delete</span>
+                                                </button>
+                                            </form>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="6" class="text-center py-5 text-muted">
+                                        <i class="material-icons d-block mb-2 moderation-empty-icon">search_off</i>
+                                        No blocked terms found.
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {% if blocked_terms.paginator.num_pages > 1 %}
+                    <nav aria-label="Blocked terms pagination" class="mt-4">
+                        <ul class="pagination justify-content-center material-circular-pagination">
+                            {% if blocked_terms.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link material-page-link" href="{% administration_url blocked_page=1 tab='moderation-tab' %}" aria-label="First">
+                                    <i class="material-icons" style="font-size: 24px;">first_page</i>
+                                </a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link material-page-link" href="{% administration_url blocked_page=blocked_terms.previous_page_number tab='moderation-tab' %}" aria-label="Previous">
+                                    <i class="material-icons" style="font-size: 24px;">chevron_left</i>
+                                </a>
+                            </li>
+                            {% endif %}
+                            {% for num in blocked_terms.paginator.page_range %}
+                                {% if blocked_terms.number == num %}
+                                    <li class="page-item active"><a class="page-link material-page-link active" href="#">{{ num }}</a></li>
+                                {% elif num > blocked_terms.number|add:'-3' and num < blocked_terms.number|add:'3' %}
+                                    <li class="page-item"><a class="page-link material-page-link" href="{% administration_url blocked_page=num tab='moderation-tab' %}">{{ num }}</a></li>
+                                {% endif %}
+                            {% endfor %}
+                            {% if blocked_terms.has_next %}
+                            <li class="page-item">
+                                <a class="page-link material-page-link" href="{% administration_url blocked_page=blocked_terms.next_page_number tab='moderation-tab' %}" aria-label="Next">
+                                    <i class="material-icons" style="font-size: 24px;">chevron_right</i>
+                                </a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link material-page-link" href="{% administration_url blocked_page=blocked_terms.paginator.num_pages tab='moderation-tab' %}" aria-label="Last">
+                                    <i class="material-icons" style="font-size: 24px;">last_page</i>
+                                </a>
+                            </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                    {% endif %}
+
+                    <div class="moderation-footer">
+                        <div class="moderation-footer-copy">
+                            <i class="material-icons">cloud_download</i>
+                            <div>
+                                <strong>CMU profanity list</strong>
+                                <p class="mb-0">Re-import the bundled list to refresh imported terms. Manual entries are kept.</p>
+                            </div>
+                        </div>
+                        <form method="post" class="moderation-footer-form" onsubmit="return confirm('Replace all CMU-imported terms with the bundled list?');">
+                            {% csrf_token %}
+                            {% admin_state_fields %}
+                            <input type="hidden" name="tab" value="moderation-tab">
+                            <button type="submit" name="import_cmu_blocked_terms" class="moderation-action-btn">
+                                <i class="material-icons">sync</i>
+                                <span>Re-import CMU list</span>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+                {% endif %}
                 {% if user.profile.can_post_blog %}
                 <div class="tab-pane fade" id="blogmgmt" role="tabpanel" aria-labelledby="blogmgmt-tab">
                     <form method="post" action="{% url 'post_to_bluesky' %}">
@@ -1030,6 +1276,8 @@
                 activeTabId = 'groups-tab';
             } else if (urlParams.get('audit_search') || urlParams.get('audit_user_filter') || urlParams.get('audit_action_filter')) {
                 activeTabId = 'audit-tab';
+            } else if (urlParams.get('blocked_search') || urlParams.get('blocked_source_filter') || urlParams.get('blocked_page')) {
+                activeTabId = 'moderation-tab';
             } else {
                 activeTabId = tabParam || lastTab;
             }
