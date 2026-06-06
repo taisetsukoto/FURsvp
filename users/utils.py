@@ -1,6 +1,13 @@
 from users.models import Notification
 from django.contrib.auth.models import User
 
+
+def get_client_ip(request):
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    if x_forwarded_for:
+        return x_forwarded_for.split(',')[0].strip()
+    return request.META.get('REMOTE_ADDR')
+
 def create_notification(user, message, link=None, event_name=None):
     """
     Creates a new notification for the specified user.

@@ -72,6 +72,24 @@
             padding: 2rem 0;
         }
 
+        .turnstile-wrap {
+            width: 100%;
+            border: 1.5px solid #e0e7ef;
+            border-radius: 0.7rem;
+            background: #f8fafc;
+            box-sizing: border-box;
+            overflow: hidden;
+        }
+
+        .turnstile-wrap .cf-turnstile {
+            width: 100%;
+            min-height: 65px;
+        }
+
+        .turnstile-wrap .cf-turnstile iframe {
+            width: 100% !important;
+        }
+
         .card {
             border: none;
             border-radius: 10px;
@@ -2774,7 +2792,7 @@
         {% endif %}
     </nav>
 
-    <footer class="gradient-footer mt-auto">
+    <footer class="gradient-footer">
         <div class="container text-center">
             <a href="{% url 'home' %}">
                 <img src="{% static 'fursvp-logo2025.png' %}" style="height: 125px;" alt="FURsvp Logo">

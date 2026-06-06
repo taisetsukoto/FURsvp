@@ -3,7 +3,7 @@ from django.contrib import messages
 from django.contrib.auth.models import User
 from django.contrib.auth import login, authenticate
 from django.contrib.auth.views import LoginView, PasswordResetView, PasswordResetDoneView, PasswordResetConfirmView, PasswordResetCompleteView
-from .forms import UserRegisterForm, UserProfileForm, AssistantAssignmentForm, UserPublicProfileForm, UserPasswordChangeForm
+from .forms import UserRegisterForm, UserProfileForm, AssistantAssignmentForm, UserPublicProfileForm, UserPasswordChangeForm, TurnstileVerificationForm, PasswordResetFormWithTurnstile
 from events.models import Group, RSVP, Event
 from events.forms import GroupForm, RenameGroupForm
 from .models import Profile, GroupDelegation, BannedUser, Notification, GroupRole, AuditLog
@@ -16,7 +16,7 @@ from django.db.models import Q
 from django.db import models, transaction
 import json
 from django.core.serializers.json import DjangoJSONEncoder
-from .utils import create_notification
+from .utils import create_notification, get_client_ip
 from django.contrib.auth import get_user_model
 from urllib.parse import urlparse
 import base64
@@ -51,8 +51,9 @@ from django.urls import reverse_lazy
 # Create your views here.
 
 def register(request):
+    remote_ip = get_client_ip(request)
     if request.method == 'POST':
-        form = UserRegisterForm(request.POST)
+        form = UserRegisterForm(request.POST, remote_ip=remote_ip)
         if form.is_valid():
             user = form.save(commit=False)
             user.save()
@@ -76,7 +77,7 @@ def register(request):
             messages.info(request, 'A verification email has been sent to your address. Please verify to activate your account.')
             return redirect('login')
     else:
-        form = UserRegisterForm()
+        form = UserRegisterForm(remote_ip=remote_ip)
     return render(request, 'users/register.html', {'form': form})
 
 def registration_success(request):
@@ -1129,9 +1130,15 @@ class CustomLoginView(LoginView):
 
 class CustomPasswordResetView(PasswordResetView):
     template_name = 'users/password_reset.html'
+    form_class = PasswordResetFormWithTurnstile
     email_template_name = 'users/password_reset_email.html'
     subject_template_name = 'users/password_reset_subject.txt'
     success_url = reverse_lazy('password_reset_done')
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['remote_ip'] = get_client_ip(self.request)
+        return kwargs
 
 class CustomPasswordResetDoneView(PasswordResetDoneView):
     template_name = 'users/password_reset_done.html'
@@ -1213,12 +1220,13 @@ def custom_login(request):
     token = request.POST.get('token') if request.method == 'POST' else ''
     pre_2fa_user_id = request.session.get('pre_2fa_user_id')
     user = None
+    remote_ip = get_client_ip(request)
+    turnstile_form = TurnstileVerificationForm(remote_ip=remote_ip)
 
     if request.method == 'POST':
         # If we're in the middle of 2FA (user id in session)
         if pre_2fa_user_id:
             from django.contrib.auth import get_user_model
-            from django.conf import settings
             User = get_user_model()
             user = User.objects.get(id=pre_2fa_user_id)
             device = TOTPDevice.objects.filter(user=user, confirmed=True).first()
@@ -1240,23 +1248,27 @@ def custom_login(request):
                 error = '2FA code required.'
                 show_2fa = True
         else:
-            # First step: username/password
-            user = authenticate(request, username=username, password=password)
-            if user is not None:
-                if not hasattr(user, 'profile') or not user.profile.is_verified:
-                    error = 'You must verify your email before logging in. Please check your inbox.'
-                else:
-                    device = TOTPDevice.objects.filter(user=user, confirmed=True).first()
-                    if device:
-                        request.session['pre_2fa_user_id'] = user.id
-                        request.session['pre_2fa_password'] = password
-                        show_2fa = True
-                        error = None
-                    else:
-                        login(request, user)
-                        return redirect('profile')
+            turnstile_form = TurnstileVerificationForm(request.POST, remote_ip=remote_ip)
+            if not turnstile_form.is_valid():
+                error = 'Captcha verification failed. Please try again.'
             else:
-                error = 'Invalid username or password.'
+                # First step: username/password
+                user = authenticate(request, username=username, password=password)
+                if user is not None:
+                    if not hasattr(user, 'profile') or not user.profile.is_verified:
+                        error = 'You must verify your email before logging in. Please check your inbox.'
+                    else:
+                        device = TOTPDevice.objects.filter(user=user, confirmed=True).first()
+                        if device:
+                            request.session['pre_2fa_user_id'] = user.id
+                            request.session['pre_2fa_password'] = password
+                            show_2fa = True
+                            error = None
+                        else:
+                            login(request, user)
+                            return redirect('profile')
+                else:
+                    error = 'Invalid username or password.'
     else:
         # GET request: clear any previous 2FA session
         if 'pre_2fa_user_id' in request.session:
@@ -1269,6 +1281,9 @@ def custom_login(request):
         'show_2fa': show_2fa,
         'username': username,
         'password': password,
+        'turnstile_form': turnstile_form,
+        'telegram_bot_username': settings.TELEGRAM_BOT_USERNAME,
+        'telegram_login_enabled': settings.TELEGRAM_LOGIN_ENABLED,
     })
 
 @require_GET

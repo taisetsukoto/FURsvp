@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     'two_factor',
     'qrcode',
     'sslserver',
+    'turnstile',
 ]
 
 MIDDLEWARE = [
@@ -249,6 +250,16 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 TELEGRAM_LOGIN_ENABLED = os.environ.get('TELEGRAM_LOGIN_ENABLED', 'false').lower() == 'true'
+
+# Cloudflare Turnstile (omit keys to use Cloudflare's dummy test keys in dev)
+if os.environ.get('TURNSTILE_SITEKEY'):
+    TURNSTILE_SITEKEY = os.environ['TURNSTILE_SITEKEY']
+if os.environ.get('TURNSTILE_SECRET'):
+    TURNSTILE_SECRET = os.environ['TURNSTILE_SECRET']
+TURNSTILE_DEFAULT_CONFIG = {
+    'theme': 'light',
+    'size': 'flexible',
+}
 
 # Django REST Framework Configuration
 REST_FRAMEWORK = {

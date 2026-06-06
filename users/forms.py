@@ -1,12 +1,23 @@
 from django import forms
-from django.contrib.auth.forms import UserCreationForm, PasswordChangeForm
+from django.contrib.auth.forms import UserCreationForm, PasswordChangeForm, PasswordResetForm
 from django.contrib.auth.models import User
 from events.models import Event, Group
 from users.models import Profile, GroupDelegation, GroupRole
 from two_factor.forms import TOTPDeviceForm as BaseTOTPDeviceForm
+from turnstile.fields import TurnstileField
 import base64
 
-class UserRegisterForm(UserCreationForm):
+
+class TurnstileMixin:
+    def __init__(self, *args, remote_ip=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if 'turnstile' not in self.fields:
+            self.fields['turnstile'] = TurnstileField()
+        if remote_ip:
+            self.fields['turnstile'].remote_ip = remote_ip
+
+
+class UserRegisterForm(TurnstileMixin, UserCreationForm):
     eula_agreement = forms.BooleanField(
         required=True,
         label="I agree to the End User License Agreement (EULA)",
@@ -156,4 +167,12 @@ class TOTPDeviceForm(BaseTOTPDeviceForm):
 
 class BlueskyBlogPostForm(forms.Form):
     title = forms.CharField(max_length=300, widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Title'}))
-    content = forms.CharField(widget=forms.Textarea(attrs={'class': 'form-control', 'placeholder': 'Write your blog post here...', 'rows': 6})) 
+    content = forms.CharField(widget=forms.Textarea(attrs={'class': 'form-control', 'placeholder': 'Write your blog post here...', 'rows': 6}))
+
+
+class TurnstileVerificationForm(TurnstileMixin, forms.Form):
+    pass
+
+
+class PasswordResetFormWithTurnstile(TurnstileMixin, PasswordResetForm):
+    pass

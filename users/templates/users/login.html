@@ -297,6 +297,11 @@
                         <label for="id_token" class="form-label login-form-label">Enter 2FA code</label>
                         <input type="text" class="form-control" id="id_token" name="token" autocomplete="one-time-code">
                     </div>
+                    {% if not show_2fa %}
+                    <div class="turnstile-wrap mb-3">
+                        {{ turnstile_form.turnstile }}
+                    </div>
+                    {% endif %}
                     <button type="submit" class="login-btn-modern" id="login-btn">
                         <i class="material-icons">login</i> Login
                     </button>
