@@ -737,7 +737,9 @@ def create_event(request):
                 post_to_telegram_channel(group.telegram_webhook_channel, msg, parse_mode="Markdown")
             return redirect('event_detail', event_id=event.id)
     else:
-        form = EventForm(user=request.user)
+        group_id = request.GET.get('group')
+        initial = {'group': group_id} if group_id else None
+        form = EventForm(user=request.user, initial=initial)
     return render(request, 'events/event_create.html', {'form': form})
 
 @login_required
@@ -885,6 +887,7 @@ def group_detail(request, group_id):
     # Check if user can edit this group
     can_edit_group = False
     can_manage_bans = False
+    can_post = False
     if request.user.is_authenticated:
         can_edit_group = (
             request.user.is_superuser or 
@@ -895,6 +898,10 @@ def group_detail(request, group_id):
         can_manage_bans = (
             request.user.is_superuser or
             GroupRole.objects.filter(user=request.user, group=group).exists()
+        )
+        can_post = (
+            request.user.is_superuser or
+            GroupRole.objects.filter(user=request.user, group=group, can_post=True).exists()
         )
     
     # Handle POST requests
@@ -990,6 +997,7 @@ def group_detail(request, group_id):
         'past_events': past_events,
         'can_edit_group': can_edit_group,
         'can_manage_bans': can_manage_bans,
+        'can_post': can_post,
         'group_banned_users': group_banned_users,
         'is_banned_from_group': is_banned_from_group,
         'group_ban_message': group_ban_message,
@@ -1067,31 +1075,47 @@ def groups_list(request):
     return render(request, 'events/groups_list.html', context)
 
 def event_calendar(request):
-    # Get year and month from request, default to current
     year = int(request.GET.get('year', timezone.now().year))
     month = int(request.GET.get('month', timezone.now().month))
-    # Set first weekday to Sunday
+    filter_adult = request.GET.get('adult', 'false')
+    filter_group = request.GET.get('group', '').strip()
+
     calendar.setfirstweekday(calendar.SUNDAY)
-    # Create calendar object
     cal = calendar.monthcalendar(year, month)
-    # Get month name
     month_name = calendar.month_name[month]
-    # Get events for this month
+
     start_date = datetime(year, month, 1).date()
     if month == 12:
         end_date = datetime(year + 1, 1, 1).date()
     else:
         end_date = datetime(year, month + 1, 1).date()
-    filter_adult = request.GET.get('adult', 'false')
+
     events_qs = Event.objects.filter(
         date__gte=start_date,
         date__lt=end_date,
-        status='active'
+        status='active',
     ).select_related('group').annotate(
         confirmed_count=models.Count('rsvps', filter=models.Q(rsvps__status='confirmed'))
     ).order_by('date', 'start_time')
+
     if filter_adult == 'false':
         events_qs = events_qs.exclude(age_restriction__in=['adult', 'mature'])
+
+    calendar_groups = Group.objects.filter(
+        id__in=events_qs.values_list('group_id', flat=True).distinct()
+    ).order_by('name')
+
+    calendar_groups_options = [
+        {
+            'value': str(group.id),
+            'text': group.name,
+            'logo': f'data:image/png;base64,{group.logo_base64}' if group.logo_base64 else '',
+        }
+        for group in calendar_groups
+    ]
+
+    if filter_group:
+        events_qs = events_qs.filter(group_id=filter_group)
 
     month_events = list(events_qs)
     if request.user.is_authenticated and month_events:
@@ -1107,13 +1131,11 @@ def event_calendar(request):
         for event in month_events:
             event.user_rsvp_list = []
 
-    # Group events by date
     events_by_date = {}
     for event in month_events:
         date_key = event.date.strftime('%Y-%m-%d')
         events_by_date.setdefault(date_key, []).append(event)
 
-    # Navigation
     prev_month = month - 1 if month > 1 else 12
     prev_year = year if month > 1 else year - 1
     next_month = month + 1 if month < 12 else 1
@@ -1121,6 +1143,7 @@ def event_calendar(request):
 
     eastern = pytz.timezone('America/New_York')
     today = timezone.now().astimezone(eastern).date()
+
     context = {
         'calendar': cal,
         'month_name': month_name,
@@ -1135,6 +1158,8 @@ def event_calendar(request):
         'next_year': next_year,
         'today': today,
         'filter_adult': filter_adult,
+        'filter_group': filter_group,
+        'calendar_groups_options': calendar_groups_options,
     }
 
     return render(request, 'events/event_calendar.html', context)

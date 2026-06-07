@@ -70,6 +70,56 @@
         </div>
     </div>
 
+    {% if is_banned_from_group %}
+    <div class="event-status-banner event-status-banner--danger mb-4">
+        <i class="material-icons">block</i>
+        {{ group_ban_message }}
+    </div>
+    {% endif %}
+
+    <!-- Upcoming Events Section -->
+    <div class="group-section-card profile-page-card mb-4">
+        <div class="group-section-header">
+            <div class="group-section-icon group-section-icon--events">
+                <i class="material-icons">event</i>
+            </div>
+            <div class="group-section-heading">
+                <h2 class="group-section-title">Upcoming Events</h2>
+                {% if upcoming_events %}
+                <span class="group-section-meta">{{ upcoming_events|length }} scheduled</span>
+                {% endif %}
+            </div>
+            {% if can_post %}
+            <div class="group-section-header-action">
+                <a href="{% url 'create_event' %}?group={{ group.id }}" class="group-toolbar-btn group-toolbar-btn--compact">
+                    <i class="material-icons">add</i> Create event
+                </a>
+            </div>
+            {% endif %}
+        </div>
+        <div class="group-section-body group-section-body--flush">
+            {% include 'events/group_events_partial.html' with events=upcoming_events prefix='group' empty_message='No upcoming events scheduled.' show_create_cta=can_post create_event_group_id=group.id %}
+        </div>
+    </div>
+
+    <!-- Past Events Section -->
+    {% if past_events %}
+    <div class="group-section-card profile-page-card mb-4">
+        <div class="group-section-header">
+            <div class="group-section-icon group-section-icon--past">
+                <i class="material-icons">history</i>
+            </div>
+            <div class="group-section-heading">
+                <h2 class="group-section-title">Recent Past Events</h2>
+                <span class="group-section-meta">{{ past_events|length }} recent</span>
+            </div>
+        </div>
+        <div class="group-section-body group-section-body--flush">
+            {% include 'events/group_events_partial.html' with events=past_events prefix='past' empty_message='No past events yet.' %}
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Description Section -->
     <div class="group-section-card profile-page-card mb-4">
         <div class="group-section-header">
@@ -77,6 +127,13 @@
                 <i class="material-icons">info</i>
             </div>
             <h2 class="group-section-title">About This Group</h2>
+            {% if can_edit_group and not group.description %}
+            <div class="group-section-header-action">
+                <button type="button" class="group-toolbar-btn group-toolbar-btn--compact" data-bs-toggle="modal" data-bs-target="#editGroupModal">
+                    <i class="material-icons">edit</i> Add description
+                </button>
+            </div>
+            {% endif %}
         </div>
         <div class="group-section-body">
             {% if group.description %}
@@ -85,6 +142,11 @@
             <div class="group-section-empty">
                 <i class="material-icons">description</i>
                 <p>No description provided yet.</p>
+                {% if can_edit_group %}
+                <button type="button" class="group-empty-cta group-toolbar-btn" data-bs-toggle="modal" data-bs-target="#editGroupModal">
+                    <i class="material-icons">edit</i> Add description
+                </button>
+                {% endif %}
             </div>
             {% endif %}
         </div>
@@ -102,6 +164,13 @@
                 <span class="group-section-meta">{{ leadership_roles|length }} leader{{ leadership_roles|length|pluralize }}</span>
                 {% endif %}
             </div>
+            {% if can_edit_group %}
+            <div class="group-section-header-action">
+                <button type="button" class="group-toolbar-btn group-toolbar-btn--compact" data-bs-toggle="modal" data-bs-target="#leadershipModal">
+                    <i class="material-icons">person_add</i> Manage
+                </button>
+            </div>
+            {% endif %}
         </div>
         <div class="group-section-body">
             {% if leadership_roles %}
@@ -142,49 +211,18 @@
             <div class="group-section-empty">
                 <i class="material-icons">people_outline</i>
                 <p>No leaders assigned to this group yet.</p>
+                {% if can_edit_group %}
+                <button type="button" class="group-empty-cta group-toolbar-btn" data-bs-toggle="modal" data-bs-target="#leadershipModal">
+                    <i class="material-icons">person_add</i> Add leader
+                </button>
+                {% endif %}
             </div>
             {% endif %}
         </div>
     </div>
 
-    <!-- Upcoming Events Section -->
-    <div class="group-section-card profile-page-card mb-4">
-        <div class="group-section-header">
-            <div class="group-section-icon group-section-icon--events">
-                <i class="material-icons">event</i>
-            </div>
-            <div class="group-section-heading">
-                <h2 class="group-section-title">Upcoming Events</h2>
-                {% if upcoming_events %}
-                <span class="group-section-meta">{{ upcoming_events|length }} scheduled</span>
-                {% endif %}
-            </div>
-        </div>
-        <div class="group-section-body group-section-body--flush">
-            {% include 'events/group_events_partial.html' with events=upcoming_events prefix='group' empty_message='No upcoming events scheduled.' %}
-        </div>
-    </div>
-
-    <!-- Past Events Section -->
-    {% if past_events %}
-    <div class="group-section-card profile-page-card mb-4">
-        <div class="group-section-header">
-            <div class="group-section-icon group-section-icon--past">
-                <i class="material-icons">history</i>
-            </div>
-            <div class="group-section-heading">
-                <h2 class="group-section-title">Recent Past Events</h2>
-                <span class="group-section-meta">{{ past_events|length }} recent</span>
-            </div>
-        </div>
-        <div class="group-section-body group-section-body--flush">
-            {% include 'events/group_events_partial.html' with events=past_events prefix='past' empty_message='No past events yet.' %}
-        </div>
-    </div>
-    {% endif %}
-
     <!-- Telegram Feed Section -->
-    {% if telegram_feed %}
+    {% if telegram_feed or group.telegram_channel %}
     <div class="group-section-card profile-page-card mb-4">
         <div class="group-section-header">
             <div class="group-section-icon group-section-icon--telegram">
@@ -192,10 +230,20 @@
             </div>
             <div class="group-section-heading">
                 <h2 class="group-section-title">Latest from Telegram</h2>
+                {% if telegram_feed %}
                 <span class="group-section-meta">{{ telegram_feed|length }} post{{ telegram_feed|length|pluralize }}</span>
+                {% endif %}
             </div>
+            {% if group.telegram_channel %}
+            <div class="group-section-header-action">
+                <a href="https://t.me/{{ group.telegram_channel }}" target="_blank" rel="noopener" class="group-toolbar-btn group-toolbar-btn--compact">
+                    <i class="material-icons">open_in_new</i> Open channel
+                </a>
+            </div>
+            {% endif %}
         </div>
         <div class="group-section-body group-section-body--flush">
+            {% if telegram_feed %}
             <div class="group-events-toolbar">
                 <span class="group-events-count">Updates from the group channel</span>
                 <div class="group-events-view-toggle">
@@ -253,8 +301,15 @@
                     {% endfor %}
                 </div>
             </div>
+            {% else %}
+            <div class="group-section-empty group-section-empty--compact">
+                <i class="material-icons">rss_feed</i>
+                <p>No recent posts from the Telegram channel.</p>
+            </div>
+            {% endif %}
         </div>
     </div>
+    {% if telegram_feed %}
     <!-- Modal for Full Article -->
     <div class="modal fade" id="fullArticleModal" tabindex="-1" aria-labelledby="fullArticleModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg">
@@ -270,6 +325,7 @@
             </div>
         </div>
     </div>
+    {% endif %}
     {% endif %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {

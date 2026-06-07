@@ -2641,7 +2641,7 @@
             gap: 0.5em;
             font-size: 1.13rem;
             font-weight: 700;
-            color: #223b7b;
+            color: #223b7b !important;
             background: #eef2ff;
             border: none;
             border-radius: 2em;
@@ -2651,21 +2651,36 @@
             outline: none;
             box-shadow: 0 2px 8px rgba(59, 130, 246, 0.07);
             position: relative;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
 
-        .modern-topnav .nav-link:hover,
-        .modern-topnav .nav-link.active {
-            background: #2563eb;
-            color: #fff;
+        .modern-topnav .nav-link:hover {
+            background: #2563eb !important;
+            color: #fff !important;
             box-shadow: 0 4px 18px rgba(59, 130, 246, 0.13);
-            transform: translateY(-2px) scale(1.04);
-            text-decoration: none;
+            transform: translateY(-1px);
+            text-decoration: none !important;
+        }
+
+        .modern-topnav .nav-link.active {
+            background: #2563eb !important;
+            color: #fff !important;
+            box-shadow: 0 4px 18px rgba(59, 130, 246, 0.13);
+            transform: none;
+            text-decoration: none !important;
         }
 
         .modern-topnav .nav-link .material-icons {
             font-size: 1.25em;
             vertical-align: middle;
             margin-right: 0.4em;
+            color: inherit;
+        }
+
+        .modern-topnav .nav-link:hover .material-icons,
+        .modern-topnav .nav-link.active .material-icons {
+            color: #fff !important;
         }
 
         @media (max-width: 900px) {

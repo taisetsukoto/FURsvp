@@ -55,6 +55,11 @@
         <div class="group-events-empty">
             <i class="material-icons">event_busy</i>
             <p>{{ empty_message|default:"No events found." }}</p>
+            {% if show_create_cta %}
+            <a href="{% url 'create_event' %}?group={{ create_event_group_id }}" class="group-empty-cta group-toolbar-btn">
+                <i class="material-icons">add</i> Create the first event
+            </a>
+            {% endif %}
         </div>
     </div>
     {% endfor %}
@@ -98,6 +103,11 @@
     <div class="group-events-empty">
         <i class="material-icons">event_busy</i>
         <p>{{ empty_message|default:"No events found." }}</p>
+        {% if show_create_cta %}
+        <a href="{% url 'create_event' %}?group={{ create_event_group_id }}" class="group-empty-cta group-toolbar-btn">
+            <i class="material-icons">add</i> Create the first event
+        </a>
+        {% endif %}
     </div>
     {% endfor %}
 </div>

@@ -169,17 +169,17 @@
             <div class="nav-content">
                 <ul class="nav-menu">
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'home' %}">
+                        <a class="nav-link{% if request.resolver_match.url_name == 'home' %} active{% endif %}" href="{% url 'home' %}">
                             <i class="material-icons">home</i> Home
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'event_calendar' %}">
+                        <a class="nav-link{% if request.resolver_match.url_name == 'event_calendar' %} active{% endif %}" href="{% url 'event_calendar' %}">
                             <i class="material-icons">calendar_month</i> Calendar
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'groups_list' %}">
+                        <a class="nav-link{% if request.resolver_match.url_name == 'groups_list' %} active{% endif %}" href="{% url 'groups_list' %}">
                             <i class="material-icons">groups</i> Groups
                         </a>
                     </li>
