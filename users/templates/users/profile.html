@@ -4,22 +4,11 @@
 {% block title %}Profile - FURsvp{% endblock %}
 
 {% block content %}
-<nav aria-label="breadcrumb" class="mb-4">
-    <div class="modern-breadcrumbs">
-        <a href="/" class="d-flex align-items-center">
-            <i class="material-icons me-1">home</i> Home
-        </a>
-        <span class="breadcrumb-chevron">›</span>
-        <span class="breadcrumb-current">Profile</span>
-    </div>
-</nav>
-
 <div class="profile-gradient-bg">
     <div class="row justify-content-center">
         <div class="col-lg-10">
-            <div class="card shadow-sm mb-4 profile-glass-card">
-                <div class="card-body p-4">
-                    <div class="text-center mb-4">
+            <div class="profile-page-card">
+                <div class="text-center mb-4">
                         <div class="position-relative d-inline-block">
                             {% if profile.profile_picture_base64 %}
                             <img src="{{ profile.profile_picture_base64 }}" alt="{{ profile.get_display_name }}"
@@ -39,219 +28,192 @@
                         <p class="text-muted">@{{ user.username }}</p>
                     </div>
 
-                    <ul class="nav nav-tabs mb-4 profile-tabs" id="profileTabs" role="tablist">
+                    <div class="profile-tabs-shell">
+                        <ul class="nav profile-tabs" id="profileTabs" role="tablist">
                         <li class="nav-item" role="presentation">
                             <button class="nav-link active" id="general-tab" data-bs-toggle="tab"
                                 data-bs-target="#general" type="button" role="tab" aria-controls="general"
                                 aria-selected="true">
-                                <i class="material-icons align-middle me-1">settings</i> General Settings
+                                <i class="material-icons">settings</i>
+                                <span>General</span>
                             </button>
                         </li>
                         <li class="nav-item" role="presentation">
                             <button class="nav-link" id="password-tab" data-bs-toggle="tab" data-bs-target="#password"
                                 type="button" role="tab" aria-controls="password" aria-selected="false">
-                                <i class="material-icons align-middle me-1">lock</i> Change Password
+                                <i class="material-icons">lock</i>
+                                <span>Password</span>
                             </button>
                         </li>
                         <li class="nav-item" role="presentation">
                             <button class="nav-link" id="twofa-tab" data-bs-toggle="tab" data-bs-target="#twofa"
                                 type="button" role="tab" aria-controls="twofa" aria-selected="false">
-                                <i class="material-icons align-middle me-1">verified_user</i> 2FA
+                                <i class="material-icons">verified_user</i>
+                                <span>2FA</span>
                             </button>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="delete-tab" data-bs-toggle="tab" data-bs-target="#delete"
+                            <button class="nav-link nav-link--danger" id="delete-tab" data-bs-toggle="tab" data-bs-target="#delete"
                                 type="button" role="tab" aria-controls="delete" aria-selected="false">
-                                <i class="material-icons align-middle me-1 text-danger">delete_forever</i> Delete
-                                Account
+                                <i class="material-icons">delete_forever</i>
+                                <span>Delete</span>
                             </button>
                         </li>
-                    </ul>
+                        </ul>
+                    </div>
 
                     <div class="tab-content" id="profileTabsContent">
                         <div class="tab-pane fade show active" id="general" role="tabpanel"
                             aria-labelledby="general-tab">
-                            <form method="post" class="mb-4 profile-form" id="main-profile-form"
-                                action="{% url 'profile' %}">
+                            <form method="post" id="main-profile-form" action="{% url 'profile' %}">
                                 {% csrf_token %}
                                 <input type="hidden" name="submit_profile_changes" value="1">
 
-                                <div class="mb-3">
-                                    <label for="{{ profile_form.display_name.id_for_label }}"
-                                        class="form-label profile-form-label">
-                                        <i class="material-icons align-middle me-1">badge</i>
-                                        Display Name
-                                    </label>
-                                    {{ profile_form.display_name }}
-                                    {% if profile_form.display_name.help_text %}
-                                    <div class="form-text">{{ profile_form.display_name.help_text }}</div>
-                                    {% endif %}
-                                </div>
-
-                                <div class="mb-3">
-                                    <label for="{{ profile_form.email.id_for_label }}"
-                                        class="form-label profile-form-label">
-                                        <i class="material-icons align-middle me-1">email</i>
-                                        Email Address
-                                    </label>
-                                    {{ profile_form.email }}
-                                    {% if profile_form.email.help_text %}
-                                    <div class="form-text">{{ profile_form.email.help_text }}</div>
-                                    {% endif %}
-                                </div>
-
-                                <div class="mb-3">
-                                    <label for="{{ profile_form.discord_username.id_for_label }}"
-                                        class="form-label profile-form-label">
-                                        <i class="material-icons align-middle me-1">chat</i>
-                                        Discord Username
-                                    </label>
-                                    {{ profile_form.discord_username }}
-                                    {% if profile_form.discord_username.help_text %}
-                                    <div class="form-text">{{ profile_form.discord_username.help_text }}</div>
-                                    {% endif %}
-                                </div>
-
-                                <div class="mb-3">
-                                    <label for="{{ profile_form.telegram_username.id_for_label }}"
-                                        class="form-label profile-form-label">
-                                        <i class="material-icons align-middle me-1">send</i>
-                                        Telegram Username
-                                    </label>
-                                    {{ profile_form.telegram_username }}
-                                    {% if profile_form.telegram_username.help_text %}
-                                    <div class="form-text">{{ profile_form.telegram_username.help_text }}</div>
-                                    {% endif %}
-                                </div>
-                                {% if telegram_login_enabled and user.profile.telegram_username%}
-                                <!-- Telegram Account Linking Section -->
-                                <div class="mb-4">
-                                    <div class="card border-0 shadow-sm"
-                                        style="background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);">
-                                        <div class="card-body p-4">
-                                            <h6 class="card-title d-flex align-items-center mb-3"
-                                                style="color: #229ED9; font-weight: 700;">
-                                                <i class="material-icons me-2">send</i>
-                                                Telegram Account (OAuth)
-                                            </h6>
-
-                                            {% if user.profile.telegram_id and user.profile.telegram_username %}
-                                            <!-- Account is linked -->
-                                            <div class="d-flex align-items-center justify-content-between">
-                                                <div>
-                                                    <p class="mb-1 fw-semibold" style="color: #1e40af;">
-                                                        <i class="material-icons align-middle me-1"
-                                                            style="font-size: 1.1rem; color: #229ED9;">check_circle</i>
-                                                        Account Linked
-                                                    </p>
-                                                    <p class="mb-0 text-muted small">
-                                                        Telegram ID: {{ user.profile.telegram_id }}
-                                                        {% if user.profile.telegram_username %}
-                                                        <br>Username: @{{ user.profile.telegram_username }}
-                                                        {% endif %}
-                                                    </p>
-                                                </div>
-                                                <button type="button" class="btn btn-outline-danger btn-sm"
-                                                    id="unlink-telegram-btn">
-                                                    <i class="material-icons me-1">link_off</i>
-                                                    Unlink
-                                                </button>
-                                            </div>
-                                            {% else %}
-                                            <!-- Account is not linked -->
-                                            <div class="text-center">
-                                                <p class="mb-3 text-muted">
-                                                    <i class="material-icons align-middle me-1"
-                                                        style="color: #6b7280;">link_off</i>
-                                                    No Telegram account linked
-                                                </p>
-                                                <div id="telegram-login-widget"></div>
-                                <script async src="https://telegram.org/js/telegram-widget.js?22"
-                                    data-telegram-login="{{ telegram_bot_username }}"
-                                    data-size="large"
-                                    data-userpic="true"
-                                    data-auth-url="{% url 'link_telegram_account' %}"></script>
-                                            </div>
-                                            {% endif %}
-                                        </div>
+                                <div class="auth-field">
+                                    <label for="{{ profile_form.display_name.id_for_label }}" class="auth-form-label">Display name</label>
+                                    <div class="input-group auth-input-group">
+                                        <span class="input-group-text"><i class="material-icons">badge</i></span>
+                                        {{ profile_form.display_name }}
                                     </div>
+                                    {% if profile_form.display_name.help_text %}
+                                    <div class="auth-field-help">{{ profile_form.display_name.help_text }}</div>
+                                    {% endif %}
+                                </div>
+
+                                <div class="auth-field">
+                                    <label for="{{ profile_form.email.id_for_label }}" class="auth-form-label">Email address</label>
+                                    <div class="input-group auth-input-group">
+                                        <span class="input-group-text"><i class="material-icons">email</i></span>
+                                        {{ profile_form.email }}
+                                    </div>
+                                    {% if profile_form.email.help_text %}
+                                    <div class="auth-field-help">{{ profile_form.email.help_text }}</div>
+                                    {% endif %}
+                                </div>
+
+                                <div class="auth-field">
+                                    <label for="{{ profile_form.discord_username.id_for_label }}" class="auth-form-label">Discord username</label>
+                                    <div class="input-group auth-input-group">
+                                        <span class="input-group-text"><i class="material-icons">discord</i></span>
+                                        {{ profile_form.discord_username }}
+                                    </div>
+                                    {% if profile_form.discord_username.help_text %}
+                                    <div class="auth-field-help">{{ profile_form.discord_username.help_text }}</div>
+                                    {% endif %}
+                                </div>
+
+                                <div class="auth-field">
+                                    <label for="{{ profile_form.telegram_username.id_for_label }}" class="auth-form-label">Telegram username</label>
+                                    <div class="input-group auth-input-group">
+                                        <span class="input-group-text"><i class="material-icons">telegram</i></span>
+                                        {{ profile_form.telegram_username }}
+                                    </div>
+                                    {% if profile_form.telegram_username.help_text %}
+                                    <div class="auth-field-help">{{ profile_form.telegram_username.help_text }}</div>
+                                    {% endif %}
+                                </div>
+
+                                {% if telegram_login_enabled and user.profile.telegram_username %}
+                                <div class="profile-section-card profile-section-card--telegram">
+                                    <div class="auth-telegram-title">
+                                        <i class="material-icons">send</i> Telegram Account (OAuth)
+                                    </div>
+                                    {% if user.profile.telegram_id and user.profile.telegram_username %}
+                                    <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+                                        <div>
+                                            <p class="mb-1 fw-semibold" style="color: #1e40af;">
+                                                <i class="material-icons align-middle me-1" style="color: #229ED9; font-size: 1.1rem;">check_circle</i>
+                                                Account linked
+                                            </p>
+                                            <p class="mb-0 text-muted small">
+                                                Telegram ID: {{ user.profile.telegram_id }}
+                                                {% if user.profile.telegram_username %}<br>Username: @{{ user.profile.telegram_username }}{% endif %}
+                                            </p>
+                                        </div>
+                                        <button type="button" class="profile-btn-outline-danger" id="unlink-telegram-btn">
+                                            <i class="material-icons">link_off</i> Unlink
+                                        </button>
+                                    </div>
+                                    {% else %}
+                                    <div class="text-center">
+                                        <p class="mb-3 text-muted small">
+                                            <i class="material-icons align-middle me-1">link_off</i>
+                                            No Telegram account linked
+                                        </p>
+                                        <div id="telegram-login-widget"></div>
+                                        <script async src="https://telegram.org/js/telegram-widget.js?22"
+                                            data-telegram-login="{{ telegram_bot_username }}"
+                                            data-size="large"
+                                            data-userpic="true"
+                                            data-auth-url="{% url 'link_telegram_account' %}"></script>
+                                    </div>
+                                    {% endif %}
                                 </div>
                                 {% endif %}
 
                                 {{ profile_form.profile_picture_base64 }}
 
-                                <div class="d-grid">
-                                    <button type="button" class="profile-save-btn" id="main-profile-save-button">
-                                        <i class="material-icons">save</i> Save Changes
-                                    </button>
-                                </div>
+                                <button type="button" class="profile-btn-primary" id="main-profile-save-button">
+                                    <i class="material-icons">save</i> Save changes
+                                </button>
                             </form>
                         </div>
                         <div class="tab-pane fade" id="password" role="tabpanel" aria-labelledby="password-tab">
-                            <div class="card-body">
-                                <form method="post" action="{% url 'profile' %}">
-                                    {% csrf_token %}
-                                    <input type="hidden" name="submit_password_changes" value="1">
-                                    {% for field in password_change_form %}
-                                    <div class="mb-3">
-                                        <label for="{{ field.id_for_label }}" class="profile-password-label">
-                                            <i class="material-icons align-middle me-1">lock</i>
-                                            {{ field.label }}
-                                        </label>
-                                        {{ field|add_class:'profile-password-input' }}
-                                        {% if field.help_text %}
-                                        <div class="form-text">{{ field.help_text }}</div>
-                                        {% endif %}
-                                        {% if field.errors %}
-                                        <div class="invalid-feedback d-block">{{ field.errors }}</div>
-                                        {% endif %}
+                            <form method="post" action="{% url 'profile' %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="submit_password_changes" value="1">
+                                {% for field in password_change_form %}
+                                <div class="auth-field">
+                                    <label for="{{ field.id_for_label }}" class="auth-form-label">{{ field.label }}</label>
+                                    <div class="input-group auth-input-group">
+                                        <span class="input-group-text"><i class="material-icons">lock</i></span>
+                                        {{ field|add_class:'form-control' }}
                                     </div>
-                                    {% endfor %}
-                                    <div class="d-grid">
-                                        <button type="submit" class="profile-password-btn">
-                                            <i class="material-icons">save</i> Change Password
-                                        </button>
-                                    </div>
-                                </form>
-                            </div>
+                                    {% if field.help_text %}
+                                    <div class="auth-field-help">{{ field.help_text }}</div>
+                                    {% endif %}
+                                    {% if field.errors %}
+                                    <div class="auth-field-error">{{ field.errors }}</div>
+                                    {% endif %}
+                                </div>
+                                {% endfor %}
+                                <button type="submit" class="profile-btn-primary">
+                                    <i class="material-icons">save</i> Change password
+                                </button>
+                            </form>
                         </div>
                         <div class="tab-pane fade" id="twofa" role="tabpanel" aria-labelledby="twofa-tab">
-                            <div class="card-body">
-                                <h2>Two-Factor Authentication (2FA)</h2>
-                                {% if device %}
-                                  <div class="alert alert-success">2FA is <strong>enabled</strong> on your account.</div>
-                                  <form method="post" action="{% url 'twofa_disable' %}">
-                                    {% csrf_token %}
-                                    <button type="submit" class="btn btn-danger">Disable 2FA</button>
-                                  </form>
-                                {% else %}
-                                  <div class="alert alert-warning">2FA is <strong>not enabled</strong> on your account.</div>
-                                  <a href="{% url 'twofa_enable' %}" class="btn btn-primary">Enable 2FA</a>
-                                {% endif %}
+                            {% if device %}
+                            <div class="auth-status-box auth-status-box--success">
+                                <i class="material-icons align-middle me-1">check_circle</i>
+                                2FA is <strong>enabled</strong> on your account.
                             </div>
+                            <form method="post" action="{% url 'twofa_disable' %}">
+                                {% csrf_token %}
+                                <button type="submit" class="profile-btn-danger">
+                                    <i class="material-icons">no_encryption</i> Disable 2FA
+                                </button>
+                            </form>
+                            {% else %}
+                            <div class="auth-status-box auth-status-box--warning">
+                                <i class="material-icons align-middle me-1">info</i>
+                                2FA is <strong>not enabled</strong> on your account.
+                            </div>
+                            <a href="{% url 'twofa_enable' %}" class="profile-btn-primary text-decoration-none">
+                                <i class="material-icons">add_moderator</i> Enable 2FA
+                            </a>
+                            {% endif %}
                         </div>
                         <div class="tab-pane fade" id="delete" role="tabpanel" aria-labelledby="delete-tab">
-                            <div class="card shadow-sm mb-4 profile-delete-section">
-                                <div class="card-body">
-                                    <h2 class="h4 mb-4 text-danger">
-                                        <i class="material-icons align-middle me-2">delete_forever</i>
-                                        Delete Account
-                                    </h2>
-                                    <p>
-                                        <strong>Warning:</strong> Deleting your account is permanent and cannot be
-                                        undone. All your data will be lost.
-                                    </p>
-                                    <div class="mt-4">
-                                        <button type="button" class="btn btn-danger w-100" data-bs-toggle="modal"
-                                            data-bs-target="#deleteAccountModal">
-                                            <i class="material-icons me-2">delete_forever</i> Delete My Account
-                                        </button>
-                                    </div>
-                                </div>
+                            <div class="auth-warning-box">
+                                <strong>Warning:</strong> All your data will be permanently lost.
                             </div>
+                            <button type="button" class="profile-btn-danger" data-bs-toggle="modal"
+                                data-bs-target="#deleteAccountModal">
+                                <i class="material-icons">delete_forever</i> Delete my account
+                            </button>
                         </div>
                     </div>
-                </div>
             </div>
         </div>
     </div>
@@ -329,8 +291,7 @@
                     </div>
                 </div>
                 <div class="modal-footer border-0 pt-0">
-                    <button type="button" class="profile-save-btn"
-                        style="background: linear-gradient(90deg, #ef4444 0%, #fca5a5 100%); color: #fff; font-weight: 800; font-size: 1.15rem;"
+                    <button type="button" class="profile-btn-danger"
                         id="open-final-delete-btn" disabled>
                         <i class="material-icons me-2">delete_forever</i> Delete My Account
                     </button>
@@ -365,8 +326,7 @@
                 <div class="modal-footer border-0 pt-0">
                     <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">I want my
                         mommy...</button>
-                    <button type="submit" class="profile-save-btn"
-                        style="background: linear-gradient(90deg, #ef4444 0%, #fca5a5 100%); color: #fff; font-weight: 800; font-size: 1.15rem;"
+                    <button type="submit" class="profile-btn-danger"
                         id="final-delete-btn">
                         <i class="material-icons me-2">delete_forever</i> Delete for real
                     </button>
@@ -392,332 +352,6 @@
     if (feedback) feedback.style.display = 'block';
   }
 </script>
-
-<style>
-    .avatar-initials-placeholder {
-        width: 150px;
-        height: 150px;
-        color: white;
-        font-size: 3rem;
-        font-weight: bold;
-    }
-
-    .profile-glass-card {
-        background: rgba(255, 255, 255, 0.92);
-        border-radius: 1.7rem;
-        box-shadow: 0 8px 32px rgba(59, 130, 246, 0.18);
-        backdrop-filter: blur(8px);
-        padding: 2.7rem 2.3rem 2.3rem 2.3rem;
-        margin-bottom: 2.5rem;
-        border: 1.5px solid #e0e7ef;
-        transition: box-shadow 0.2s, border 0.2s;
-    }
-
-    .profile-glass-card {
-        background: rgba(255, 255, 255, 0.88);
-        border-radius: 1.5rem;
-        box-shadow: 0 8px 32px rgba(59, 130, 246, 0.13);
-        backdrop-filter: blur(6px);
-        padding: 2.5rem 2.2rem 2.2rem 2.2rem;
-        margin-bottom: 2.5rem;
-        border: 1.5px solid #e0e7ef;
-    }
-
-    .profile-avatar {
-        width: 150px;
-        height: 150px;
-        object-fit: cover;
-        border-radius: 50%;
-        box-shadow: 0 4px 24px rgba(59, 130, 246, 0.13);
-        border: 4px solid #fff;
-        background: #f8fafc;
-    }
-
-    .profile-edit-btn {
-        background: linear-gradient(135deg, #2563eb 0%, #06b6d4 100%);
-        color: #fff;
-        border: none;
-        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.10);
-        width: 44px;
-        height: 44px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 50%;
-        position: absolute;
-        bottom: -10px;
-        right: -10px;
-        transition: background 0.18s, box-shadow 0.18s, transform 0.13s;
-    }
-
-    .profile-edit-btn:hover {
-        background: linear-gradient(135deg, #1a2f9a 0%, #0e7490 100%);
-        color: #fff;
-        box-shadow: 0 4px 18px rgba(59, 130, 246, 0.18);
-        transform: scale(1.07);
-    }
-
-    .profile-tabs {
-        border-bottom: none !important;
-        display: flex;
-        justify-content: center;
-        gap: 0.5rem;
-        margin-bottom: 2rem;
-        background: transparent;
-    }
-
-    .profile-tabs .nav-link {
-        border: none !important;
-        border-radius: 2em !important;
-        background: linear-gradient(90deg, #f4f8ff 0%, #e0f2fe 100%);
-        color: #223b7b;
-        font-weight: 700;
-        font-size: 1.13rem;
-        padding: 0.8em 2.2em;
-        margin: 0 0.1em;
-        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.07);
-        transition: background 0.18s, color 0.18s, box-shadow 0.18s, transform 0.13s;
-        position: relative;
-        z-index: 1;
-        outline: none;
-    }
-
-    .profile-tabs .nav-link.active,
-    .profile-tabs .nav-link:focus,
-    .profile-tabs .nav-link:hover {
-        background: linear-gradient(90deg, #2563eb 0%, #06b6d4 100%);
-        color: #fff !important;
-        box-shadow: 0 6px 24px rgba(59, 130, 246, 0.18);
-        transform: translateY(-3px) scale(1.06);
-        font-weight: 800;
-    }
-
-    .profile-tabs .nav-link:not(.active):hover {
-        background: #e0f0ff;
-        color: #2563eb;
-        box-shadow: 0 2px 12px rgba(59, 130, 246, 0.13);
-        transform: translateY(-1px) scale(1.03);
-        font-weight: 700;
-        transition: background 0.18s, color 0.18s, box-shadow 0.18s, transform 0.13s;
-    }
-
-    .profile-tabs .nav-link .material-icons {
-        vertical-align: middle;
-        margin-right: 0.3em;
-        font-size: 1.2em;
-    }
-
-    .profile-form-label {
-        font-weight: 700;
-        color: #223b7b;
-        margin-bottom: 0.4rem;
-    }
-
-    .profile-form .form-control {
-        background: #f8fafc;
-        border-radius: 0.7rem;
-        border: 1.5px solid #e0e7ef;
-        font-size: 1.13rem;
-        font-weight: 500;
-        color: #223b7b;
-        transition: box-shadow 0.18s, border-color 0.18s;
-    }
-
-    .profile-form .form-control:focus {
-        box-shadow: 0 0 0 2px #b3d1f7;
-        border-color: #2563eb;
-        background: #fff;
-    }
-
-    .profile-save-btn {
-        width: 100%;
-        background: linear-gradient(90deg, #2563eb 0%, #06b6d4 100%);
-        color: #fff !important;
-        font-weight: 800;
-        border: none;
-        border-radius: 2em;
-        box-shadow: 0 2px 12px rgba(59, 130, 246, 0.10);
-        padding: 0.9em 0;
-        font-size: 1.18rem;
-        transition: background 0.18s, box-shadow 0.18s, transform 0.13s;
-        margin-top: 0.2rem;
-        margin-bottom: 0.7rem;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 0.7em;
-    }
-
-    .profile-save-btn:hover,
-    .profile-save-btn:focus {
-        background: linear-gradient(90deg, #1a2f9a 0%, #0e7490 100%);
-        color: #fff !important;
-        box-shadow: 0 4px 18px rgba(59, 130, 246, 0.18);
-        transform: scale(1.03);
-    }
-
-    .profile-delete-section .card {
-        border: 2px solid #ffe0e0;
-        background: linear-gradient(90deg, #fff0f0 0%, #ffe0e0 100%);
-        border-radius: 1.1rem;
-        box-shadow: 0 2px 12px rgba(220, 53, 69, 0.07);
-    }
-
-    .profile-delete-section .btn-danger {
-        background: linear-gradient(90deg, #dc3545 0%, #ff6f6f 100%);
-        border: none;
-        border-radius: 2em;
-        font-weight: 700;
-        font-size: 1.08rem;
-        box-shadow: 0 2px 8px rgba(220, 53, 69, 0.10);
-        transition: background 0.18s, box-shadow 0.18s, transform 0.13s;
-    }
-
-    .profile-delete-section .btn-danger:hover,
-    .profile-delete-section .btn-danger:focus {
-        background: linear-gradient(90deg, #b91c1c 0%, #dc2626 100%);
-        color: #fff;
-        box-shadow: 0 4px 18px rgba(220, 53, 69, 0.18);
-        transform: scale(1.03);
-    }
-
-    @media (max-width: 600px) {
-        .profile-glass-card {
-            padding: 1.2rem 0.5rem 1.2rem 0.5rem;
-        }
-
-        .profile-tabs {
-            flex-direction: column;
-            gap: 0.3rem;
-        }
-
-        .profile-tabs .nav-link {
-            font-size: 1rem;
-            padding: 0.7em 0.7em;
-        }
-
-        .profile-avatar {
-            width: 90px;
-            height: 90px;
-        }
-    }
-
-    .profile-password-card {
-        background: #f8fafc;
-        border-radius: 1.25rem;
-        box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.10);
-        padding: 2.5rem 2.5rem 2rem 2.5rem;
-        margin-bottom: 2.5rem;
-        border: 1.5px solid #e0e7ef;
-    }
-
-    .profile-password-label {
-        font-weight: 700;
-        color: #223b7b;
-        margin-bottom: 0.4rem;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        font-size: 1.1rem;
-    }
-
-    .profile-password-input {
-        width: 100%;
-        border-radius: 0.7rem;
-        border: 1.5px solid #e0e7ef;
-        background: #fff;
-        font-size: 1.13rem;
-        font-weight: 500;
-        color: #223b7b;
-        padding: 0.85rem 1.1rem;
-        margin-bottom: 0.5rem;
-        transition: box-shadow 0.18s, border-color 0.18s;
-    }
-
-    .profile-password-input:focus {
-        box-shadow: 0 0 0 2px #b3d1f7;
-        border-color: #2563eb;
-        background: #fff;
-    }
-
-    .profile-password-btn {
-        width: 100%;
-        background: linear-gradient(90deg, #2563eb 0%, #06b6d4 100%);
-        color: #fff !important;
-        font-weight: 800;
-        border: none;
-        border-radius: 2em;
-        box-shadow: 0 2px 12px rgba(59, 130, 246, 0.10);
-        padding: 1em 0;
-        font-size: 1.18rem;
-        transition: background 0.18s, box-shadow 0.18s, transform 0.13s;
-        margin-top: 0.2rem;
-        margin-bottom: 0.7rem;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 0.7em;
-    }
-
-    .profile-password-btn:hover,
-    .profile-password-btn:focus {
-        background: linear-gradient(90deg, #1a2f9a 0%, #0e7490 100%);
-        color: #fff !important;
-        box-shadow: 0 4px 18px rgba(59, 130, 246, 0.18);
-        transform: scale(1.03);
-    }
-    .profile-save-btn, .profile-password-btn, .btn-danger, .btn-primary {
-        width: 100%;
-        background: linear-gradient(90deg, #2563eb 0%, #06b6d4 100%);
-        color: #fff !important;
-        font-weight: 800;
-        border: none;
-        border-radius: 2em;
-        box-shadow: 0 2px 12px rgba(59, 130, 246, 0.10);
-        padding: 1em 0;
-        font-size: 1.18rem;
-        transition: background 0.18s, box-shadow 0.18s, transform 0.13s;
-        margin-top: 0.2rem;
-        margin-bottom: 0.7rem;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 0.7em;
-    }
-    .profile-save-btn:hover, .profile-password-btn:hover, .btn-danger:hover, .btn-primary:hover,
-    .profile-save-btn:focus, .profile-password-btn:focus, .btn-danger:focus, .btn-primary:focus {
-        background: linear-gradient(90deg, #1a2f9a 0%, #0e7490 100%);
-        color: #fff !important;
-        box-shadow: 0 4px 18px rgba(59, 130, 246, 0.18);
-        transform: scale(1.03);
-    }
-    .profile-delete-section .btn-danger {
-        background: linear-gradient(90deg, #dc3545 0%, #ff6f6f 100%);
-        color: #fff;
-    }
-    .profile-delete-section .btn-danger:hover, .profile-delete-section .btn-danger:focus {
-        background: linear-gradient(90deg, #b91c1c 0%, #dc2626 100%);
-        color: #fff;
-    }
-    @media (max-width: 600px) {
-        .profile-glass-card {
-            padding: 1.2rem 0.5rem 1.2rem 0.5rem;
-        }
-        .profile-tabs {
-            flex-direction: column;
-            gap: 0.3rem;
-        }
-        .profile-tabs .nav-link {
-            font-size: 1rem;
-            padding: 0.7em 0.7em;
-        }
-        .profile-avatar {
-            width: 90px;
-            height: 90px;
-        }
-    }
-</style>
-
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         const profilePictureInput = document.getElementById('profile-picture-input');

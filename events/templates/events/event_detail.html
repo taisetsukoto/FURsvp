@@ -1,1390 +1,179 @@
 {% extends 'events/base.html' %}
 {% load users_extras %}
+{% load static %}
 {% block title %}{{ event.title }} - FURsvp{% endblock %}
 {% load widget_tweaks %}
 
+{% block extra_css %}
+{% if location_display_string %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+{% endif %}
+{% endblock %}
+
 {% block content %}
-<style>
-    .card-body img {
-        max-width: 100% !important;
-        height: auto !important;
-        display: block;
-        margin: 1rem auto;
-        box-sizing: border-box;
-    }
-
-    .card-body a,
-    .modern-card-body a {
-        color: #2563eb;
-        text-decoration: underline;
-        transition: color 0.15s ease-in-out;
-    }
-
-    .card-body a:hover,
-    .modern-card-body a:hover {
-        color: #1d4ed8;
-        text-decoration: underline;
-    }
-
-    .dark-mode .card-body a,
-    .dark-mode .modern-card-body a {
-        color: #60a5fa;
-    }
-
-    .dark-mode .card-body a:hover,
-    .dark-mode .modern-card-body a:hover {
-        color: #93c5fd;
-    }
-
-    .organizer-tools-buttons .btn {
-        white-space: nowrap;
-    }
-
-    .dark-mode .list-group-item,
-    .dark-mode .list-group-item a,
-    .dark-mode .list-group-item span {
-        color: #fff !important;
-    }
-
-    .dark-mode .card-body,
-    .dark-mode .card-body span,
-    .dark-mode .card-body .ms-2 {
-        color: #fff !important;
-    }
-
-    .card-text img,
-    .modern-card-body .card-text img,
-    .modern-card-body img {
-        max-width: 100% !important;
-        height: auto !important;
-        display: block;
-        margin: 1rem auto;
-        box-sizing: border-box;
-    }
-
-    .event-hero-gradient {
-        background: linear-gradient(90deg, #6366f1 0%, #06b6d4 100%);
-        color: #fff;
-        border-radius: 1.5rem;
-        box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.10);
-        padding: 2.5rem 2rem 2rem 2rem;
-        margin-bottom: 2.5rem;
-    }
-
-    .modern-card {
-        border-radius: 2rem;
-        box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.10);
-        background: #fff8fa00;
-        margin-bottom: 2rem;
-    }
-
-    .modern-card-header.event-info {
-        background: linear-gradient(90deg, #6366f1 0%, #06b6d4 100%);
-        color: #fff;
-        font-size: 1.25rem;
-        font-weight: 700;
-        padding: 1.2rem 2rem;
-        border-bottom: none;
-        display: flex;
-        align-items: center;
-        border-top-left-radius: 2rem;
-        border-top-right-radius: 2rem;
-    }
-
-    .modern-card-header.attendees {
-        background: linear-gradient(90deg, #42f56c 0%, #66f43f 100%);
-        color: #fff;
-        font-size: 1.25rem;
-        font-weight: 700;
-        padding: 1.2rem 2rem;
-        border-bottom: none;
-        display: flex;
-        align-items: center;
-        border-top-left-radius: 2rem;
-        border-top-right-radius: 2rem;
-    }
-
-    .modern-card-body {
-        padding: 2rem 2.5rem 1.5rem 2.5rem;
-        background: #f8fafc;
-        color: #222;
-        font-size: 1.08rem;
-        margin-bottom: 0.5rem;
-        border-bottom-left-radius: 2rem;
-        border-bottom-right-radius: 2rem;
-    }
-
-    .modern-select {
-        border-radius: 2rem !important;
-        box-shadow: 0 2px 12px rgba(59, 130, 246, 0.10);
-        border: 2px solid #e0e7ef;
-        font-size: 1.15rem;
-        padding: 0.85rem 1.5rem;
-        background: linear-gradient(90deg, #f8fafc 0%, #e0e7ef 100%);
-        color: #222;
-        transition: border 0.18s, box-shadow 0.18s;
-        margin-bottom: 1.2rem;
-        width: 100%;
-        font-weight: 500;
-    }
-
-    .modern-select:focus {
-        border-color: #3b82f6;
-        box-shadow: 0 0 0 2px #3b82f655;
-        outline: none;
-        background: linear-gradient(90deg, #e0e7ef 0%, #f8fafc 100%);
-    }
-
-    .rsvp-label {
-        font-size: 1.13rem;
-        font-weight: 600;
-        color: #2563eb;
-        display: flex;
-        align-items: center;
-        margin-bottom: 0.7rem;
-        gap: 0.5rem;
-    }
-
-    .rsvp-label .material-icons {
-        font-size: 1.5rem;
-        color: #06b6d4;
-    }
-
-    .rsvp-submit-btn {
-        width: 100%;
-        border-radius: 2rem;
-        font-size: 1.13rem;
-        font-weight: 700;
-        padding: 0.85rem 0;
-        margin-top: 0.5rem;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 0.7rem;
-        background: linear-gradient(90deg, #3b82f6 0%, #06b6d4 100%);
-        color: #fff;
-        box-shadow: 0 2px 12px rgba(59, 130, 246, 0.10);
-        border: none;
-        transition: background 0.18s, box-shadow 0.18s, transform 0.12s;
-    }
-
-    .rsvp-submit-btn:hover {
-        background: linear-gradient(90deg, #2563eb 0%, #0ea5e9 100%);
-        color: #fff;
-        box-shadow: 0 4px 18px rgba(59, 130, 246, 0.18);
-        transform: translateY(-2px) scale(1.04);
-    }
-
-    .gradient-btn-primary,
-    .gradient-btn-success,
-    .gradient-btn-danger {
-        width: 100%;
-        border-radius: 2rem;
-        font-size: 1.13rem;
-        font-weight: 700;
-        padding: 0.85rem 0;
-        margin-bottom: 1rem;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        gap: 0.7rem;
-        box-shadow: 0 2px 12px rgba(59, 130, 246, 0.10);
-        transition: background 0.18s, box-shadow 0.18s, transform 0.12s;
-    }
-
-    .gradient-btn-primary {
-        background: linear-gradient(90deg, #3b82f6 0%, #06b6d4 100%);
-        color: #fff;
-    }
-
-    .gradient-btn-primary:hover {
-        background: linear-gradient(90deg, #2563eb 0%, #0ea5e9 100%);
-        color: #fff;
-        box-shadow: 0 4px 18px rgba(59, 130, 246, 0.18);
-        transform: translateY(-2px) scale(1.04);
-    }
-
-    .gradient-btn-success {
-        background: linear-gradient(90deg, #10b981 0%, #059669 100%);
-        color: #fff;
-    }
-
-    .gradient-btn-success:hover {
-        background: linear-gradient(90deg, #059669 0%, #047857 100%);
-        color: #fff;
-        box-shadow: 0 4px 18px rgba(16, 185, 129, 0.18);
-        transform: translateY(-2px) scale(1.04);
-    }
-
-    .gradient-btn-danger {
-        background: linear-gradient(90deg, #ef4444 0%, #dc2626 100%);
-        color: #fff;
-    }
-
-    .gradient-btn-danger:hover {
-        background: linear-gradient(90deg, #dc2626 0%, #b91c1c 100%);
-        color: #fff;
-        box-shadow: 0 4px 18px rgba(239, 68, 68, 0.18);
-        transform: translateY(-2px) scale(1.04);
-    }
-
-    .attendee-counter-badge {
-        display: inline-block;
-        min-width: 2.1rem;
-        padding: 0.25rem 0.9rem;
-        font-size: 1.08rem;
-        font-weight: 700;
-        color: #fff;
-        background: linear-gradient(90deg, #2563eb 0%, #06b6d4 100%);
-        border-radius: 1.2rem;
-        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.10);
-        margin-left: 0.7rem;
-        vertical-align: middle;
-        transition: background 0.18s, box-shadow 0.18s, transform 0.12s;
-    }
-
-    .attendee-counter-badge:empty {
-        display: none;
-    }
-
-    .gradient-badge-18 {
-        background: linear-gradient(90deg, #f59e42 0%, #fbbf24 100%);
-        color: #92400e;
-        border-radius: 1.2rem;
-        font-size: 1.05rem;
-        font-weight: 600;
-        padding: 0.5rem 1.2rem;
-        display: inline-flex;
-        align-items: center;
-        box-shadow: 0 2px 8px rgba(251, 191, 36, 0.10);
-        margin-left: 0.5rem;
-        vertical-align: middle;
-    }
-
-    .gradient-badge-21 {
-        background: linear-gradient(90deg, #ef4444 0%, #dc2626 100%);
-        color: #fff;
-        border-radius: 1.2rem;
-        font-size: 1.05rem;
-        font-weight: 600;
-        padding: 0.5rem 1.2rem;
-        display: inline-flex;
-        align-items: center;
-        box-shadow: 0 2px 8px rgba(239, 68, 68, 0.10);
-        margin-left: 0.5rem;
-        vertical-align: middle;
-    }
-
-    .gradient-alert-success {
-        background: linear-gradient(90deg, #a8ff78 0%, #78ffd6 100%);
-        color: #14532d;
-        border-radius: 1.1rem;
-        box-shadow: 0 2px 12px rgba(34, 197, 94, 0.08);
-        border-left: 6px solid #22c55e;
-        padding: 1.1rem 1.7rem;
-        display: flex;
-        align-items: center;
-        font-size: 1.18rem;
-        font-weight: 600;
-        margin-bottom: 1.5rem;
-        margin-top: 1.2rem;
-    }
-
-    .gradient-alert-success .material-icons {
-        font-size: 2rem;
-        margin-right: 1.1rem;
-        color: #22c55e;
-        background: #e0ffe7;
-        border-radius: 50%;
-        padding: 0.25rem;
-    }
-
-    .gradient-alert-waitlist {
-        background: linear-gradient(90deg, #fdfb72 0%, #f8d800 100%);
-        color: #92400e;
-        border-radius: 1.1rem;
-        box-shadow: 0 2px 12px rgba(251, 191, 36, 0.08);
-        border-left: 6px solid #f59e42;
-        padding: 1.1rem 1.7rem;
-        display: flex;
-        align-items: center;
-        font-size: 1.18rem;
-        font-weight: 600;
-        margin-bottom: 1.5rem;
-        margin-top: 1.2rem;
-    }
-
-    .gradient-alert-waitlist .material-icons {
-        font-size: 2rem;
-        margin-right: 1.1rem;
-        color: #f59e42;
-        background: #fffbe6;
-        border-radius: 50%;
-        padding: 0.25rem;
-    }
-
-    .gradient-alert-maybe {
-        background: linear-gradient(90deg, #fdfb72 0%, #f8d800 100%);
-        color: #92400e;
-        border-radius: 1.1rem;
-        box-shadow: 0 2px 12px rgba(251, 191, 36, 0.08);
-        border-left: 6px solid #f59e42;
-        padding: 1.1rem 1.7rem;
-        display: flex;
-        align-items: center;
-        font-size: 1.18rem;
-        font-weight: 600;
-        margin-bottom: 1.5rem;
-        margin-top: 1.2rem;
-    }
-
-    .gradient-alert-maybe .material-icons {
-        font-size: 2rem;
-        margin-right: 1.1rem;
-        color: #f59e42;
-        background: #fffbe6;
-        border-radius: 50%;
-        padding: 0.25rem;
-    }
-
-    .gradient-alert-notgoing {
-        background: linear-gradient(90deg, #ffbaba 0%, #ff5e62 100%);
-        color: #7f1d1d;
-        border-radius: 1.1rem;
-        box-shadow: 0 2px 12px rgba(239, 68, 68, 0.08);
-        border-left: 6px solid #ef4444;
-        padding: 1.1rem 1.7rem;
-        display: flex;
-        align-items: center;
-        font-size: 1.18rem;
-        font-weight: 600;
-        margin-bottom: 1.5rem;
-        margin-top: 1.2rem;
-    }
-
-    .gradient-alert-notgoing .material-icons {
-        font-size: 2rem;
-        margin-right: 1.1rem;
-        color: #ef4444;
-        background: #ffeaea;
-        border-radius: 50%;
-        padding: 0.25rem;
-    }
-
-    .dark-mode .modern-card {
-        background: #181a20;
-        color: #f3f4f6;
-        box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.18);
-    }
-
-    .dark-mode .modern-card-header.event-info {
-        background: linear-gradient(90deg, #6366f1 0%, #06b6d4 100%);
-        color: #fff;
-    }
-
-    .dark-mode .modern-card-header.attendees {
-        background: linear-gradient(90deg, #42f56c 0%, #66f43f 100%);
-        color: #fff;
-    }
-
-    .dark-mode .modern-card-header {
-        border-bottom: none;
-    }
-
-    .dark-mode .modern-card-body {
-        background: #181a20;
-        color: #f3f4f6;
-    }
-
-    .dark-mode .attendee-counter-badge {
-        background: linear-gradient(90deg, #2563eb 0%, #06b6d4 100%);
-        color: #fff;
-        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.18);
-    }
-
-    .dark-mode .gradient-alert-success {
-        background: linear-gradient(90deg, #3bb78f 0%, #0bab64 100%);
-        color: #d1fae5;
-        border-left: 6px solid #10b981;
-    }
-
-    .dark-mode .gradient-alert-success .material-icons {
-        color: #10b981;
-        background: #134e4a;
-    }
-
-    .dark-mode .gradient-alert-cancelled {
-        background: linear-gradient(90deg, #ff5e62 0%, #ff9966 100%);
-        color: #fff1f2;
-        border-left: 6px solid #ef4444;
-    }
-
-    .dark-mode .gradient-alert-cancelled .material-icons {
-        color: #ef4444;
-        background: #7f1d1d;
-    }
-
-    .dark-mode .gradient-alert-waitlist {
-        background: linear-gradient(90deg, #f8d800 0%, #fbb034 100%);
-        color: #fffbe6;
-        border-left: 6px solid #f59e42;
-    }
-
-    .dark-mode .gradient-alert-waitlist .material-icons {
-        color: #f59e42;
-        background: #78350f;
-    }
-
-    .dark-mode .gradient-btn-primary {
-        background: linear-gradient(90deg, #2563eb 0%, #0ea5e9 100%);
-        color: #fff;
-    }
-
-    .dark-mode .gradient-btn-success {
-        background: linear-gradient(90deg, #059669 0%, #10b981 100%);
-        color: #fff;
-    }
-
-    .dark-mode .gradient-btn-danger {
-        background: linear-gradient(90deg, #dc2626 0%, #b91c1c 100%);
-        color: #fff;
-    }
-
-    .dark-mode .modern-select {
-        background: linear-gradient(90deg, #23272f 0%, #181a20 100%);
-        color: #f3f4f6;
-        border: 2px solid #374151;
-    }
-
-    .dark-mode .modern-select:focus {
-        border-color: #3b82f6;
-        box-shadow: 0 0 0 2px #3b82f655;
-        background: linear-gradient(90deg, #181a20 0%, #23272f 100%);
-        color: #fff;
-    }
-
-    .dark-mode .rsvp-label {
-        color: #38bdf8;
-    }
-
-    .dark-mode .rsvp-label .material-icons {
-        color: #38bdf8;
-    }
-
-    .dark-mode .list-group-item {
-        background: #23272f !important;
-        color: #f3f4f6 !important;
-        border-color: #374151 !important;
-    }
-
-    .dark-mode .list-group-item.text-muted {
-        color: #9ca3af !important;
-    }
-
-    .dark-mode .badge.bg-primary {
-        background: linear-gradient(90deg, #2563eb 0%, #06b6d4 100%) !important;
-        color: #fff !important;
-    }
-
-    .rsvp-group-card {
-        border-radius: 1.1rem;
-        box-shadow: 0 2px 12px rgba(59, 130, 246, 0.08);
-        margin-bottom: 1.9rem;
-        padding: 1.1rem 1.2rem 0.7rem 1.2rem;
-        background: #fff;
-        transition: background 0.18s, box-shadow 0.18s;
-    }
-
-    .rsvp-group-card:last-child {
-        margin-bottom: 0;
-    }
-
-    .rsvp-group-confirmed {
-        background: linear-gradient(90deg, #d1fae5 0%, #a7f3d0 100%);
-    }
-
-    .rsvp-group-maybe {
-        background: linear-gradient(90deg, #fef9c3 0%, #fde68a 100%);
-    }
-
-    .rsvp-group-notattending {
-        background: linear-gradient(90deg, #fee2e2 0%, #fecaca 100%);
-    }
-
-    .rsvp-group-card .list-group-item {
-        background: transparent !important;
-        border: none !important;
-        color: #222 !important;
-        border-radius: 0.7rem;
-        margin-bottom: 0.3rem;
-        padding: 0.7rem 1rem;
-    }
-
-    .rsvp-group-card .list-group-item.text-muted {
-        color: #6b7280 !important;
-        font-style: italic;
-        background: rgba(255, 255, 255, 0.7) !important;
-        border-radius: 0.7rem;
-    }
-
-    .rsvp-group-card .avatar {
-        border-radius: 50%;
-        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.10);
-        width: 36px;
-        height: 36px;
-        object-fit: cover;
-        margin-right: 0.7rem;
-    }
-
-    .modern-breadcrumbs {
-        background: #f8fafc;
-        border-radius: 2rem;
-        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.07);
-        padding: 0.7rem 1.5rem;
-        display: flex;
-        align-items: center;
-        gap: 0.7rem;
-        font-size: 1.13rem;
-        margin-bottom: 1.5rem;
-    }
-
-    .modern-breadcrumbs a {
-        color: #64748b;
-        text-decoration: none;
-        font-weight: 600;
-        display: flex;
-        align-items: center;
-        transition: color 0.15s;
-    }
-
-    .modern-breadcrumbs a:hover {
-        color: #2563eb;
-    }
-
-    .modern-breadcrumbs .breadcrumb-chevron {
-        color: #b0b8c1;
-        font-size: 1.3em;
-        margin: 0 0.5rem;
-        user-select: none;
-    }
-
-    .modern-breadcrumbs .breadcrumb-current {
-        color: #2563eb;
-        font-weight: 700;
-    }
-
-    .modern-breadcrumbs .material-icons {
-        font-size: 1.3em;
-        margin-right: 0.3em;
-        color: #64748b;
-    }
-
-    .gradient-alert-past {
-        background: linear-gradient(90deg, #a1a1aa 0%, #f3f4f6 100%);
-        color: #334155;
-        border-radius: 1.1rem;
-        box-shadow: 0 2px 12px rgba(100, 116, 139, 0.08);
-        border-left: 6px solid #64748b;
-        padding: 1.1rem 1.7rem;
-        display: flex;
-        align-items: center;
-        font-size: 1.18rem;
-        font-weight: 600;
-        margin-bottom: 1.5rem;
-        margin-top: 1.2rem;
-    }
-
-    .gradient-alert-past .material-icons {
-        font-size: 2rem;
-        margin-right: 1.1rem;
-        color: #64748b;
-        background: #e5e7eb;
-        border-radius: 50%;
-        padding: 0.25rem;
-    }
-
-    .attendee-restriction-modal {
-        background: linear-gradient(90deg, #e0e7ff 0%, #f0abfc 100%);
-        color: #312e81;
-        border-radius: 1.1rem;
-        box-shadow: 0 2px 12px rgba(139, 92, 246, 0.08);
-        border-left: 6px solid #8b5cf6;
-        padding: 1.2rem 2rem;
-        display: flex;
-        align-items: center;
-        gap: 1.1rem;
-        font-size: 1.18rem;
-        font-weight: 600;
-        margin-bottom: 0;
-        margin-top: 0.2rem;
-    }
-
-    .attendee-restriction-icon {
-        font-size: 2.1rem;
-        color: #8b5cf6;
-        flex-shrink: 0;
-    }
-
-    .attendee-restriction-text {
-        flex: 1;
-    }
-
-    .login-required-modal {
-        background: linear-gradient(90deg, #fef9c3 0%, #fde68a 100%);
-        color: #92400e;
-        border-radius: 1.1rem;
-        box-shadow: 0 2px 12px rgba(251, 191, 36, 0.08);
-        border-left: 6px solid #f59e42;
-        padding: 1.2rem 2rem;
-        display: flex;
-        align-items: center;
-        gap: 1.1rem;
-        font-size: 1.18rem;
-        font-weight: 600;
-        margin-bottom: 0;
-        margin-top: 0.2rem;
-    }
-
-    .login-required-icon {
-        font-size: 2.1rem;
-        color: #f59e42;
-        flex-shrink: 0;
-    }
-
-    .login-required-text {
-        flex: 1;
-    }
-
-    .login-link {
-        color: #2563eb;
-        font-weight: 700;
-        text-decoration: underline;
-    }
-
-    .login-link:hover,
-    .login-link:focus {
-        color: #1d4ed8;
-        text-decoration: underline;
-    }
-
-    #editEventModal .modal-content {
-        border-radius: 1.25rem;
-        box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.25);
-        border: none;
-        overflow: hidden;
-    }
-
-    #editEventModal .modal-header {
-        background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 100%);
-        color: #fff;
-        border-bottom: none;
-        padding-top: 2rem;
-        padding-bottom: 2rem;
-        align-items: center;
-    }
-
-    #editEventModal .modal-title {
-        font-size: 1.7rem;
-        font-weight: 600;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-    }
-
-    #editEventModal .modal-header .material-icons {
-        font-size: 2.2rem;
-        vertical-align: middle;
-    }
-
-    #editEventModal .modal-header .btn-close {
-        filter: invert(1);
-        opacity: 0.8;
-    }
-
-    #editEventModal .modal-header .btn-close:hover {
-        opacity: 1;
-    }
-
-    #editEventModal .modal-body {
-        padding: 2rem 2.5rem 1.5rem 2.5rem;
-        background: #f8fafc;
-    }
-
-    #editEventModal .modal-footer {
-        background: #f3f4f6;
-        border-top: none;
-        padding: 1.5rem 2.5rem;
-    }
-
-    #editEventModal .btn-primary {
-        background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 100%);
-        border: none;
-        font-weight: 600;
-        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.10);
-        transition: background 0.2s, box-shadow 0.2s;
-    }
-
-    #editEventModal .btn-primary:hover,
-    #editEventModal .btn-primary:focus {
-        background: linear-gradient(90deg, #2563eb 0%, #7c3aed 100%);
-        box-shadow: 0 4px 16px rgba(59, 130, 246, 0.18);
-    }
-
-    #editEventModal .btn-cancel {
-        background: #fff;
-        color: #6366f1;
-        border: 2px solid #a5b4fc;
-        border-radius: 0.8rem;
-        font-weight: 600;
-        box-shadow: 0 2px 8px rgba(139, 92, 246, 0.08);
-        transition: background 0.18s, color 0.18s, border 0.18s;
-    }
-
-    #editEventModal .btn-cancel:hover,
-    #editEventModal .btn-cancel:focus {
-        background: linear-gradient(90deg, #e0e7ff 0%, #f3e8ff 100%);
-        color: #4f46e5;
-        border-color: #6366f1;
-    }
-
-    #editEventModal label.form-label {
-        font-weight: 500;
-        color: #4f46e5;
-    }
-
-    #editEventModal input.form-control,
-    #editEventModal textarea.form-control {
-        border-radius: 0.75rem;
-        border: 1.5px solid #d1d5db;
-        background: #fff;
-        font-size: 1rem;
-        padding: 0.75rem 1rem;
-        margin-bottom: 0.5rem;
-    }
-
-    #editEventModal input.form-control:focus,
-    #editEventModal textarea.form-control:focus {
-        border-color: #8b5cf6;
-        box-shadow: 0 0 0 2px #c7d2fe;
-    }
-
-    #editEventModal .form-text {
-        color: #6b7280;
-        font-size: 0.95rem;
-    }
-
-    #editEventModal .input-group .form-control {
-        border-top-right-radius: 0;
-        border-bottom-right-radius: 0;
-    }
-
-    #editEventModal .input-group .btn {
-        height: 100%;
-        padding-top: 0.5rem;
-        padding-bottom: 0.5rem;
-        display: flex;
-        align-items: center;
-        border-top-left-radius: 0;
-        border-bottom-left-radius: 0;
-    }
-
-    #editEventModal #useLocationBtn {
-        border-top-right-radius: 0.95rem;
-        border-bottom-right-radius: 0.95rem;
-        display: flex;
-        align-items: center;
-        padding-top: 0.75rem;
-        padding-bottom: 0.75rem;
-    }
-
-    #editEventModal .custom-select-modern {
-        width: 100%;
-        display: block;
-        border-radius: 0.75rem;
-        border: 1.5px solid #d1d5db;
-        background: #fff;
-        font-size: 1rem;
-        padding: 0.75rem 1.5rem 0.75rem 1rem;
-        margin-bottom: 0.5rem;
-        appearance: none;
-        -webkit-appearance: none;
-        background-image: url("data:image/svg+xml,%3Csvg fill='none' stroke='gray' stroke-width='2' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
-        background-repeat: no-repeat;
-        background-position: right 1rem center;
-        background-size: 1.2em;
-        transition: border-color 0.18s, box-shadow 0.18s;
-    }
-
-    #editEventModal .custom-select-modern:focus {
-        border-color: #8b5cf6;
-        box-shadow: 0 0 0 2px #c7d2fe;
-        outline: none;
-    }
-
-    #editEventModal .form-check {
-        display: flex;
-        align-items: center;
-        margin-bottom: 1.1rem;
-    }
-
-    #editEventModal .form-check-input {
-        width: 1.35em;
-        height: 1.35em;
-        border-radius: 24px;
-        margin-bottom: 4px;
-        border: 2px solid #a5b4fc;
-        background: #fff;
-        margin-right: 0.7em;
-        accent-color: #3b82f6;
-        /* Ensures checkmark is visible and blue */
-        box-shadow: 0 2px 8px rgba(139, 92, 246, 0.08);
-        transition: border-color 0.18s, box-shadow 0.18s;
-        appearance: auto;
-        /* Use browser default for checkmark */
-    }
-
-    #editEventModal .form-check-input:checked {
-        background-color: #3b82f6;
-        border-color: #3b82f6;
-    }
-
-    #editEventModal .form-check-label {
-        font-size: 1.08rem;
-        font-weight: 500;
-        color: #222;
-        cursor: pointer;
-    }
-
-    .btn-location-modern {
-        background: #fff;
-        color: #6366f1;
-        border: 2px solid #a5b4fc;
-        border-radius: 0.8rem;
-        font-weight: 600;
-        box-shadow: 0 2px 8px rgba(139, 92, 246, 0.08);
-        transition: background 0.18s, color 0.18s, border 0.18s;
-        padding: 0.45rem 1.1rem;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1.1rem;
-        margin-left: 0.5rem;
-    }
-
-    .btn-location-modern:hover,
-    .btn-location-modern:focus {
-        background: #eef2ff;
-        color: #4f46e5;
-        border-color: #6366f1;
-        text-decoration: none;
-    }
-
-    #editEventModal .input-group {
-        align-items: stretch !important;
-    }
-
-    #editEventModal input.form-control {
-        padding-top: 0.75rem;
-        padding-bottom: 0.75rem;
-    }
-
-    .btn-save-outline {
-        background: #fff;
-        color: #6366f1;
-        border: 2px solid #6366f1;
-        border-radius: 0.8rem;
-        font-weight: 600;
-        box-shadow: 0 2px 8px rgba(99, 102, 241, 0.08);
-        transition: background 0.18s, color 0.18s, border 0.18s;
-        padding: 0.85rem 2.2rem;
-        font-size: 1.13rem;
-        display: flex;
-        align-items: center;
-        gap: 0.7rem;
-    }
-
-    .btn-save-outline:hover,
-    .btn-save-outline:focus {
-        background: linear-gradient(90deg, #e0e7ff 0%, #f3e8ff 100%);
-        color: #4f46e5;
-        border-color: #6366f1;
-        text-decoration: none;
-    }
-
-    .btn-cancel-outline {
-        background: #fff;
-        color: #6366f1;
-        border: 2px solid #a5b4fc;
-        border-radius: 0.8rem;
-        font-weight: 600;
-        box-shadow: 0 2px 8px rgba(139, 92, 246, 0.08);
-        transition: background 0.18s, color 0.18s, border 0.18s;
-        padding: 0.45rem 1.1rem;
-        font-size: 1.08rem;
-        display: flex;
-        align-items: center;
-        gap: 0.7rem;
-    }
-
-    .btn-cancel-outline:hover,
-    .btn-cancel-outline:focus {
-        background: linear-gradient(90deg, #e0e7ff 0%, #f3e8ff 100%);
-        color: #4f46e5;
-        border-color: #6366f1;
-        text-decoration: none;
-    }
-
-    .btn-save-gradient {
-        background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 100%);
-        color: #fff;
-        border: none;
-        border-radius: 0.8rem;
-        font-weight: 600;
-        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.10);
-        transition: background 0.2s, box-shadow 0.2s;
-        padding: 0.85rem 2.2rem;
-        font-size: 1.13rem;
-        display: flex;
-        align-items: center;
-        gap: 0.7rem;
-    }
-
-    .btn-save-gradient:hover,
-    .btn-save-gradient:focus {
-        background: linear-gradient(90deg, #2563eb 0%, #7c3aed 100%);
-        color: #fff;
-        box-shadow: 0 4px 16px rgba(59, 130, 246, 0.18);
-    }
-
-    .btn-cancel-gradient {
-        background: linear-gradient(90deg, #f59e42 0%, #f43f5e 100%);
-        color: #fff;
-        border: none;
-        border-radius: 0.8rem;
-        font-weight: 600;
-        box-shadow: 0 2px 8px rgba(244, 63, 94, 0.10);
-        transition: background 0.2s, box-shadow 0.2s;
-        padding: 0.85rem 2.2rem;
-        font-size: 1.13rem;
-        display: flex;
-        align-items: center;
-        gap: 0.7rem;
-    }
-
-    .btn-cancel-gradient:hover,
-    .btn-cancel-gradient:focus {
-        background: linear-gradient(90deg, #f43f5e 0%, #f59e42 100%);
-        color: #fff;
-        box-shadow: 0 4px 16px rgba(244, 63, 94, 0.18);
-    }
-
-    .rsvp-modal-answer-block {
-        background: #f3f6fd;
-        border-radius: 0.7rem;
-        padding: 0.7rem 1.1rem 0.7rem 1.1rem;
-        margin-bottom: 0.7rem;
-        margin-top: 0.7rem;
-        display: block;
-        word-break: break-word;
-    }
-
-    .rsvp-modal-answer-block .rsvp-modal-question {
-        font-weight: 700;
-        color: #2563eb;
-        display: block;
-        margin-bottom: 0.2rem;
-    }
-
-    .rsvp-modal-answer-block .rsvp-modal-answer {
-        font-weight: 400;
-        color: #222;
-        display: block;
-        margin-left: 0;
-        margin-top: 0.2rem;
-        max-height: 7.5em;
-        overflow-y: auto;
-        white-space: pre-line;
-    }
-
-    .rsvp-modal-answer-block .rsvp-modal-answer.muted {
-        color: #888;
-        font-style: italic;
-    }
-
-    .rsvp-modal-answer-block .material-icons {
-        font-size: 1.2em;
-        vertical-align: middle;
-        color: #2563eb;
-        margin-right: 0.2em;
-    }
-
-    .dark-mode .display-5,
-    .dark-mode .fw-bold {
-        color: #f3f4f6 !important;
-    }
-
-    .dark-mode .modern-breadcrumbs {
-        background: linear-gradient(90deg, #22335a 0%, #1a233a 100%) !important;
-        color: #e0e7ef !important;
-        border-radius: 2rem;
-        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.13);
-        border: 1.5px solid #374151;
-    }
-
-    .dark-mode .modern-breadcrumbs .breadcrumb-current,
-    .dark-mode .modern-breadcrumbs .material-icons {
-        color: #60a5fa !important;
-    }
-
-    .dark-mode .modern-breadcrumbs a {
-        color: #b3d1f7 !important;
-    }
-
-    .dark-mode .event-hero-gradient {
-        background: linear-gradient(90deg, #223a5f 0%, #0ea5e9 100%) !important;
-        color: #fff !important;
-        box-shadow: 0 8px 32px 0 rgba(20, 30, 50, 0.18);
-    }
-
-    .dark-mode .modern-card,
-    .dark-mode .modern-card-body {
-        background: #23272b !important;
-        color: #e0e0e0 !important;
-        box-shadow: 0 2px 12px rgba(30, 58, 138, 0.13);
-        border: 1px solid #232b3a !important;
-    }
-
-    .dark-mode .modern-card-header.event-info {
-        background: linear-gradient(90deg, #6366f1 0%, #06b6d4 100%) !important;
-        color: #fff !important;
-    }
-
-    .dark-mode .modern-card-header.attendees {
-        background: linear-gradient(90deg, #22d3ee 0%, #22c55e 100%) !important;
-        color: #fff !important;
-    }
-
-    .dark-mode .modern-card-header {
-        border-bottom: none !important;
-    }
-
-    .dark-mode .organizer-tools-buttons .btn {
-        background: linear-gradient(90deg, #ef4444 0%, #f59e42 100%) !important;
-        color: #fff !important;
-        border: none !important;
-    }
-
-    .dark-mode .organizer-tools-buttons .btn-primary {
-        background: linear-gradient(90deg, #2563eb 0%, #06b6d4 100%) !important;
-        color: #fff !important;
-    }
-
-    .dark-mode .organizer-tools-buttons .btn-danger {
-        background: linear-gradient(90deg, #ef4444 0%, #dc2626 100%) !important;
-        color: #fff !important;
-    }
-
-    .dark-mode .attendee-counter-badge {
-        background: linear-gradient(90deg, #2563eb 0%, #06b6d4 100%) !important;
-        color: #fff !important;
-        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.18);
-    }
-
-    .dark-mode .gradient-badge-18 {
-        background: linear-gradient(90deg, #fbbf24 0%, #f59e42 100%) !important;
-        color: #fff !important;
-    }
-
-    .dark-mode .gradient-badge-21 {
-        background: linear-gradient(90deg, #ef4444 0%, #dc2626 100%) !important;
-        color: #fff !important;
-    }
-
-    .dark-mode .gradient-alert-success {
-        background: linear-gradient(90deg, #3bb78f 0%, #0bab64 100%) !important;
-        color: #d1fae5 !important;
-        border-left: 6px solid #10b981 !important;
-    }
-
-    .dark-mode .gradient-alert-success .material-icons {
-        color: #10b981 !important;
-        background: #134e4a !important;
-    }
-
-    .dark-mode .gradient-alert-waitlist,
-    .dark-mode .gradient-alert-maybe {
-        background: linear-gradient(90deg, #fbbf24 0%, #f59e42 100%) !important;
-        color: #fff !important;
-        border-left: 6px solid #f59e42 !important;
-    }
-
-    .dark-mode .gradient-alert-waitlist .material-icons,
-    .dark-mode .gradient-alert-maybe .material-icons {
-        color: #f59e42 !important;
-        background: #7c4700 !important;
-    }
-
-    .dark-mode .gradient-alert-notgoing {
-        background: linear-gradient(90deg, #ff5e62 0%, #ffbaba 100%) !important;
-        color: #fff !important;
-        border-left: 6px solid #ef4444 !important;
-    }
-
-    .dark-mode .gradient-alert-notgoing .material-icons {
-        color: #ef4444 !important;
-        background: #7f1d1d !important;
-    }
-
-    .dark-mode .gradient-alert-cancelled {
-        background: linear-gradient(90deg, #ff5e62 0%, #ff9966 100%) !important;
-        color: #fff1f2 !important;
-        border-left: 6px solid #ef4444 !important;
-    }
-
-    .dark-mode .gradient-alert-cancelled .material-icons {
-        color: #ef4444 !important;
-        background: #7f1d1d !important;
-    }
-
-    .dark-mode .rsvp-label {
-        color: #38bdf8 !important;
-    }
-
-    .dark-mode .rsvp-label .material-icons {
-        color: #38bdf8 !important;
-    }
-
-    .dark-mode .list-group-item {
-        background: #23272f !important;
-        color: #f3f4f6 !important;
-        border-color: #374151 !important;
-    }
-
-    .dark-mode .list-group-item.text-muted {
-        color: #9ca3af !important;
-    }
-
-    .dark-mode .badge.bg-primary {
-        background: linear-gradient(90deg, #2563eb 0%, #06b6d4 100%) !important;
-        color: #fff !important;
-    }
-
-    .dark-mode .rsvp-group-card {
-        background: #23272b !important;
-        color: #e0e0e0 !important;
-        border-radius: 1.1rem;
-        box-shadow: 0 2px 12px rgba(30, 58, 138, 0.13);
-        border: 1.5px solid #232b3a !important;
-        margin-bottom: 1.9rem;
-        padding: 1.1rem 1.2rem 0.7rem 1.2rem;
-    }
-
-    .dark-mode .rsvp-group-card:last-child {
-        margin-bottom: 0;
-    }
-
-    .dark-mode .rsvp-group-confirmed {
-        border-top: 6px solid #34d399 !important;
-        background: #23272b !important;
-    }
-
-    .dark-mode .rsvp-group-maybe {
-        border-top: 6px solid #fde68a !important;
-        background: #23272b !important;
-    }
-
-    .dark-mode .rsvp-group-notattending {
-        border-top: 6px solid #fca5a5 !important;
-        background: #23272b !important;
-    }
-
-    .dark-mode .rsvp-group-card .list-group-item {
-        border: none !important;
-        color: #e0e0e0 !important;
-        border-radius: 0.7rem;
-        margin-bottom: 0.3rem;
-        padding: 0.7rem 1rem;
-    }
-
-    .dark-mode .rsvp-group-card .list-group-item.text-muted {
-        color: #b0b8c1 !important;
-        font-style: italic;
-        background: #23272b !important;
-        border-radius: 0.7rem;
-    }
-</style>
-<div class="container">
+<div class="container py-4 event-page">
     {% if event.status == 'cancelled' %}
-    <div class="gradient-alert-cancelled">
+    <div class="event-status-banner event-status-banner--danger">
         <i class="material-icons">event_busy</i>
         This event has been cancelled.
     </div>
     {% elif user_rsvp and event.status != 'cancelled' %}
     {% if user_rsvp.status == 'confirmed' %}
-    <div class="gradient-alert-success">
+    <div class="event-status-banner event-status-banner--success">
         <i class="material-icons">check_circle</i>
-        You are currently Confirmed for this event.
+        You are confirmed for this event.
     </div>
     {% elif user_rsvp.status == 'maybe' %}
-    <div class="gradient-alert-maybe">
+    <div class="event-status-banner event-status-banner--warning">
         <i class="material-icons">help</i>
-        You are currently a Maybe for this event.
+        You marked yourself as maybe for this event.
     </div>
     {% elif user_rsvp.status == 'not_attending' %}
-    <div class="gradient-alert-notgoing">
+    <div class="event-status-banner event-status-banner--danger">
         <i class="material-icons">cancel</i>
-        You are Not Going to this event.
+        You are not going to this event.
     </div>
     {% elif user_rsvp.status == 'waitlisted' %}
-    <div class="gradient-alert-waitlist">
+    <div class="event-status-banner event-status-banner--warning">
         <i class="material-icons">hourglass_empty</i>
-        You are currently Waitlisted for this event. You will be notified if a spot opens up.
+        You are waitlisted. You will be notified if a spot opens up.
     </div>
     {% endif %}
     {% endif %}
-    <!-- Breadcrumbs in separate section -->
-    <div class="row mb-3">
-        <div class="col-12">
-            <nav aria-label="breadcrumb">
-                <div class="modern-breadcrumbs">
-                    <a href="/" class="d-flex align-items-center">
-                        <i class="material-icons">home</i> Events
-                    </a>
-                    <span class="breadcrumb-chevron">›</span>
-                    <span class="breadcrumb-current">{{ event.title }}</span>
-                </div>
-            </nav>
-        </div>
-    </div>
-    <div class="row">
-        <div class="col-12">
-            <div class="event-hero-gradient mb-4">
-                <h1 class="display-5 mb-0 fw-bold">{{ event.title }}</h1>
-                {% if event.age_restriction == 'mature' %}
-                <span class="badge gradient-badge-21 ms-2">
-                    <i class="material-icons me-1 align-middle" style="font-size: 16px;">warning</i> 21+
-                </span>
-                {% elif event.age_restriction == 'adult' %}
-                <span class="badge gradient-badge-18 ms-2">
-                    <i class="material-icons me-1 align-middle" style="font-size: 16px;">warning</i> 18+
-                </span>
-                {% endif %}
-            </div>
-        </div>
-    </div>
 
     {% if event_has_passed %}
-    <div class="gradient-alert-past">
+    <div class="event-status-banner event-status-banner--muted">
         <i class="material-icons">info</i>
         This event has passed.
     </div>
     {% endif %}
 
-    <!-- Main Event Info and RSVP Section -->
-    <div class="row mb-4 align-items-stretch">
-        <!-- Event Details (Left) -->
-        <div class="col-lg-8 d-flex flex-column">
-            <div class="modern-card mb-4 h-100">
-                <div class="modern-card-header event-info">
-                    <i class="material-icons me-2">info</i> Event Information
+    <div class="event-hero-card profile-page-card mb-4">
+        <div class="event-hero-inner">
+            <div class="event-hero-date">
+                <span class="event-hero-date-month">{{ event.date|date:"M" }}</span>
+                <span class="event-hero-date-day">{{ event.date|date:"j" }}</span>
+            </div>
+            <div class="event-hero-content">
+                <h1 class="event-hero-title">{{ event.title }}</h1>
+                <div class="event-hero-chips">
+                    <span class="event-hero-chip">
+                        <i class="material-icons">schedule</i>
+                        {{ event.start_time|time:"g:i A" }}{% if event.end_time %} – {{ event.end_time|time:"g:i A" }}{% endif %}
+                    </span>
+                    <a href="{% url 'group_detail' event.group.id %}" class="event-hero-chip">
+                        <i class="material-icons">groups</i>{{ event.group.name }}
+                    </a>
+                    {% if event.age_restriction == 'mature' %}
+                    <span class="event-age-badge event-age-badge--21"><i class="material-icons">warning</i> 21+</span>
+                    {% elif event.age_restriction == 'adult' %}
+                    <span class="event-age-badge event-age-badge--18"><i class="material-icons">warning</i> 18+</span>
+                    {% endif %}
+                    {% if event.status == 'cancelled' %}
+                    <span class="event-age-badge event-age-badge--21">Cancelled</span>
+                    {% endif %}
                 </div>
-                <div class="modern-card-body">
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <div class="d-flex align-items-center mb-2">
-                                <i class="material-icons text-primary me-2" style="font-size: 24px;">group</i>
-                                <strong class="text-primary">Group:</strong>
-                                <span class="ms-2">
-                                    <a href="{% url 'group_detail' event.group.id %}" class="text-decoration-none">
-                                        {{ event.group.name }}
-                                    </a>
-                                </span>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4 mb-4 align-items-start">
+        <div class="col-lg-8">
+            <div class="group-section-card profile-page-card mb-4">
+                <div class="group-section-header">
+                    <div class="group-section-icon group-section-icon--info">
+                        <i class="material-icons">info</i>
+                    </div>
+                    <h2 class="group-section-title">Event Information</h2>
+                </div>
+                <div class="group-section-body">
+                    <div class="event-meta-grid">
+                        <div class="event-meta-item">
+                            <i class="material-icons">groups</i>
+                            <div>
+                                <span class="event-meta-label">Group</span>
+                                <span class="event-meta-value"><a href="{% url 'group_detail' event.group.id %}">{{ event.group.name }}</a></span>
                             </div>
                         </div>
-                        <div class="col-md-6">
-                            <div class="d-flex align-items-center mb-2">
-                                <i class="material-icons text-primary me-2" style="font-size: 24px;">calendar_today</i>
-                                <strong class="text-primary">Date:</strong>
-                                <span class="ms-2">{{ event.date }}</span>
+                        <div class="event-meta-item">
+                            <i class="material-icons">calendar_today</i>
+                            <div>
+                                <span class="event-meta-label">Date</span>
+                                <span class="event-meta-value">{{ event.date|date:"F j, Y" }}</span>
                             </div>
                         </div>
-                        <div class="col-md-{% if event.capacity %}6{% else %}12{% endif %}">
-                            <div class="d-flex align-items-center mb-2">
-                                <i class="material-icons text-primary me-2" style="font-size: 24px;">schedule</i>
-                                <strong class="text-primary">Time:</strong>
-                                <span class="ms-2">
-                                    {{ event.start_time|time:"g:i A" }}
-                                    {% if event.end_time %}
-                                    - {{ event.end_time|time:"g:i A" }}
-                                    {% endif %}
-                                </span>
+                        <div class="event-meta-item">
+                            <i class="material-icons">schedule</i>
+                            <div>
+                                <span class="event-meta-label">Time</span>
+                                <span class="event-meta-value">{{ event.start_time|time:"g:i A" }}{% if event.end_time %} – {{ event.end_time|time:"g:i A" }}{% endif %}</span>
                             </div>
                         </div>
                         {% if event.capacity %}
-                        <div class="col-md-6">
-                            <div class="d-flex align-items-center mb-2">
-                                <i class="material-icons text-primary me-2" style="font-size: 24px;">group</i>
-                                <strong class="text-primary">Capacity:</strong>
-                                <span class="ms-2">{{ confirmed_rsvps_count }} / {{ event.capacity }} Confirmed</span>
-                                {% if waitlisted_rsvps_count %}
-                                <span class="ms-2 text-warning">(<i class="material-icons align-middle"
-                                        style="font-size: 1rem;">queue</i> {{ waitlisted_rsvps_count }}
-                                    Waitlisted)</span>
-                                {% endif %}
+                        <div class="event-meta-item">
+                            <i class="material-icons">people</i>
+                            <div>
+                                <span class="event-meta-label">Capacity</span>
+                                <span class="event-meta-value">{{ confirmed_rsvps_count }} / {{ event.capacity }} confirmed{% if waitlisted_rsvps_count %} · {{ waitlisted_rsvps_count }} waitlisted{% endif %}</span>
                             </div>
                         </div>
                         {% endif %}
-                        <div class="col-12{% if event.capacity %} mt-4{% endif %}">
-                            <div class="d-flex align-items-center mb-2">
-                                <i class="material-icons text-primary me-2" style="font-size: 24px;">location_on</i>
-                                <strong class="text-primary">Location:</strong>
-                                <span class="ms-2">
-                                    {# TODO: Only show state if it's a valid US state. For now, show as before. #}
-                                    {{ location_display_string }}
-                                </span>
+                        {% if location_display_string %}
+                        <div class="event-meta-item event-meta-item--full event-meta-item--with-map">
+                            <i class="material-icons">place</i>
+                            <div class="event-meta-location">
+                                <span class="event-meta-label">Location</span>
+                                <span class="event-meta-value">{{ location_display_string }}</span>
+                                <div class="event-location-map-wrap">
+                                    <div id="eventLocationMap" class="event-location-map"
+                                        data-location="{{ location_display_string|escape }}"></div>
+                                </div>
+                                <a href="https://www.google.com/maps/search/?api=1&query={{ location_display_string|urlencode }}"
+                                    class="event-location-map-link" target="_blank" rel="noopener noreferrer">
+                                    <i class="material-icons">open_in_new</i>
+                                    Open in Google Maps
+                                </a>
                             </div>
                         </div>
-                        <div class="col-12 mt-4">
-                            <div class="mb-3 d-flex align-items-center text-primary">
-                                <i class="material-icons text-primary me-2" style="font-size: 24px;">info</i>
-                                <strong class="text-primary">Description:</strong>
-                                <br>
-                            </div>
-                            <div>{{ event.description|safe }}</div>
-                            {% if event.accessibility_details %}
-                            <span class="material-icons text-primary"
-                                style="font-size: 1.3em; margin-right: 0.3em;">accessible</span><strong
-                                class="text-primary">Accessibility:</strong><br>
-                            <span>{{ event.accessibility_details|linebreaksbr }}</span>
-                            {% endif %}
-                        </div>
+                        {% endif %}
                     </div>
+                    <div class="event-description-html">{{ event.description|safe }}</div>
+                    {% if event.accessibility_details %}
+                    <div class="event-accessibility-note">
+                        <strong><i class="material-icons align-middle" style="font-size:1.1rem;">accessible</i> Accessibility:</strong>
+                        {{ event.accessibility_details|linebreaksbr }}
+                    </div>
+                    {% endif %}
                 </div>
             </div>
             <!-- Attendees Section moved here, in line with bottom of description -->
             {% if can_view_attendee_list or rsvp_groups.confirmed|length > 0 or rsvp_groups.waitlisted|length > 0 or rsvp_groups.maybe|length > 0 or rsvp_groups.not_attending|length > 0 %}
-            <div class="modern-card mb-4">
-                <div class="modern-card-header attendees">
-                    <i class="material-icons me-2">groups</i> <span class="fw-bold">Attendees</span>
-                    <span class="attendee-counter-badge">{{ confirmed_rsvps_count }}</span>
+            <div class="group-section-card profile-page-card mb-4">
+                <div class="group-section-header">
+                    <div class="group-section-icon group-section-icon--attendees">
+                        <i class="material-icons">groups</i>
+                    </div>
+                    <div class="group-section-heading">
+                        <h2 class="group-section-title">Attendees</h2>
+                        <span class="group-section-meta">{{ confirmed_rsvps_count }} confirmed</span>
+                    </div>
                 </div>
-                <div class="modern-card-body attendees">
+                <div class="group-section-body">
                     {% if not can_view_attendee_list %}
-                    <div class="alert alert-info mb-3"
-                        style="background: linear-gradient(90deg, #e0e7ff 0%, #f0abfc 100%); color: #312e81; border-radius: 0.8rem; font-weight: 600;">
+                    <div class="event-attendee-notice">
                         The attendee list is hidden. You can only see your own RSVP.
                     </div>
                     {% endif %}
                     <!-- RSVP Status Groups in Attendees card -->
-                    <div class="rsvp-group-card rsvp-group-confirmed">
-                        <h4 class="h6 text-success mb-2 d-flex align-items-center">
-                            <i class="material-icons align-middle me-1">check_circle</i> Confirmed
-                            ({{ confirmed_rsvps_count }})
-                        </h4>
-                        <div class="list-group list-group-flush">
+                    <div class="event-rsvp-group event-rsvp-group--confirmed">
+                        <div class="event-rsvp-group-header">
+                            <i class="material-icons">check_circle</i> Confirmed ({{ confirmed_rsvps_count }})
+                        </div>
+                        <ul class="event-rsvp-list">
                             {% for rsvp_data in rsvp_groups.confirmed %}
                             {% with rsvp=rsvp_data.rsvp %}
-                            <div class="list-group-item d-flex align-items-center py-2">
+                            <li class="event-rsvp-person">
                                 {% if rsvp.user %}
                                 <div class="me-2">{{ rsvp.user.profile|get_avatar_sized_html:32|safe }}</div>
                                 {% if can_view_contact_info %}
@@ -1393,7 +182,8 @@
                                     data-display-name="{{ rsvp.user.profile.get_display_name }}"
                                     data-discord="{{ rsvp.user.profile.discord_username|default_if_none:'' }}"
                                     data-telegram="{{ rsvp.user.profile.telegram_username|default_if_none:'' }}"
-                                    data-user-id="{{ rsvp.user.id }}">
+                                    data-user-id="{{ rsvp.user.id }}"
+                                    data-username="{{ rsvp.user.username }}">
                                     {{ rsvp.user.profile.get_display_name }}
                                 </a>
                                 {% else %}
@@ -1403,21 +193,21 @@
                                 <div class="me-2"><i class="material-icons text-muted">person</i></div>
                                 <span class="text-body">{{ rsvp.name }}</span>
                                 {% endif %}
-                            </div>
+                            </li>
                             {% endwith %}
                             {% empty %}
-                            <div class="list-group-item text-muted py-2">No confirmed RSVPs yet</div>
+                            <li class="event-rsvp-empty">No confirmed RSVPs yet</li>
                             {% endfor %}
-                        </div>
+                        </ul>
                     </div>
-                    <div class="rsvp-group-card rsvp-group-maybe">
-                        <h4 class="h6 text-warning mb-2 d-flex align-items-center">
-                            <i class="material-icons align-middle me-1">help</i> Maybe ({{ rsvp_groups.maybe|length }})
-                        </h4>
-                        <div class="list-group list-group-flush">
+                    <div class="event-rsvp-group event-rsvp-group--maybe">
+                        <div class="event-rsvp-group-header">
+                            <i class="material-icons">help</i> Maybe ({{ rsvp_groups.maybe|length }})
+                        </div>
+                        <ul class="event-rsvp-list">
                             {% for rsvp_data in rsvp_groups.maybe %}
                             {% with rsvp=rsvp_data.rsvp %}
-                            <div class="list-group-item d-flex align-items-center py-2">
+                            <li class="event-rsvp-person">
                                 {% if rsvp.user %}
                                 <div class="me-2">{{ rsvp.user.profile|get_avatar_sized_html:32|safe }}</div>
                                 {% if can_view_contact_info %}
@@ -1426,7 +216,8 @@
                                     data-display-name="{{ rsvp.user.profile.get_display_name }}"
                                     data-discord="{{ rsvp.user.profile.discord_username|default_if_none:'' }}"
                                     data-telegram="{{ rsvp.user.profile.telegram_username|default_if_none:'' }}"
-                                    data-user-id="{{ rsvp.user.id }}">
+                                    data-user-id="{{ rsvp.user.id }}"
+                                    data-username="{{ rsvp.user.username }}">
                                     {{ rsvp.user.profile.get_display_name }}
                                 </a>
                                 {% else %}
@@ -1436,22 +227,21 @@
                                 <div class="me-2"><i class="material-icons text-muted">person</i></div>
                                 <span class="text-body">{{ rsvp.name }}</span>
                                 {% endif %}
-                            </div>
+                            </li>
                             {% endwith %}
                             {% empty %}
-                            <div class="list-group-item text-muted py-2">No maybes yet</div>
+                            <li class="event-rsvp-empty">No maybes yet</li>
                             {% endfor %}
-                        </div>
+                        </ul>
                     </div>
-                    <div class="rsvp-group-card rsvp-group-notattending">
-                        <h4 class="h6 text-danger mb-2 d-flex align-items-center">
-                            <i class="material-icons align-middle me-1">cancel</i> Not Attending
-                            ({{ rsvp_groups.not_attending|length }})
-                        </h4>
-                        <div class="list-group list-group-flush">
+                    <div class="event-rsvp-group event-rsvp-group--notattending">
+                        <div class="event-rsvp-group-header">
+                            <i class="material-icons">cancel</i> Not attending ({{ rsvp_groups.not_attending|length }})
+                        </div>
+                        <ul class="event-rsvp-list">
                             {% for rsvp_data in rsvp_groups.not_attending %}
                             {% with rsvp=rsvp_data.rsvp %}
-                            <div class="list-group-item d-flex align-items-center py-2">
+                            <li class="event-rsvp-person">
                                 {% if rsvp.user %}
                                 <div class="me-2">{{ rsvp.user.profile|get_avatar_sized_html:32|safe }}</div>
                                 {% if can_view_contact_info %}
@@ -1460,7 +250,8 @@
                                     data-display-name="{{ rsvp.user.profile.get_display_name }}"
                                     data-discord="{{ rsvp.user.profile.discord_username|default_if_none:'' }}"
                                     data-telegram="{{ rsvp.user.profile.telegram_username|default_if_none:'' }}"
-                                    data-user-id="{{ rsvp.user.id }}">
+                                    data-user-id="{{ rsvp.user.id }}"
+                                    data-username="{{ rsvp.user.username }}">
                                     {{ rsvp.user.profile.get_display_name }}
                                 </a>
                                 {% else %}
@@ -1470,26 +261,24 @@
                                 <div class="me-2"><i class="material-icons text-muted">person</i></div>
                                 <span class="text-body">{{ rsvp.name }}</span>
                                 {% endif %}
-                            </div>
+                            </li>
                             {% endwith %}
                             {% empty %}
-                            <div class="list-group-item text-muted py-2">No one has declined yet</div>
+                            <li class="event-rsvp-empty">No one has declined yet</li>
                             {% endfor %}
-                        </div>
+                        </ul>
                     </div>
 
-                    <!-- Waitlisted -->
                     {% if event.waitlist_enabled %}
-                    <div class="rsvp-group-card rsvp-group-waitlist">
-                        <h4 class="h6 text-warning mb-2 d-flex align-items-center">
-                            <i class="material-icons align-middle me-1">queue</i> Waitlisted
-                            ({{ waitlisted_rsvps_count }})
-                        </h4>
-                        <div class="list-group list-group-flush">
+                    <div class="event-rsvp-group event-rsvp-group--waitlist">
+                        <div class="event-rsvp-group-header">
+                            <i class="material-icons">queue</i> Waitlisted ({{ waitlisted_rsvps_count }})
+                        </div>
+                        <ul class="event-rsvp-list">
                             {% for rsvp_data in rsvp_groups.waitlisted %}
                             {% with rsvp=rsvp_data.rsvp %}
                             {% if rsvp.status == 'waitlisted' %}
-                            <div class="list-group-item d-flex align-items-center py-2">
+                            <li class="event-rsvp-person">
                                 {% if rsvp.user %}
                                 <div class="me-2">{{ rsvp.user.profile|get_avatar_sized_html:32|safe }}</div>
                                 {% if can_view_contact_info %}
@@ -1498,7 +287,8 @@
                                     data-display-name="{{ rsvp.user.profile.get_display_name }}"
                                     data-discord="{{ rsvp.user.profile.discord_username|default_if_none:'' }}"
                                     data-telegram="{{ rsvp.user.profile.telegram_username|default_if_none:'' }}"
-                                    data-user-id="{{ rsvp.user.id }}">
+                                    data-user-id="{{ rsvp.user.id }}"
+                                    data-username="{{ rsvp.user.username }}">
                                     {{ rsvp.user.profile.get_display_name }}
                                 </a>
                                 {% else %}
@@ -1508,361 +298,266 @@
                                 <div class="me-2"><i class="material-icons text-muted">person</i></div>
                                 <span class="text-body">{{ rsvp.name }}</span>
                                 {% endif %}
-                            </div>
+                            </li>
                             {% endif %}
                             {% endwith %}
                             {% empty %}
-                            <div class="list-group-item text-muted py-2">No one on waitlist yet</div>
+                            <li class="event-rsvp-empty">No one on waitlist yet</li>
                             {% endfor %}
-                        </div>
+                        </ul>
                     </div>
                     {% endif %}
                 </div>
             </div>
             {% else %}
-            <div class="modern-card mb-4">
-                <div class="modern-card-header attendees">
-                    <i class="material-icons me-2">groups</i> <span class="fw-bold">Attendees</span>
+            <div class="group-section-card profile-page-card mb-4">
+                <div class="group-section-header">
+                    <div class="group-section-icon group-section-icon--attendees">
+                        <i class="material-icons">groups</i>
+                    </div>
+                    <h2 class="group-section-title">Attendees</h2>
                 </div>
-                <div class="modern-card-body">
-                    <div class="attendee-restriction-modal">
-                        <i class="material-icons attendee-restriction-icon">lock</i>
-                        <span class="attendee-restriction-text">The attendee list is only visible to group leaders for
-                            this event.</span>
+                <div class="group-section-body">
+                    <div class="group-section-empty">
+                        <i class="material-icons">lock</i>
+                        <p>The attendee list is only visible to group leaders for this event.</p>
                     </div>
                 </div>
             </div>
             {% endif %}
         </div>
 
-        <!-- RSVP/Organizer Tools (Right) -->
-        <div class="col-lg-4 d-flex flex-column h-100">
-            <div class="modern-card mb-4 h-100 d-flex flex-column justify-content-between">
+        <div class="col-lg-4">
                 {% if is_organizer or is_site_admin or is_delegated_assistant %}
-                <!-- Organizer Tools -->
-                <div class="modern-card mb-4">
-                    <div class="modern-card-header event-info"
-                        style="background: linear-gradient(90deg, #f59e42 0%, #f43f5e 100%);">
-                        <i class="material-icons me-2">settings</i> Organizer Tools
+                <div class="group-section-card profile-page-card mb-4">
+                    <div class="group-section-header">
+                        <div class="group-section-icon group-section-icon--tools">
+                            <i class="material-icons">settings</i>
+                        </div>
+                        <h2 class="group-section-title">Organizer Tools</h2>
                     </div>
-                    <div class="modern-card-body">
-                        <button type="button" class="btn gradient-btn-primary mb-2" data-bs-toggle="modal"
-                            data-bs-target="#editEventModal">
+                    <div class="group-section-body">
+                        <div class="event-sidebar-actions">
+                        <button type="button" class="group-toolbar-btn" data-bs-toggle="modal" data-bs-target="#editEventModal">
                             <i class="material-icons">edit</i> Edit Event
                         </button>
                         {% if event.status == 'cancelled' %}
-                        <form method="post" action="{% url 'uncancel_event' event.id %}" class="d-block mb-2"
+                        <form method="post" action="{% url 'uncancel_event' event.id %}"
                             onsubmit="return confirm('Are you sure you want to uncancel this event? This will notify all attendees.');">
                             {% csrf_token %}
-                            <button type="submit" class="btn gradient-btn-success mb-2">
+                            <button type="submit" class="group-toolbar-btn group-toolbar-btn--success">
                                 <i class="material-icons">restore</i> Uncancel Event
                             </button>
                         </form>
                         {% else %}
-                        <form method="post" class="d-block mb-2"
+                        <form method="post"
                             onsubmit="return confirm('Are you sure you want to cancel this event? This will notify all attendees.');">
                             {% csrf_token %}
-                            <button type="submit" name="cancel_event" class="btn gradient-btn-danger mb-2">
+                            <button type="submit" name="cancel_event" class="group-toolbar-btn group-toolbar-btn--danger">
                                 <i class="material-icons">cancel</i> Cancel Event
                             </button>
                         </form>
                         {% endif %}
-                        <form method="post" class="d-block mb-2"
+                        <form method="post"
                             onsubmit="return confirm('Are you sure you want to delete this event? This action cannot be undone.');">
                             {% csrf_token %}
                             <input type="hidden" name="delete_event" value="1">
-                            <button type="submit" class="btn gradient-btn-danger btn-sm">
-                                <i class="material-icons me-1">delete</i> Delete Event
+                            <button type="submit" class="group-toolbar-btn group-toolbar-btn--danger">
+                                <i class="material-icons">delete</i> Delete Event
                             </button>
                         </form>
-                        <a href="{% url 'organizer_tools' event.id %}" class="btn gradient-btn-success btn-sm" style="text-decoration: none; color: white;">
-                            <i class="material-icons me-1">badge</i> Badges & Exporting
+                        <a href="{% url 'organizer_tools' event.id %}" class="group-toolbar-btn group-toolbar-btn--secondary">
+                            <i class="material-icons">badge</i> Badges &amp; Exporting
                         </a>
+                        </div>
                     </div>
                 </div>
                 <!-- Edit Event Modal -->
-                <div class="modal fade" id="editEventModal" tabindex="-1" aria-labelledby="editEventModalLabel"
-                    aria-hidden="true">
-                    <div class="modal-dialog modal-lg">
-                        <div class="modal-content"
-                            style="border-radius: 1.25rem; box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.25); border: none; overflow: hidden;">
-                            <div class="modal-header"
-                                style="background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 100%); color: #fff; border-bottom: none; padding-top: 2rem; padding-bottom: 2rem; align-items: center;">
-                                <h5 class="modal-title d-flex align-items-center" id="editEventModalLabel"
-                                    style="font-size: 1.7rem; font-weight: 600; gap: 0.5rem;">
-                                    <i class="material-icons me-2"
-                                        style="font-size: 2.2rem; vertical-align: middle;">edit</i> Edit Event
-                                </h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"
-                                    style="filter: invert(1); opacity: 0.8;"></button>
-                            </div>
-                            <form method="post" action="{% url 'edit_event' event.id %}" enctype="multipart/form-data"
-                                id="editEventForm">
+                <div class="modal fade" id="editEventModal" tabindex="-1" aria-labelledby="editEventModalLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                        <div class="modal-content modern-modal-content event-editor-modal">
+                            <form method="post" action="{% url 'edit_event' event.id %}" enctype="multipart/form-data" id="editEventForm" class="event-editor-form">
+                                <div class="event-editor-modal-header">
+                                    <div class="event-editor-modal-header-icon">
+                                        <i class="material-icons">edit</i>
+                                    </div>
+                                    <div class="event-editor-modal-header-text">
+                                        <h5 class="event-editor-modal-title" id="editEventModalLabel">Edit Event</h5>
+                                        <p class="event-editor-modal-subtitle">Update event details, location, and settings</p>
+                                    </div>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
                                 {% csrf_token %}
-                                <div class="modal-body"
-                                    style="padding: 2rem 2.5rem 1.5rem 2.5rem; background: #f8fafc;">
-                                    <!-- Title Field -->
-                                    <div class="mb-4 event-form-group">
-                                        <label for="{{ event_form.title.id_for_label }}"
-                                            class="form-label d-flex align-items-center"
-                                            style="font-weight: 500; color: #4f46e5;">
-                                            <i class="material-icons me-2" style="font-size: 1.3em;">event</i>
-                                            Event Title
-                                        </label>
-                                        {% render_field event_form.title class="form-control" %}
-                                        {% if event_form.title.errors %}
-                                        <div class="invalid-feedback d-block">{{ event_form.title.errors }}</div>
-                                        {% endif %}
-                                    </div>
-                                    <!-- Group Field -->
-                                    <div class="mb-4 event-form-group">
-                                        <label for="{{ event_form.group.id_for_label }}"
-                                            class="form-label d-flex align-items-center"
-                                            style="font-weight: 500; color: #4f46e5;">
-                                            <i class="material-icons me-2" style="font-size: 1.3em;">groups</i>
-                                            Group
-                                        </label>
-                                        {% render_field event_form.group class="form-control" %}
-                                        {% if event_form.group.errors %}
-                                        <div class="invalid-feedback d-block">{{ event_form.group.errors }}</div>
-                                        {% endif %}
-                                    </div>
-                                    <!-- Date/Time Fields -->
-                                    <div class="mb-4 event-form-group">
-                                        <label class="form-label d-flex align-items-center"
-                                            style="font-weight: 500; color: #4f46e5;">
-                                            <i class="material-icons me-2" style="font-size: 1.3em;">calendar_today</i>
-                                            Date and Time
-                                        </label>
-                                        <div class="row">
-                                            <div class="col-md-4 mb-2 mb-md-0">
-                                                {% render_field event_form.date class="form-control flatpickr" placeholder="MM/DD/YYYY" %}
-                                                {% if event_form.date.errors %}
-                                                <div class="invalid-feedback d-block">{{ event_form.date.errors }}</div>
-                                                {% endif %}
+                                <div class="modal-body event-editor-modal-body">
+                                    <div class="event-editor-panel">
+                                        <h6 class="event-editor-section-label">Basic info</h6>
+                                        <div class="auth-field">
+                                            <label for="{{ event_form.title.id_for_label }}" class="auth-form-label">Event title</label>
+                                            <div class="input-group auth-input-group">
+                                                <span class="input-group-text"><i class="material-icons">event_note</i></span>
+                                                {% render_field event_form.title class="form-control" %}
                                             </div>
-                                            <div class="col-md-4 mb-2 mb-md-0">
-                                                <label for="{{ event_form.start_time.id_for_label }}"
-                                                    class="form-label visually-hidden">Start Time</label>
-                                                {% render_field event_form.start_time class="form-control flatpickr" placeholder="Start time" required='required' %}
-                                                {% if event_form.start_time.errors %}
-                                                <div class="invalid-feedback d-block">{{ event_form.start_time.errors }}
+                                            {% if event_form.title.errors %}<div class="invalid-feedback d-block">{{ event_form.title.errors }}</div>{% endif %}
+                                        </div>
+                                        <div class="auth-field mb-0">
+                                            <label for="{{ event_form.group.id_for_label }}" class="auth-form-label">Group</label>
+                                            <div class="input-group auth-input-group">
+                                                <span class="input-group-text"><i class="material-icons">groups</i></span>
+                                                {% render_field event_form.group class="form-select" %}
+                                            </div>
+                                            {% if event_form.group.errors %}<div class="invalid-feedback d-block">{{ event_form.group.errors }}</div>{% endif %}
+                                        </div>
+                                    </div>
+
+                                    <div class="event-editor-panel">
+                                        <h6 class="event-editor-section-label">Date &amp; time</h6>
+                                        <div class="event-editor-grid event-editor-grid--3">
+                                            <div class="auth-field mb-0">
+                                                <label for="{{ event_form.date.id_for_label }}" class="auth-form-label">Date</label>
+                                                <div class="input-group auth-input-group">
+                                                    <span class="input-group-text"><i class="material-icons">calendar_today</i></span>
+                                                    {% render_field event_form.date class="form-control flatpickr" placeholder="MM/DD/YYYY" %}
                                                 </div>
-                                                {% endif %}
+                                                {% if event_form.date.errors %}<div class="invalid-feedback d-block">{{ event_form.date.errors }}</div>{% endif %}
                                             </div>
-                                            <div class="col-md-4">
-                                                <label for="{{ event_form.end_time.id_for_label }}"
-                                                    class="form-label visually-hidden">End Time</label>
-                                                {% render_field event_form.end_time class="form-control flatpickr" placeholder="End time" required='required' %}
-                                                {% if event_form.end_time.errors %}
-                                                <div class="invalid-feedback d-block">{{ event_form.end_time.errors }}
+                                            <div class="auth-field mb-0">
+                                                <label for="{{ event_form.start_time.id_for_label }}" class="auth-form-label">Start time</label>
+                                                <div class="input-group auth-input-group">
+                                                    <span class="input-group-text"><i class="material-icons">schedule</i></span>
+                                                    {% render_field event_form.start_time class="form-control flatpickr" placeholder="Start time" required='required' %}
                                                 </div>
-                                                {% endif %}
+                                                {% if event_form.start_time.errors %}<div class="invalid-feedback d-block">{{ event_form.start_time.errors }}</div>{% endif %}
+                                            </div>
+                                            <div class="auth-field mb-0">
+                                                <label for="{{ event_form.end_time.id_for_label }}" class="auth-form-label">End time</label>
+                                                <div class="input-group auth-input-group">
+                                                    <span class="input-group-text"><i class="material-icons">schedule</i></span>
+                                                    {% render_field event_form.end_time class="form-control flatpickr" placeholder="End time" required='required' %}
+                                                </div>
+                                                {% if event_form.end_time.errors %}<div class="invalid-feedback d-block">{{ event_form.end_time.errors }}</div>{% endif %}
                                             </div>
                                         </div>
                                     </div>
-                                    <!-- Location Details Fields -->
-                                    <div class="mb-4 event-form-group">
-                                        <label for="{{ event_form.address.id_for_label }}"
-                                            class="form-label d-flex align-items-center">
-                                            <i class="material-icons me-2" style="font-size: 1.3em;">location_on</i>
-                                            Street Address
-                                        </label>
-                                        <div class="input-group mb-2" style="align-items: center;">
-                                            {% render_field event_form.address class="form-control" placeholder="Enter street address" %}
-                                            <button type="button" class="btn btn-location-modern" id="useLocationBtn"
-                                                title="Use My Location">
-                                                <i class="material-icons" style="font-size: 1.2em;">my_location</i>
-                                            </button>
+
+                                    <div class="event-editor-panel">
+                                        <h6 class="event-editor-section-label">Location</h6>
+                                        <div class="auth-field">
+                                            <label for="{{ event_form.address.id_for_label }}" class="auth-form-label">Street address</label>
+                                            <div class="input-group auth-input-group">
+                                                <span class="input-group-text"><i class="material-icons">place</i></span>
+                                                {% render_field event_form.address class="form-control" placeholder="Enter street address" %}
+                                                <button type="button" class="input-group-text input-group-text--action" id="useLocationBtn" title="Use my location">
+                                                    <i class="material-icons">my_location</i>
+                                                </button>
+                                            </div>
+                                            {% if event_form.address.errors %}<div class="invalid-feedback d-block">{{ event_form.address.errors }}</div>{% endif %}
                                         </div>
-                                        {% if event_form.address.errors %}
-                                        <div class="invalid-feedback d-block">{{ event_form.address.errors }}</div>
-                                        {% endif %}
-                                        <div class="row mt-3">
-                                            <div class="col-md-6 mb-3 mb-md-0">
-                                                <label for="{{ event_form.city.id_for_label }}"
-                                                    class="form-label d-flex align-items-center">
-                                                    <i class="material-icons me-2"
-                                                        style="font-size: 1.3em;">location_city</i>
-                                                    City
-                                                </label>
-                                                {% render_field event_form.city class="form-control" placeholder="Enter city" %}
-                                                {% if event_form.city.errors %}
-                                                <div class="invalid-feedback d-block">{{ event_form.city.errors }}</div>
-                                                {% endif %}
+                                        <div class="event-editor-grid">
+                                            <div class="auth-field mb-0">
+                                                <label for="{{ event_form.city.id_for_label }}" class="auth-form-label">City</label>
+                                                <div class="input-group auth-input-group">
+                                                    <span class="input-group-text"><i class="material-icons">location_city</i></span>
+                                                    {% render_field event_form.city class="form-control" placeholder="Enter city" %}
+                                                </div>
+                                                {% if event_form.city.errors %}<div class="invalid-feedback d-block">{{ event_form.city.errors }}</div>{% endif %}
                                             </div>
-                                            <div class="col-md-6 mb-3 mb-md-0">
-                                                <label for="{{ event_form.country.id_for_label }}"
-                                                    class="form-label d-flex align-items-center">
-                                                    <i class="material-icons me-2" style="font-size: 1.3em;">flag</i>
-                                                    Country
-                                                </label>
-                                                {% render_field event_form.country class="custom-select-modern" %}
-                                                {% if event_form.country.errors %}
-                                                <div class="invalid-feedback d-block">{{ event_form.country.errors }}</div>
-                                                {% endif %}
-                                            </div>
-                                        </div>
-                                        <div class="row">
-                                            <div class="col-md-6 mb-3 mb-md-0 state-field-group">
-                                                <label for="{{ event_form.state.id_for_label }}"
-                                                    class="form-label d-flex align-items-center">
-                                                    <i class="material-icons me-2" style="font-size: 1.3em;">map</i>
-                                                    State
-                                                </label>
-                                                {% render_field event_form.state class="custom-select-modern" %}
-                                                {% if event_form.state.errors %}
-                                                <div class="invalid-feedback d-block">{{ event_form.state.errors }}</div>
-                                                {% endif %}
-                                            </div>
-                                            <div class="col-md-6">
-                                                <label for="{{ event_form.timezone.id_for_label }}"
-                                                    class="form-label d-flex align-items-center">
-                                                    <i class="material-icons me-2" style="font-size: 1.3em;">schedule</i>
-                                                    Time Zone
-                                                </label>
-                                                {% render_field event_form.timezone class="custom-select-modern" %}
-                                                {% if event_form.timezone.errors %}
-                                                <div class="invalid-feedback d-block">{{ event_form.timezone.errors }}</div>
-                                                {% endif %}
+                                            <div class="auth-field mb-0">
+                                                <label for="{{ event_form.state.id_for_label }}" class="auth-form-label">State</label>
+                                                <div class="input-group auth-input-group">
+                                                    <span class="input-group-text"><i class="material-icons">map</i></span>
+                                                    {% render_field event_form.state class="form-select" %}
+                                                </div>
+                                                {% if event_form.state.errors %}<div class="invalid-feedback d-block">{{ event_form.state.errors }}</div>{% endif %}
                                             </div>
                                         </div>
                                     </div>
-                                    <!-- Age Restriction Field -->
-                                    <div class="mb-4 event-form-group">
-                                        <label for="{{ event_form.age_restriction.id_for_label }}"
-                                            class="form-label d-flex align-items-center"
-                                            style="font-weight: 500; color: #4f46e5;">
-                                            <i class="material-icons me-2" style="font-size: 1.3em;">warning</i>
-                                            Age Restriction
-                                        </label>
-                                        {% render_field event_form.age_restriction class="custom-select-modern" %}
-                                        {% if event_form.age_restriction.errors %}
-                                        <div class="invalid-feedback d-block">{{ event_form.age_restriction.errors }}
+
+                                    <div class="event-editor-panel">
+                                        <h6 class="event-editor-section-label">Event settings</h6>
+                                        <div class="event-editor-grid">
+                                            <div class="auth-field mb-0">
+                                                <label for="{{ event_form.age_restriction.id_for_label }}" class="auth-form-label">Age restriction</label>
+                                                <div class="input-group auth-input-group">
+                                                    <span class="input-group-text"><i class="material-icons">block</i></span>
+                                                    {% render_field event_form.age_restriction class="form-select" %}
+                                                </div>
+                                                {% if event_form.age_restriction.errors %}<div class="invalid-feedback d-block">{{ event_form.age_restriction.errors }}</div>{% endif %}
+                                            </div>
+                                            <div class="auth-field mb-0">
+                                                <label for="{{ event_form.capacity.id_for_label }}" class="auth-form-label">Capacity <span class="text-muted">(optional)</span></label>
+                                                <div class="input-group auth-input-group">
+                                                    <span class="input-group-text"><i class="material-icons">people_alt</i></span>
+                                                    {% render_field event_form.capacity class="form-control" %}
+                                                </div>
+                                                {% if event_form.capacity.errors %}<div class="invalid-feedback d-block">{{ event_form.capacity.errors }}</div>{% endif %}
+                                            </div>
                                         </div>
-                                        {% endif %}
-                                    </div>
-                                    <!-- Description Field (TinyMCE) -->
-                                    <div class="mb-4 event-form-group">
-                                        <label for="{{ event_form.description.id_for_label }}"
-                                            class="form-label d-flex align-items-center"
-                                            style="font-weight: 500; color: #4f46e5;">
-                                            <i class="material-icons me-2" style="font-size: 1.3em;">description</i>
-                                            Description
-                                        </label>
-                                        {% render_field event_form.description class="form-control" %}
-                                        {% if event_form.description.errors %}
-                                        <div class="invalid-feedback d-block">{{ event_form.description.errors }}</div>
-                                        {% endif %}
-                                    </div>
-                                    <!-- Event Capacity Field -->
-                                    <div class="mb-4 event-form-group">
-                                        <label for="{{ event_form.capacity.id_for_label }}"
-                                            class="form-label d-flex align-items-center"
-                                            style="font-weight: 500; color: #4f46e5;">
-                                            <i class="material-icons me-2" style="font-size: 1.3em;">people</i>
-                                            Event Capacity
-                                        </label>
-                                        {% render_field event_form.capacity class="form-control" %}
-                                        {% if event_form.capacity.errors %}
-                                        <div class="invalid-feedback d-block">{{ event_form.capacity.errors }}</div>
-                                        {% endif %}
-                                    </div>
-                                    <!-- Waitlist Enabled Field -->
-                                    <div class="mb-4 event-form-group">
-                                        <div class="form-check">
-                                            {% render_field event_form.waitlist_enabled class="form-check-input" %}
-                                            <label class="form-check-label d-flex align-items-center"
-                                                for="{{ event_form.waitlist_enabled.id_for_label }}">
-                                                <i class="material-icons me-2"
-                                                    style="font-size: 1.3em;">hourglass_empty</i>
-                                                Enable Waitlist
+                                        <div class="event-editor-perms mt-3">
+                                            <label class="event-editor-perm">
+                                                {% render_field event_form.waitlist_enabled class="form-check-input" %}
+                                                <span>Enable waitlist</span>
+                                            </label>
+                                            <label class="event-editor-perm">
+                                                {% render_field event_form.attendee_list_public class="form-check-input" %}
+                                                <span>Public attendee list</span>
                                             </label>
                                         </div>
-                                        {% if event_form.waitlist_enabled.errors %}
-                                        <div class="invalid-feedback d-block">{{ event_form.waitlist_enabled.errors }}
+                                    </div>
+
+                                    <div class="event-editor-panel">
+                                        <h6 class="event-editor-section-label">Accessibility</h6>
+                                        <div class="auth-field mb-0">
+                                            <label for="{{ event_form.accessibility_details.id_for_label }}" class="auth-form-label">Accessibility details</label>
+                                            {% render_field event_form.accessibility_details class="form-control" %}
+                                            <div class="auth-field-help">Leave blank if not accessible.</div>
+                                            {% if event_form.accessibility_details.errors %}<div class="invalid-feedback d-block">{{ event_form.accessibility_details.errors }}</div>{% endif %}
                                         </div>
-                                        {% endif %}
                                     </div>
-                                    <!-- Attendee List Public Field -->
-                                    <div class="mb-4 event-form-group">
-                                        <div class="form-check">
-                                            {% render_field event_form.attendee_list_public class="form-check-input" %}
-                                            <label class="form-check-label d-flex align-items-center"
-                                                for="{{ event_form.attendee_list_public.id_for_label }}">
-                                                <i class="material-icons me-2" style="font-size: 1.3em;">visibility</i>
-                                                Make attendee list public
-                                            </label>
+
+                                    <div class="event-editor-panel">
+                                        <h6 class="event-editor-section-label">RSVP questions</h6>
+                                        <div class="auth-field">
+                                            <label for="{{ event_form.question1_text.id_for_label }}" class="auth-form-label">Question 1</label>
+                                            {% render_field event_form.question1_text class="form-control" placeholder="Leave blank to disable" %}
+                                            <div class="auth-field-help">Leave blank to disable.</div>
                                         </div>
-                                        {% if event_form.attendee_list_public.errors %}
-                                        <div class="invalid-feedback d-block">
-                                            {{ event_form.attendee_list_public.errors }}</div>
-                                        {% endif %}
+                                        <div class="auth-field">
+                                            <label for="{{ event_form.question2_text.id_for_label }}" class="auth-form-label">Question 2</label>
+                                            {% render_field event_form.question2_text class="form-control" placeholder="Leave blank to disable" %}
+                                            <div class="auth-field-help">Leave blank to disable.</div>
+                                        </div>
+                                        <div class="auth-field mb-0">
+                                            <label for="{{ event_form.question3_text.id_for_label }}" class="auth-form-label">Question 3</label>
+                                            {% render_field event_form.question3_text class="form-control" placeholder="Leave blank to disable" %}
+                                            <div class="auth-field-help">Leave blank to disable.</div>
+                                        </div>
                                     </div>
-                                    <!-- Accessibility Details Field -->
-                                    <div class="mb-4 event-form-group">
-                                        <label for="{{ event_form.accessibility_details.id_for_label }}"
-                                            class="form-label d-flex align-items-center"
-                                            style="font-weight: 500; color: #4f46e5;">
-                                            <i class="material-icons me-2" style="font-size: 1.3em;">accessible</i>
-                                            Accessibility Details
-                                        </label>
-                                        {% render_field event_form.accessibility_details class="form-control" %}
-                                        <small class="form-text text-muted">Leave blank if not accessible.</small>
-                                        {% if event_form.accessibility_details.errors %}
-                                        <div class="invalid-feedback d-block">
-                                            {{ event_form.accessibility_details.errors }}</div>
-                                        {% endif %}
-                                    </div>
-                                    <!-- RSVP Questions Fields -->
-                                    <div class="mb-3">
-                                        <label for="{{ event_form.question1_text.id_for_label }}" class="form-label"><i
-                                                class="material-icons align-middle me-1"
-                                                style="color: #2563eb;">quiz</i> RSVP Question 1</label>
-                                        {% render_field event_form.question1_text class="form-control" placeholder="RSVP Question 1 (leave blank to disable)" %}
-                                        <div class="form-text">Leave blank to disable this question.</div>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label for="{{ event_form.question2_text.id_for_label }}" class="form-label"><i
-                                                class="material-icons align-middle me-1"
-                                                style="color: #2563eb;">quiz</i> RSVP Question 2</label>
-                                        {% render_field event_form.question2_text class="form-control" placeholder="RSVP Question 2 (leave blank to disable)" %}
-                                        <div class="form-text">Leave blank to disable this question.</div>
-                                    </div>
-                                    <div class="mb-3">
-                                        <label for="{{ event_form.question3_text.id_for_label }}" class="form-label"><i
-                                                class="material-icons align-middle me-1"
-                                                style="color: #2563eb;">quiz</i> RSVP Question 3</label>
-                                        {% render_field event_form.question3_text class="form-control" placeholder="RSVP Question 3 (leave blank to disable)" %}
-                                        <div class="form-text">Leave blank to disable this question.</div>
+
+                                    <div class="event-editor-panel">
+                                        <h6 class="event-editor-section-label">Description</h6>
+                                        <div class="auth-field mb-0">
+                                            {% render_field event_form.description class="form-control" %}
+                                            {% if event_form.description.errors %}<div class="invalid-feedback d-block">{{ event_form.description.errors }}</div>{% endif %}
+                                        </div>
                                     </div>
                                 </div>
-                                <div class="modal-footer"
-                                    style="background: #f3f4f6; border-top: none; padding: 1.5rem 2.5rem;">
-                                    <button type="button" class="btn btn-cancel-gradient"
-                                        data-bs-dismiss="modal">Cancel</button>
-                                    <button type="submit" class="btn btn-save-gradient">
-                                        <i class="material-icons me-1">save</i> Save Changes
+                                <div class="modal-footer group-modal-footer">
+                                    <button type="button" class="group-toolbar-btn group-toolbar-btn--secondary" data-bs-dismiss="modal">Cancel</button>
+                                    <button type="submit" class="group-toolbar-btn">
+                                        <i class="material-icons">save</i> Save changes
                                     </button>
                                 </div>
                             </form>
                         </div>
                     </div>
                 </div>
-                <style>
-                    #editEventModal .modal-dialog {
-                        min-width: 600px;
-                        max-width: 900px;
-                    }
-                </style>
-                <script src="https://cdn.jsdelivr.net/npm/tinymce@7.9.1/tinymce.min.js" referrerpolicy="origin">
-                </script>
+                <script src="https://cdn.jsdelivr.net/npm/tinymce@7.9.1/tinymce.min.js" referrerpolicy="origin"></script>
                 <script>
                     function initTinyMCEEventModal() {
                         const isDark = document.body.classList.contains('dark-mode');
                         tinymce.init({
                 selector: '#{{ event_form.description.id_for_label }}',
-                height: 300,
+                height: 220,
                 width: '100%',
                 menubar: false,
                                                     plugins: 'advlist autolink lists image charmap anchor searchreplace visualblocks code insertdatetime table help wordcount textcolor backcolor link',
@@ -1879,8 +574,7 @@
                         skin: isDark ? 'oxide-dark' : 'oxide',
                         content_css: isDark ? '/static/tinymce-dark-content.css' : '',
                         toolbar_mode: 'wrap',
-                        toolbar_sticky: true,
-                        toolbar_sticky_offset: 0,
+                        toolbar_sticky: false,
                                                     content_style: 'body { font-family: -apple-system, BlinkMacSystemFont, San Francisco, Segoe UI, Roboto, Helvetica Neue, sans-serif; font-size: 14px; } img { max-width: 100%; height: auto; display: block; margin: 1em auto; } .tox-statusbar { display: none !important; }',
                             auto_link: true,
                             link_default_target: '_blank',
@@ -1953,106 +647,89 @@
                 </script>
                 {% endif %}
                 {% if not event_has_passed and event.status == 'active' %}
-                <!-- RSVP Panel -->
-                <div class="modern-card mb-4">
-                    <div class="modern-card-header event-info"
-                        style="background: linear-gradient(90deg, #06b6d4 0%, #6366f1 100%);">
-                        <i class="material-icons me-2">event_available</i> RSVP
+                <div class="group-section-card profile-page-card mb-4">
+                    <div class="group-section-header">
+                        <div class="group-section-icon group-section-icon--rsvp">
+                            <i class="material-icons">event_available</i>
+                        </div>
+                        <h2 class="group-section-title">RSVP</h2>
                     </div>
-                    <div class="modern-card-body">
+                    <div class="group-section-body">
                         {% if user.is_authenticated %}
                         {% if is_event_full and can_join_waitlist %}
-                        <div class="alert alert-info mb-3">Event is full, but you can join the waitlist.</div>
+                        <div class="event-attendee-notice">Event is full, but you can join the waitlist.</div>
                         {% endif %}
-                        <form method="post">
+                        <form method="post" class="event-rsvp-form">
                             {% csrf_token %}
-                            <label for="{{ form.status.id_for_label }}" class="rsvp-label">
-                                <i class="material-icons">event_available</i> Status:
-                            </label>
-                            <select name="status" id="{{ form.status.id_for_label }}" class="modern-select">
-                                <option value="" disabled {% if not form.status.value %}selected{% endif %}>--- Select
-                                    RSVP Status ---</option>
-                                {% with choices=form.status.field.choices %}
-                                {# Confirmed first #}
-                                {% for option in choices %}
-                                {% if option.0 == 'confirmed' %}
-                                <option value="{{ option.0 }}"
-                                    {% if form.status.value == option.0 %}selected{% endif %}>{{ option.1 }}</option>
-                                {% endif %}
-                                {% endfor %}
-                                {# Waitlisted second #}
-                                {% for option in choices %}
-                                {% if option.0 == 'waitlisted' %}
-                                <option value="{{ option.0 }}"
-                                    {% if form.status.value == option.0 %}selected{% endif %}>{{ option.1 }}</option>
-                                {% endif %}
-                                {% endfor %}
-                                {# All others except confirmed and waitlisted #}
-                                {% for option in choices %}
-                                {% if option.0 != 'confirmed' and option.0 != 'waitlisted' %}
-                                <option value="{{ option.0 }}"
-                                    {% if form.status.value == option.0 %}selected{% endif %}>{{ option.1 }}</option>
-                                {% endif %}
-                                {% endfor %}
-                                {% endwith %}
-                            </select>
-                            <!-- RSVP Questions: Only show if event.questionX_text is set -->
+                            <div class="auth-field">
+                                <label for="{{ form.status.id_for_label }}" class="auth-form-label">Your status</label>
+                                <div class="input-group auth-input-group">
+                                    <span class="input-group-text"><i class="material-icons">how_to_reg</i></span>
+                                    <select name="status" id="{{ form.status.id_for_label }}" class="form-select">
+                                        <option value="" disabled {% if not form.status.value %}selected{% endif %}>Select RSVP status</option>
+                                        {% with choices=form.status.field.choices %}
+                                        {% for option in choices %}
+                                        {% if option.0 == 'confirmed' %}
+                                        <option value="{{ option.0 }}" {% if form.status.value == option.0 %}selected{% endif %}>{{ option.1 }}</option>
+                                        {% endif %}
+                                        {% endfor %}
+                                        {% for option in choices %}
+                                        {% if option.0 == 'waitlisted' %}
+                                        <option value="{{ option.0 }}" {% if form.status.value == option.0 %}selected{% endif %}>{{ option.1 }}</option>
+                                        {% endif %}
+                                        {% endfor %}
+                                        {% for option in choices %}
+                                        {% if option.0 != 'confirmed' and option.0 != 'waitlisted' %}
+                                        <option value="{{ option.0 }}" {% if form.status.value == option.0 %}selected{% endif %}>{{ option.1 }}</option>
+                                        {% endif %}
+                                        {% endfor %}
+                                        {% endwith %}
+                                    </select>
+                                </div>
+                            </div>
                             {% if event.question1_text %}
-                            <div class="mb-3">
-                                <label for="{{ form.question1.id_for_label }}"
-                                    class="form-label">{{ event.question1_text }}</label>
-                                {{ form.question1 }}
-                                {% if form.question1.help_text %}<div class="form-text">{{ form.question1.help_text }}
-                                </div>{% endif %}
-                                {% if form.question1.errors %}<div class="invalid-feedback d-block">
-                                    {{ form.question1.errors }}</div>{% endif %}
+                            <div class="auth-field">
+                                <label for="{{ form.question1.id_for_label }}" class="auth-form-label">{{ event.question1_text }}</label>
+                                {{ form.question1|add_class:"form-control" }}
+                                {% if form.question1.errors %}<div class="invalid-feedback d-block">{{ form.question1.errors }}</div>{% endif %}
                             </div>
                             {% endif %}
                             {% if event.question2_text %}
-                            <div class="mb-3">
-                                <label for="{{ form.question2.id_for_label }}"
-                                    class="form-label">{{ event.question2_text }}</label>
-                                {{ form.question2 }}
-                                {% if form.question2.help_text %}<div class="form-text">{{ form.question2.help_text }}
-                                </div>{% endif %}
-                                {% if form.question2.errors %}<div class="invalid-feedback d-block">
-                                    {{ form.question2.errors }}</div>{% endif %}
+                            <div class="auth-field">
+                                <label for="{{ form.question2.id_for_label }}" class="auth-form-label">{{ event.question2_text }}</label>
+                                {{ form.question2|add_class:"form-control" }}
+                                {% if form.question2.errors %}<div class="invalid-feedback d-block">{{ form.question2.errors }}</div>{% endif %}
                             </div>
                             {% endif %}
                             {% if event.question3_text %}
-                            <div class="mb-3">
-                                <label for="{{ form.question3.id_for_label }}"
-                                    class="form-label">{{ event.question3_text }}</label>
-                                {{ form.question3 }}
-                                {% if form.question3.help_text %}<div class="form-text">{{ form.question3.help_text }}
-                                </div>{% endif %}
-                                {% if form.question3.errors %}<div class="invalid-feedback d-block">
-                                    {{ form.question3.errors }}</div>{% endif %}
+                            <div class="auth-field mb-0">
+                                <label for="{{ form.question3.id_for_label }}" class="auth-form-label">{{ event.question3_text }}</label>
+                                {{ form.question3|add_class:"form-control" }}
+                                {% if form.question3.errors %}<div class="invalid-feedback d-block">{{ form.question3.errors }}</div>{% endif %}
                             </div>
                             {% endif %}
-                            <button type="submit" class="rsvp-submit-btn"><i class="material-icons">event</i> Submit
-                                RSVP</button>
+                            <button type="submit" class="group-toolbar-btn mt-3">
+                                <i class="material-icons">event</i> Submit RSVP
+                            </button>
                         </form>
                         {% if user_rsvp %}
-                        <form method="post" class="mt-3"
+                        <form method="post" class="event-rsvp-remove-form mt-3"
                             onsubmit="return confirm('Are you sure you want to remove your RSVP?');">
                             {% csrf_token %}
-                            <button type="submit" name="remove_rsvp" class="gradient-btn-danger">
+                            <button type="submit" name="remove_rsvp" class="group-toolbar-btn group-toolbar-btn--danger">
                                 <i class="material-icons">cancel</i> Remove RSVP
                             </button>
                         </form>
                         {% endif %}
                         {% else %}
-                        <div class="login-required-modal">
-                            <i class="material-icons login-required-icon">login</i>
-                            <span class="login-required-text">Please <a href="{% url 'login' %}" class="login-link">log
-                                    in</a> to RSVP.</span>
+                        <div class="event-login-prompt">
+                            <i class="material-icons">login</i>
+                            <span>Please <a href="{% url 'login' %}">log in</a> to RSVP.</span>
                         </div>
                         {% endif %}
                     </div>
                 </div>
                 {% endif %}
-            </div>
         </div>
     </div>
 </div>
@@ -2060,167 +737,90 @@
 <!-- Contact Info Modal -->
 <div class="modal fade" id="contactInfoModal" tabindex="-1" aria-labelledby="contactInfoModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content modern-glass-modal">
-            <div class="modal-header modern-glass-header">
-                <h5 class="modal-title d-flex align-items-center gap-2" id="contactInfoModalLabel">
-                    <i class="material-icons me-2">contact_mail</i> Attendee Info
-                </h5>
-                <button type="button" class="btn-close btn-close-white modern-close-btn" data-bs-dismiss="modal"
-                    aria-label="Close"></button>
+        <div class="modal-content modern-modal-content attendee-info-modal">
+            <div class="attendee-info-modal-header">
+                <div class="attendee-info-modal-header-icon">
+                    <i class="material-icons">contact_mail</i>
+                </div>
+                <div class="attendee-info-modal-header-text">
+                    <h5 class="attendee-info-modal-title" id="contactInfoModalLabel">Attendee Info</h5>
+                    <p class="attendee-info-modal-subtitle">Contact details and RSVP responses</p>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body py-4 px-4 modern-glass-body">
-                <div class="rsvp-modal-answer-block mb-2">
-                    <span class="rsvp-modal-question">Display Name:</span>
-                    <span class="rsvp-modal-answer" id="modalContactDisplayName"></span>
+            <div class="modal-body attendee-info-modal-body">
+                <div class="attendee-info-panel">
+                    <div class="attendee-info-row">
+                        <div class="attendee-info-row-icon">
+                            <i class="material-icons">person</i>
+                        </div>
+                        <div>
+                            <span class="attendee-info-label">Display name</span>
+                            <span class="attendee-info-value" id="modalContactDisplayName"></span>
+                        </div>
+                    </div>
+                    {% if can_view_contact_info %}
+                    <div class="attendee-info-row">
+                        <div class="attendee-info-row-icon attendee-info-row-icon--username">
+                            <i class="material-icons">alternate_email</i>
+                        </div>
+                        <div>
+                            <span class="attendee-info-label">Username</span>
+                            <span class="attendee-info-value" id="modalContactUsername"></span>
+                        </div>
+                    </div>
+                    {% endif %}
+                    <div class="attendee-info-row">
+                        <div class="attendee-info-row-icon attendee-info-row-icon--discord">
+                            <i class="material-icons">discord</i>
+                        </div>
+                        <div>
+                            <span class="attendee-info-label">Discord</span>
+                            <span class="attendee-info-value" id="modalContactDiscord"></span>
+                        </div>
+                    </div>
+                    <div class="attendee-info-row">
+                        <div class="attendee-info-row-icon attendee-info-row-icon--telegram">
+                            <i class="material-icons">telegram</i>
+                        </div>
+                        <div>
+                            <span class="attendee-info-label">Telegram</span>
+                            <span class="attendee-info-value" id="modalContactTelegram"></span>
+                        </div>
+                    </div>
                 </div>
-                <div class="rsvp-modal-answer-block mb-2">
-                    <span class="rsvp-modal-question"><i class="material-icons align-middle me-1"
-                            style="color: #5865F2;">chat</i>Discord:</span>
-                    <span class="rsvp-modal-answer" id="modalContactDiscord"></span>
-                </div>
-                <div class="rsvp-modal-answer-block mb-2">
-                    <span class="rsvp-modal-question"><i class="material-icons align-middle me-1"
-                            style="color: #229ED9;">send</i>Telegram:</span>
-                    <span class="rsvp-modal-answer" id="modalContactTelegram"></span>
-                </div>
-                <hr style="border-top: 1.5px solid #e0e7ef; margin: 1.1rem 0 1.2rem 0;" />
-                <div id="modalRsvpAnswers"></div>
-                {% if is_organizer or is_site_admin or is_delegated_assistant %}
-                {% if modal_rsvp %}
-                {% if event.question1_text and modal_rsvp.question1 %}
-                <div class="mb-2">
-                    <span class="fw-bold" style="color: #2563eb;"><i class="material-icons align-middle me-1"
-                            style="font-size: 1.2em; vertical-align: middle;">quiz</i>{{ event.question1_text }}:</span>
-                    <span class="ms-2">{{ modal_rsvp.question1 }}</span>
-                </div>
-                {% endif %}
-                {% if event.question2_text and modal_rsvp.question2 %}
-                <div class="mb-2">
-                    <span class="fw-bold" style="color: #2563eb;"><i class="material-icons align-middle me-1"
-                            style="font-size: 1.2em; vertical-align: middle;">quiz</i>{{ event.question2_text }}:</span>
-                    <span class="ms-2">{{ modal_rsvp.question2 }}</span>
-                </div>
-                {% endif %}
-                {% if event.question3_text and modal_rsvp.question3 %}
-                <div class="mb-2">
-                    <span class="fw-bold" style="color: #2563eb;"><i class="material-icons align-middle me-1"
-                            style="font-size: 1.2em; vertical-align: middle;">quiz</i>{{ event.question3_text }}:</span>
-                    <span class="ms-2">{{ modal_rsvp.question3 }}</span>
-                </div>
-                {% endif %}
-                {% endif %}
-                {% endif %}
-                {% if can_ban_user %}
-                <form id="banUserForm" method="post" class="mt-3">
+
+                <div id="modalRsvpAnswers" class="attendee-info-answers"></div>
+
+                {% if can_ban_user and event.group %}
+                <form id="banUserForm" method="post" class="attendee-info-ban-form">
                     {% csrf_token %}
+                    <input type="hidden" name="action" value="ban">
+                    <input type="hidden" name="ban_type" value="group">
+                    <input type="hidden" name="username" id="banUsername" value="">
                     <input type="hidden" name="group_id" value="{{ event.group.id }}">
-                    <input type="hidden" name="event_id" value="{{ event.id }}">
-                    <button type="submit" class="btn btn-danger btn-sm gradient-btn-danger modern-ban-btn">
-                        <i class="material-icons me-1">gavel</i> Ban User from Group
+                    <button type="submit" class="group-toolbar-btn group-toolbar-btn--danger">
+                        <i class="material-icons">gavel</i> Ban user from group
                     </button>
                 </form>
                 {% endif %}
             </div>
-            <div class="modal-footer modern-glass-footer">
-                <button type="button" class="btn btn-secondary modern-close-btn" data-bs-dismiss="modal">Close</button>
+            <div class="modal-footer group-modal-footer">
+                <button type="button" class="group-toolbar-btn group-toolbar-btn--secondary" data-bs-dismiss="modal">Done</button>
             </div>
         </div>
     </div>
 </div>
-<style>
-    /* Modern Glassmorphism Modal Styles */
-    .modern-glass-modal {
-        border-radius: 1.5rem;
-        background: rgba(255, 255, 255, 0.85);
-        box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.18);
-        backdrop-filter: blur(16px) saturate(180%);
-        border: 1.5px solid rgba(59, 130, 246, 0.13);
-        overflow: hidden;
-        animation: fadeInGlass 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-
-    @keyframes fadeInGlass {
-        from {
-            opacity: 0;
-            transform: translateY(24px) scale(0.98);
-        }
-
-        to {
-            opacity: 1;
-            transform: none;
-        }
-    }
-
-    .modern-glass-header {
-        background: linear-gradient(90deg, #3b82f6 0%, #8b5cf6 100%);
-        color: #fff;
-        border-bottom: none;
-        border-top-left-radius: 1.5rem;
-        border-top-right-radius: 1.5rem;
-        padding: 1.5rem 2rem 1.2rem 2rem;
-        box-shadow: 0 2px 12px rgba(59, 130, 246, 0.08);
-    }
-
-    .modern-glass-body {
-        background: rgba(248, 250, 252, 0.95);
-        color: #222;
-        font-size: 1.08rem;
-        padding: 2rem 2.5rem 1.5rem 2.5rem;
-    }
-
-    .modern-glass-footer {
-        background: rgba(243, 244, 246, 0.95);
-        border-top: none;
-        border-bottom-left-radius: 1.5rem;
-        border-bottom-right-radius: 1.5rem;
-        padding: 1.2rem 2rem;
-        box-shadow: 0 -2px 12px rgba(59, 130, 246, 0.05);
-    }
-
-    .modern-close-btn {
-        border-radius: 50%;
-        background: rgba(255, 255, 255, 0.7);
-        color: #6366f1;
-        border: none;
-        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.10);
-        transition: background 0.18s, color 0.18s;
-    }
-
-    .modern-close-btn:hover,
-    .modern-close-btn:focus {
-        background: #e0e7ef;
-        color: #4f46e5;
-    }
-
-    .modern-ban-btn {
-        border-radius: 2rem;
-        font-weight: 600;
-        font-size: 1.08rem;
-        box-shadow: 0 2px 8px rgba(239, 68, 68, 0.10);
-        padding: 0.5rem 1.5rem;
-        margin-top: 0.5rem;
-    }
-
-    @media (max-width: 600px) {
-        .modern-glass-modal {
-            border-radius: 1rem;
-        }
-
-        .modern-glass-header,
-        .modern-glass-footer {
-            padding: 1rem;
-        }
-
-        .modern-glass-body {
-            padding: 1rem;
-        }
-    }
-</style>
 
 {% endblock %}
 
 {% block extra_js %}
 {{ block.super }}
+{% if location_display_string %}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="{% static 'event-location-map.js' %}"></script>
+{% endif %}
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         // Contact Info Modal
@@ -2232,16 +832,26 @@
                 var discord = button.getAttribute('data-discord');
                 var telegram = button.getAttribute('data-telegram');
                 var userId = button.getAttribute('data-user-id');
+                var username = button.getAttribute('data-username');
                 var eventId = {{ event.id|default:'null' }};
                 var isOrganizer = {% if is_organizer or is_site_admin %}true{% else %}false{% endif %};
                 var canBanUser = {% if can_ban_user %}true{% else %}false{% endif %};
                 var modalDisplayName = contactInfoModal.querySelector('#modalContactDisplayName');
+                var modalUsername = contactInfoModal.querySelector('#modalContactUsername');
                 var modalDiscord = contactInfoModal.querySelector('#modalContactDiscord');
                 var modalTelegram = contactInfoModal.querySelector('#modalContactTelegram');
                 var answersDiv = contactInfoModal.querySelector('#modalRsvpAnswers');
-                if (modalDisplayName) modalDisplayName.textContent = displayName || 'Not provided';
-                if (modalDiscord) modalDiscord.textContent = discord || 'Not provided';
-                if (modalTelegram) modalTelegram.textContent = telegram || 'Not provided';
+                function setContactValue(el, value) {
+                    if (!el) return;
+                    el.textContent = value || 'Not provided';
+                    el.classList.toggle('is-empty', !value);
+                }
+                setContactValue(modalDisplayName, displayName);
+                if (modalUsername) {
+                    setContactValue(modalUsername, username ? '@' + username : '');
+                }
+                setContactValue(modalDiscord, discord);
+                setContactValue(modalTelegram, telegram);
                 if (answersDiv) answersDiv.innerHTML = '';
                 if (isOrganizer && userId) {
                     fetch(`/event/${eventId}/rsvp_answers/${userId}/`)
@@ -2266,36 +876,61 @@
                             function nl2br(text) {
                                 return escapeHtml(text).replace(/(?:\r\n|\r|\n)/g, '<br>');
                             }
-                            if (data.question1_text) {
-                                html +=
-                                    `<div class=\"rsvp-modal-answer-block\"><span class=\"rsvp-modal-question\"><i class=\"material-icons align-middle me-1\">quiz</i>${escapeHtml(data.question1_text)}</span><span class=\"rsvp-modal-answer${data.question1 ? '' : ' muted'}\">${data.question1 ? nl2br(data.question1) : 'Not answered'}</span></div>`;
+
+                            function answerBlock(question, answer) {
+                                const empty = !answer;
+                                return `<div class="attendee-info-answer-block"><span class="attendee-info-label">${escapeHtml(question)}</span><span class="attendee-info-value${empty ? ' is-empty' : ''}">${empty ? 'Not answered' : nl2br(answer)}</span></div>`;
                             }
-                            if (data.question2_text) {
-                                html +=
-                                    `<div class=\"rsvp-modal-answer-block\"><span class=\"rsvp-modal-question\"><i class=\"material-icons align-middle me-1\">quiz</i>${escapeHtml(data.question2_text)}</span><span class="rsvp-modal-answer${data.question2 ? '' : ' muted'}\">${data.question2 ? nl2br(data.question2) : 'Not answered'}</span></div>`;
+
+                            if (data.question1_text || data.question2_text || data.question3_text) {
+                                html += '<h6 class="attendee-info-section-label">RSVP answers</h6>';
                             }
-                            if (data.question3_text) {
-                                html +=
-                                    `<div class=\"rsvp-modal-answer-block\"><span class=\"rsvp-modal-question\"><i class=\"material-icons align-middle me-1\">quiz</i>${escapeHtml(data.question3_text)}</span><span class="rsvp-modal-answer${data.question3 ? '' : ' muted'}\">${data.question3 ? nl2br(data.question3) : 'Not answered'}</span></div>`;
-                            }
+                            if (data.question1_text) html += answerBlock(data.question1_text, data.question1);
+                            if (data.question2_text) html += answerBlock(data.question2_text, data.question2);
+                            if (data.question3_text) html += answerBlock(data.question3_text, data.question3);
                             if (answersDiv) answersDiv.innerHTML = html;
                         });
                 }
                 if (canBanUser) {
                     var banForm = contactInfoModal.querySelector('#banUserForm');
                     if (banForm) {
-                        var banUrl = `/users/${userId}/ban/`;
-                        banForm.action = banUrl;
-                        banForm.onsubmit = function () {
-                            return confirm(
-                                `Are you sure you want to ban ${displayName} from this group?`);
+                        var banUsernameInput = banForm.querySelector('#banUsername');
+                        if (banUsernameInput) {
+                            banUsernameInput.value = username || '';
+                        }
+                        banForm.onsubmit = async function (e) {
+                            e.preventDefault();
+                            if (!userId) return false;
+                            if (!confirm('Are you sure you want to ban ' + displayName + ' from this group?')) {
+                                return false;
+                            }
+                            const formData = new FormData(banForm);
+                            try {
+                                const response = await fetch('/users/' + userId + '/ban/', {
+                                    method: 'POST',
+                                    headers: {
+                                        'X-CSRFToken': formData.get('csrfmiddlewaretoken')
+                                    },
+                                    body: formData
+                                });
+                                const data = await response.json();
+                                if (data.status === 'success') {
+                                    alert(data.message);
+                                    bootstrap.Modal.getInstance(contactInfoModal).hide();
+                                } else {
+                                    alert(data.message || 'Could not ban user.');
+                                }
+                            } catch (error) {
+                                alert('Could not ban user.');
+                            }
+                            return false;
                         };
                     }
                 }
             });
         }
         // Prevent Enter from submitting RSVP form if status is already selected
-        var rsvpForm = document.querySelector('.modern-card-body form');
+        var rsvpForm = document.querySelector('.event-rsvp-form');
         if (rsvpForm) {
             var statusSelect = rsvpForm.querySelector('select[name="status"]');
             var questionInputs = rsvpForm.querySelectorAll(
@@ -2329,45 +964,6 @@
         var cityField = document.getElementById('id_city');
         var stateField = document.getElementById('id_state');
         var addressField = document.getElementById('id_address');
-
-        function updateStateVisibility() {
-            var countrySelect = document.getElementById('id_country');
-            var stateGroup = document.querySelector('.state-field-group');
-            var stateSelect = document.getElementById('id_state');
-            if (!countrySelect || !stateGroup || !stateSelect) {
-                return;
-            }
-
-            var selectedCountry = countrySelect.value;
-            var visibleStates = 0;
-
-            Array.from(stateSelect.options).forEach(function (option) {
-                if (!option.value) {
-                    option.hidden = false;
-                    return;
-                }
-                var optionCountry = option.dataset.country || '';
-                if (selectedCountry && optionCountry === selectedCountry) {
-                    option.hidden = false;
-                    visibleStates += 1;
-                } else {
-                    option.hidden = true;
-                    if (option.selected) {
-                        option.selected = false;
-                    }
-                }
-            });
-
-            stateGroup.style.display = selectedCountry && visibleStates ? '' : 'none';
-        }
-
-        updateStateVisibility();
-        var countrySelect = document.getElementById('id_country');
-        if (countrySelect) {
-            countrySelect.addEventListener('change', function () {
-                updateStateVisibility();
-            });
-        }
 
         if (addressField) {
             var autocompleteContainer = document.createElement('div');
@@ -2491,7 +1087,7 @@
         }
 
         // RSVP form: prevent Enter from submitting when in question fields
-        var rsvpForm = document.querySelector('.modern-card-body form');
+        var rsvpForm = document.querySelector('.event-rsvp-form');
         if (rsvpForm) {
             var questionInputs = rsvpForm.querySelectorAll(
                 'input[name^="question"], textarea[name^="question"]');
@@ -2505,24 +1101,4 @@
         }
     });
 </script>
-<style>
-    .material-icons.spin {
-        animation: spin 1s linear infinite;
-    }
-
-    .autocomplete-container {
-        font-size: 1rem;
-    }
-
-    .autocomplete-suggestion.active,
-    .autocomplete-suggestion:hover {
-        background: #f5f5f5;
-    }
-
-    @keyframes spin {
-        100% {
-            transform: rotate(360deg);
-        }
-    }
-</style>
 {% endblock %}

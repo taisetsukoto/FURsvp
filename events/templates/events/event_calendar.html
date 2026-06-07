@@ -1,476 +1,319 @@
 {% extends 'events/base.html' %}
-{% load calendar_extras %}
+{% load calendar_extras dict_extras %}
 {% block title %}Event Calendar - {{ month_name }} {{ year }} - FURsvp{% endblock %}
 
 {% block content %}
-<style>
-    .calendar-container {
-        background: #f8fafc;
-        border-radius: 1.5rem;
-        box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.10);
-        padding: 2rem;
-        margin-bottom: 2rem;
-    }
-
-    .calendar-header {
-        background: linear-gradient(90deg, #3b82f6 0%, #06b6d4 100%);
-        color: #fff;
-        border-radius: 1.25rem;
-        padding: 1.5rem 2rem;
-        margin-bottom: 2rem;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-
-    .calendar-nav {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-    }
-
-    .calendar-nav-btn {
-        background: rgba(255, 255, 255, 0.2);
-        border: none;
-        color: #fff;
-        border-radius: 50%;
-        width: 40px;
-        height: 40px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: all 0.2s;
-        text-decoration: none;
-    }
-
-    .calendar-nav-btn:hover {
-        background: rgba(255, 255, 255, 0.3);
-        color: #fff;
-        transform: scale(1.1);
-    }
-
-    .calendar-title {
-        font-size: 1.5rem;
-        font-weight: 700;
-        margin: 0;
-    }
-
-    .calendar-grid {
-        display: grid;
-        grid-template-columns: repeat(7, 1fr);
-        gap: 1px;
-        background: #e2e8f0;
-        border-radius: 1rem;
-        overflow: hidden;
-    }
-
-    .calendar-day-header {
-        background: linear-gradient(90deg, #64748b 0%, #94a3b8 100%);
-        color: #fff;
-        padding: 1rem;
-        text-align: center;
-        font-weight: 600;
-        font-size: 1.1rem;
-    }
-
-    .calendar-day {
-        background: #fff;
-        min-height: 120px;
-        padding: 0.5rem;
-        position: relative;
-        transition: all 0.2s;
-    }
-
-    .calendar-day:hover {
-        background: #f1f5f9;
-        transform: scale(1.02);
-    }
-
-    .calendar-day.today {
-        background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
-        border: 2px solid #3b82f6;
-    }
-
-    .calendar-day.other-month {
-        background: #f8fafc;
-        color: #94a3b8;
-    }
-
-    .calendar-day.has-events {
-        background: linear-gradient(135deg, #e0f7fa 0%, #b2ebf2 100%);
-        box-shadow: 0 2px 8px rgba(6,182,212,0.10);
-        border: 2px solid #06b6d4;
-        position: relative;
-    }
-    .calendar-day.has-events .event-dot-prominent {
-        width: 16px;
-        height: 16px;
-        border-radius: 50%;
-        display: block;
-        margin: 0 auto 0.3rem auto;
-    }
-
-    .day-number {
-        font-weight: 700;
-        font-size: 1.2rem;
-        color: #1e293b;
-        position: absolute;
-        top: 0.5rem;
-        left: 0.7rem;
-        z-index: 2;
-    }
-
-    .calendar-day.other-month .day-number {
-        color: #94a3b8;
-    }
-
-    .event-dot {
-        width: 8px;
-        height: 8px;
-        background: linear-gradient(90deg, #3b82f6 0%, #06b6d4 100%);
-        border-radius: 50%;
-        display: inline-block;
-        margin-right: 0.25rem;
-    }
-
-    .event-item {
-        font-size: 0.75rem;
-        margin-bottom: 0.25rem;
-        padding: 0.25rem 0.5rem;
-        background: linear-gradient(90deg, #dbeafe 0%, #bfdbfe 100%);
-        border-radius: 0.5rem;
-        border-left: 3px solid #3b82f6;
-        transition: all 0.2s;
-        cursor: pointer;
-        text-decoration: none;
-        color: #1e40af;
-        display: block;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-    }
-
-    .event-item:hover {
-        background: linear-gradient(90deg, #bfdbfe 0%, #93c5fd 100%);
-        transform: translateX(2px);
-        color: #1e3a8a;
-        text-decoration: none;
-    }
-
-    .event-item.adult {
-        background: linear-gradient(90deg, #fef3c7 0%, #fde68a 100%);
-        border-left-color: #f59e0b;
-        color: #92400e;
-    }
-
-    .event-item.adult:hover {
-        background: linear-gradient(90deg, #fde68a 0%, #fbbf24 100%);
-        color: #78350f;
-    }
-
-    .event-item.mature {
-        background: linear-gradient(90deg, #fecaca 0%, #fca5a5 100%);
-        border-left-color: #ef4444;
-        color: #991b1b;
-    }
-
-    .event-item.mature:hover {
-        background: linear-gradient(90deg, #fca5a5 0%, #f87171 100%);
-        color: #7f1d1d;
-    }
-
-    .event-count {
-        position: absolute;
-        top: 0.5rem;
-        right: 0.7rem;
-        z-index: 2;
-    }
-
-    .no-events {
-        color: #94a3b8;
-        font-style: italic;
-        font-size: 0.8rem;
-        text-align: center;
-        margin-top: 1rem;
-    }
-
-    .calendar-legend {
-        background: #fff;
-        border-radius: 1rem;
-        padding: 1.5rem;
-        margin-top: 2rem;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    }
-
-    .legend-item {
-        display: flex;
-        align-items: center;
-        margin-bottom: 0.5rem;
-    }
-
-    .legend-color {
-        width: 16px;
-        height: 16px;
-        border-radius: 50%;
-        margin-right: 0.5rem;
-    }
-
-    .legend-color.all-ages {
-        background: linear-gradient(90deg, #3b82f6 0%, #06b6d4 100%);
-    }
-
-    .legend-color.adult {
-        background: linear-gradient(90deg, #fef3c7 0%, #fde68a 100%);
-    }
-
-    .legend-color.mature {
-        background: linear-gradient(90deg, #fecaca 0%, #fca5a5 100%);
-    }
-
-    .calendar-day.has-events .event-dot-prominent {
-        margin-top: 2.2rem;
-        margin-bottom: 0.2rem;
-    }
-
-    @media (max-width: 768px) {
-        .calendar-container {
-            padding: 1rem;
-        }
-        
-        .calendar-header {
-            flex-direction: column;
-            gap: 1rem;
-            text-align: center;
-        }
-        
-        .calendar-day {
-            min-height: 80px;
-            padding: 0.25rem;
-        }
-        
-        .event-item {
-            font-size: 0.7rem;
-            padding: 0.2rem 0.4rem;
-        }
-    }
-
-    @media (max-width: 480px) {
-        .calendar-container {
-            padding: 0.5rem;
-        }
-        .calendar-header {
-            padding: 0.7rem 0.5rem;
-            font-size: 1rem;
-        }
-        .calendar-title {
-            font-size: 1.1rem;
-        }
-        .calendar-grid-scroll {
-            overflow-x: auto;
-            -webkit-overflow-scrolling: touch;
-            margin-bottom: 0.5rem;
-            position: relative;
-        }
-        .calendar-grid {
-            min-width: 560px;
-            font-size: 0.85rem;
-            display: grid;
-            grid-template-columns: repeat(7, minmax(64px, 1fr));
-        }
-        .calendar-day-header, .calendar-day {
-            min-width: 64px;
-            padding: 0.3rem 0.1rem;
-        }
-        .calendar-day {
-            min-height: 44px;
-        }
-        .calendar-legend {
-            padding: 0.7rem;
-            font-size: 0.9rem;
-        }
-        .calendar-grid-scroll::after {
-            content: '→';
-            position: absolute;
-            right: 8px;
-            top: 8px;
-            color: #b0b8c1;
-            font-size: 1.2em;
-            pointer-events: none;
-            opacity: 0.5;
-        }
-    }
-
-    .btn-today-pretty {
-        background: linear-gradient(90deg, #8b5cf6 0%, #ec4899 100%);
-        color: #fff;
-        border: none;
-        border-radius: 1.2rem;
-        font-weight: 700;
-        font-size: 1.1rem;
-        box-shadow: 0 2px 12px rgba(139,92,246,0.10);
-        padding: 0.7rem 1.7rem;
-        display: inline-flex;
-        align-items: center;
-        gap: 0.5rem;
-        transition: background 0.18s, box-shadow 0.18s, transform 0.12s;
-    }
-    .btn-today-pretty:hover, .btn-today-pretty:focus {
-        background: linear-gradient(90deg, #ec4899 0%, #8b5cf6 100%);
-        color: #fff;
-        transform: translateY(-2px) scale(1.04);
-        box-shadow: 0 4px 18px rgba(236,72,153,0.18);
-        text-decoration: none;
-    }
-
-    .dark-mode .calendar-container {
-        background: #23272f !important;
-        color: #f3f4f6 !important;
-    }
-    .dark-mode .calendar-legend {
-        background: #23272f !important;
-        color: #a1a1aa !important;
-        border: 1.5px solid #374151 !important;
-    }
-    .dark-mode .calendar-grid {
-        background: #181c23 !important;
-        border: 1px solid #374151 !important;
-    }
-    .dark-mode .calendar-day-header {
-        background: #23293a !important;
-        color: #e0e7ef !important;
-        font-weight: 700 !important;
-    }
-    .dark-mode .calendar-day {
-        background: #23272f !important;
-        color: #f3f4f6 !important;
-        border: 1px solid #374151 !important;
-    }
-    .dark-mode .calendar-day.today {
-        background: linear-gradient(135deg, #2563eb 0%, #1e293b 100%) !important;
-        border: 2px solid #60a5fa !important;
-    }
-    .dark-mode .event-item {
-        background: linear-gradient(90deg, #2563eb 0%, #1e293b 100%) !important;
-        color: #fff !important;
-        border-left: 3px solid #60a5fa !important;
-    }
-    .dark-mode .day-number {
-        color: #e0e7ef !important;
-        font-weight: 700 !important;
-    }
-    .dark-mode .event-item.adult {
-        background: linear-gradient(90deg, #fbbf24 0%, #f59e42 100%) !important;
-        color: #92400e !important;
-        border-left: 3px solid #fbbf24 !important;
-    }
-    .dark-mode .event-item.mature {
-        background: linear-gradient(90deg, #ef4444 0%, #dc2626 100%) !important;
-        color: #fff !important;
-        border-left: 3px solid #ef4444 !important;
-    }
-</style>
-
-<div class="container">
-    <div class="calendar-container">
-        <div class="calendar-header">
-            <div class="calendar-nav">
-                <a href="?year={{ prev_year }}&month={{ prev_month }}" class="calendar-nav-btn">
-                    <i class="material-icons">chevron_left</i>
-                </a>
-                <h1 class="calendar-title">{{ month_name }} {{ year }}</h1>
-                <a href="?year={{ next_year }}&month={{ next_month }}" class="calendar-nav-btn">
-                    <i class="material-icons">chevron_right</i>
-                </a>
+<div class="container py-4 calendar-page">
+    <div class="group-section-card profile-page-card calendar-shell">
+        <div class="group-section-header">
+            <div class="group-section-icon group-section-icon--events">
+                <i class="material-icons">calendar_month</i>
             </div>
-            <div class="d-flex gap-2">
-                <a href="{% url 'event_calendar' %}" class="btn btn-today-pretty">
-                    <i class="material-icons me-1">today</i> Today
-                </a>
+            <div class="group-section-heading">
+                <h1 class="group-section-title">Event Calendar</h1>
+                <span class="group-section-meta">{{ month_event_count }} event{{ month_event_count|pluralize }} in {{ month_name }}</span>
             </div>
         </div>
 
-        <div class="calendar-grid-scroll">
-            <div class="calendar-grid">
-                <!-- Day headers -->
-                <div class="calendar-day-header">Sunday</div>
-                <div class="calendar-day-header">Monday</div>
-                <div class="calendar-day-header">Tuesday</div>
-                <div class="calendar-day-header">Wednesday</div>
-                <div class="calendar-day-header">Thursday</div>
-                <div class="calendar-day-header">Friday</div>
-                <div class="calendar-day-header">Saturday</div>
+        <div class="group-section-body calendar-body">
+            <div class="calendar-panels">
+                <section class="calendar-panel calendar-panel--grid" aria-label="Month calendar">
+                    <div class="calendar-nav">
+                        <a href="?year={{ prev_year }}&amp;month={{ prev_month }}&amp;adult={{ filter_adult|default:'false' }}{% if filter_group %}&amp;group={{ filter_group|escapejs }}{% endif %}" class="calendar-nav-btn" aria-label="Previous month">
+                            <i class="material-icons">chevron_left</i>
+                        </a>
+                        <h2 class="calendar-title">{{ month_name }} {{ year }}</h2>
+                        <a href="?year={{ next_year }}&amp;month={{ next_month }}&amp;adult={{ filter_adult|default:'false' }}{% if filter_group %}&amp;group={{ filter_group|escapejs }}{% endif %}" class="calendar-nav-btn" aria-label="Next month">
+                            <i class="material-icons">chevron_right</i>
+                        </a>
+                    </div>
 
-                <!-- Calendar days -->
-                {% for week in calendar %}
-                    {% for day in week %}
-                        {% if day == 0 %}
-                            <div class="calendar-day other-month"></div>
-                        {% else %}
-                            {% make_date_key year month day as date_key %}
-                            <div class="calendar-day{% if events_by_date|get_item:date_key|length > 0 %} has-events{% endif %}"
-                                 {% if events_by_date|get_item:date_key|length > 0 %}data-date="{{ date_key }}"{% endif %}>
-                                <div class="day-number">{{ day }}</div>
-                                {% if events_by_date|get_item:date_key|length > 0 %}
-                                    <span class="event-dot-prominent"></span>
-                                    {% for event in events_by_date|get_item:date_key %}
-                                        <a href="{% url 'event_detail' event.id %}" 
-                                           class="event-item {% if event.age_restriction == 'adult' %}adult{% elif event.age_restriction == 'mature' %}mature{% endif %}">
-                                            {{ event.title|truncatechars:20 }}
-                                        </a>
-                                    {% endfor %}
-                                {% endif %}
+                    <div class="calendar-grid-scroll">
+                        <div class="calendar-grid" role="grid" aria-label="{{ month_name }} {{ year }}">
+                            <div class="calendar-day-header" role="columnheader">Sun</div>
+                            <div class="calendar-day-header" role="columnheader">Mon</div>
+                            <div class="calendar-day-header" role="columnheader">Tue</div>
+                            <div class="calendar-day-header" role="columnheader">Wed</div>
+                            <div class="calendar-day-header" role="columnheader">Thu</div>
+                            <div class="calendar-day-header" role="columnheader">Fri</div>
+                            <div class="calendar-day-header" role="columnheader">Sat</div>
+
+                            {% for week in calendar %}
+                                {% for day in week %}
+                                    {% if day == 0 %}
+                                    <div class="calendar-day calendar-day--blank" role="gridcell" aria-hidden="true"></div>
+                                    {% else %}
+                                    {% make_date_key year month day as date_key %}
+                                    {% with day_events=events_by_date|get_item:date_key %}
+                                    <button type="button"
+                                        class="calendar-day{% if day_events|length > 0 %} has-events{% endif %}{% if date_key == today|date:'Y-m-d' %} today{% endif %}"
+                                        role="gridcell"
+                                        data-date="{{ date_key }}"
+                                        aria-label="{{ month_name }} {{ day }}{% if day_events|length > 0 %}, {{ day_events|length }} event{{ day_events|length|pluralize }}{% endif %}">
+                                        <div class="calendar-day-top">
+                                            <span class="day-number">{{ day }}</span>
+                                            {% if day_events|length > 0 %}
+                                            <span class="event-count">{{ day_events|length }}</span>
+                                            {% endif %}
+                                        </div>
+                                        {% if day_events|length > 0 %}
+                                        <div class="calendar-day-dots" aria-hidden="true">
+                                            {% for event in day_events|slice:":4" %}
+                                            <span class="calendar-day-dot calendar-day-dot--{{ event.age_restriction|default:'all' }}"></span>
+                                            {% endfor %}
+                                        </div>
+                                        {% endif %}
+                                    </button>
+                                    {% endwith %}
+                                    {% endif %}
+                                {% endfor %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                </section>
+
+                <aside class="calendar-panel calendar-panel--sidebar" aria-label="Filters and events">
+                    <div class="calendar-sidebar-filters">
+                        <h2 class="calendar-sidebar-title">Filters</h2>
+                        <div class="calendar-filter-actions">
+                            <a href="{% url 'event_calendar' %}?adult={{ filter_adult|default:'false' }}{% if filter_group %}&amp;group={{ filter_group|escapejs }}{% endif %}" class="calendar-filter-btn">
+                                <i class="material-icons">today</i>
+                                Today
+                            </a>
+                            <button type="button" id="calendarToggleAdult" class="calendar-filter-btn calendar-filter-btn--toggle{% if filter_adult == 'true' %} active{% endif %}">
+                                <i class="material-icons">{% if filter_adult == 'true' %}visibility_off{% else %}visibility{% endif %}</i>
+                                {% if filter_adult == 'true' %}Hide{% else %}Show{% endif %} 18+/21+
+                            </button>
+                        </div>
+                        <div class="calendar-group-filter">
+                            <label class="calendar-group-filter-label" for="calendarGroupFilter">Group</label>
+                            <select id="calendarGroupFilter" aria-label="Filter by group">
+                                <option value="">All groups</option>
+                                {% for group in calendar_groups_options %}
+                                <option value="{{ group.value }}"{% if filter_group == group.value %} selected{% endif %}>{{ group.text }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="calendar-agenda" aria-live="polite">
+                        <div class="calendar-agenda-header">
+                            <div>
+                                <h3 class="calendar-agenda-title" id="calendarAgendaTitle">{{ month_name }} {{ year }}</h3>
+                                <p class="calendar-agenda-subtitle" id="calendarAgendaSubtitle">
+                                    {% if month_event_count == 0 %}
+                                    No events this month{% if filter_adult == 'false' %} — try showing 18+/21+{% endif %}
+                                    {% else %}
+                                    Select a date to filter, or browse all events below
+                                    {% endif %}
+                                </p>
                             </div>
-                        {% endif %}
-                    {% endfor %}
-                {% endfor %}
-            </div>
-        </div>
+                            <button type="button" class="calendar-agenda-reset" id="calendarAgendaReset" hidden>
+                                Show all
+                            </button>
+                        </div>
 
-        <div class="calendar-legend">
-            <h5 class="mb-3">Legend</h5>
-            <div class="legend-item">
-                <div class="legend-color all-ages"></div>
-                <span>All Ages</span>
+                        <div class="calendar-agenda-list" id="calendarAgendaList">
+                            {% if month_event_count == 0 %}
+                            <div class="calendar-agenda-empty">
+                                <i class="material-icons">event_busy</i>
+                                <p>Nothing on the calendar for {{ month_name }}.</p>
+                            </div>
+                            {% else %}
+                            {% regroup month_events by date as events_by_day %}
+                            {% for day_group in events_by_day %}
+                            <div class="calendar-agenda-group" data-date="{{ day_group.grouper|date:'Y-m-d' }}">
+                                <h4 class="calendar-agenda-date">
+                                    <span class="calendar-agenda-date-weekday">{{ day_group.grouper|date:"D" }}</span>
+                                    {{ day_group.grouper|date:"M j" }}
+                                </h4>
+                                <div class="calendar-agenda-events">
+                                    {% for event in day_group.list %}
+                                    <a href="{% url 'event_detail' event.id %}" class="calendar-agenda-event calendar-agenda-event--{{ event.age_restriction|default:'all' }}">
+                                        <div class="calendar-agenda-event-main">
+                                            <div class="calendar-agenda-event-title">{{ event.title }}</div>
+                                            <div class="calendar-agenda-event-meta">
+                                                {% if event.start_time %}
+                                                <span><i class="material-icons">schedule</i>{{ event.start_time|time:"g:i A" }}{% if event.end_time %} – {{ event.end_time|time:"g:i A" }}{% endif %}</span>
+                                                {% endif %}
+                                                <span><i class="material-icons">groups</i>{{ event.group.name }}</span>
+                                                {% if event.city %}
+                                                <span><i class="material-icons">location_on</i>{{ event.city }}{% if event.state %}, {{ event.state|state_abbr }}{% endif %}</span>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                        <div class="calendar-agenda-event-side">
+                                            {% if event.user_rsvp_list %}
+                                            {% with user_rsvp=event.user_rsvp_list.0 %}
+                                            <span class="calendar-agenda-rsvp calendar-agenda-rsvp--{{ user_rsvp.status }}">
+                                                {% if user_rsvp.status == 'confirmed' %}Going{% elif user_rsvp.status == 'maybe' %}Maybe{% elif user_rsvp.status == 'waitlisted' %}Waitlist{% else %}No{% endif %}
+                                            </span>
+                                            {% endwith %}
+                                            {% endif %}
+                                            {% if event.age_restriction == 'mature' %}
+                                            <span class="calendar-agenda-age calendar-agenda-age--21">21+</span>
+                                            {% elif event.age_restriction == 'adult' %}
+                                            <span class="calendar-agenda-age calendar-agenda-age--18">18+</span>
+                                            {% endif %}
+                                            <i class="material-icons calendar-agenda-chevron">chevron_right</i>
+                                        </div>
+                                    </a>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                            {% endif %}
+                        </div>
+                    </div>
+                </aside>
             </div>
-            <div class="legend-item">
-                <div class="legend-color adult"></div>
-                <span>18+ (Adult)</span>
-            </div>
-            <div class="legend-item">
-                <div class="legend-color mature"></div>
-                <span>21+ (Mature)</span>
+
+            <div class="calendar-legend calendar-legend--footer">
+                <span class="calendar-legend-chip"><span class="calendar-day-dot calendar-day-dot--all"></span> All ages</span>
+                <span class="calendar-legend-chip"><span class="calendar-day-dot calendar-day-dot--adult"></span> 18+</span>
+                <span class="calendar-legend-chip"><span class="calendar-day-dot calendar-day-dot--mature"></span> 21+</span>
             </div>
         </div>
     </div>
 </div>
+{{ calendar_groups_options|json_script:"calendar-groups-data" }}
+{% endblock %}
 
-<!-- Modal for day events -->
-<div class="modal fade" id="eventDayModal" tabindex="-1" aria-labelledby="eventDayModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="eventDayModalLabel">Events on <span id="modalEventDate"></span></h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body" id="modalEventList">
-        <!-- Events will be loaded here -->
-      </div>
-    </div>
-  </div>
-</div>
-<script id="eventsByDateData" type="application/json">
-{
-{% for date_key, events in events_by_date.items %}
-  "{{ date_key }}": [
-    {% for event in events %}
-      {
-        "title": "{{ event.title|escapejs }}",
-        "url": "{% url 'event_detail' event.id %}",
-        "age": "{{ event.age_restriction }}"
-      }{% if not forloop.last %},{% endif %}
-    {% endfor %}
-  ]{% if not forloop.last %},{% endif %}
-{% endfor %}
-}
+{% block extra_js %}
+{{ block.super }}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const filterAdult = '{{ filter_adult|default:"false"|escapejs }}' === 'true';
+    const filterGroup = '{{ filter_group|default:""|escapejs }}';
+    const year = {{ year }};
+    const month = {{ month }};
+
+    const groupLogos = {};
+    JSON.parse(document.getElementById('calendar-groups-data').textContent).forEach(function(group) {
+        groupLogos[group.value] = group.logo || '';
+    });
+
+    function renderCalendarGroupOption(data, escape) {
+        if (!data.value) {
+            return '<div class="calendar-group-option calendar-group-option--all"><span class="calendar-group-option-name">' + escape(data.text || 'All groups') + '</span></div>';
+        }
+        const logo = groupLogos[data.value] || '';
+        const logoHtml = logo
+            ? '<img class="calendar-group-option-logo" src="' + escape(logo) + '" alt="">'
+            : '<span class="calendar-group-option-logo calendar-group-option-logo--placeholder"><i class="material-icons">groups</i></span>';
+        return '<div class="calendar-group-option">' + logoHtml + '<span class="calendar-group-option-name">' + escape(data.text) + '</span></div>';
+    }
+
+    const groupFilterEl = document.getElementById('calendarGroupFilter');
+    if (groupFilterEl && window.TomSelect) {
+        new TomSelect(groupFilterEl, {
+            allowEmptyOption: true,
+            maxItems: 1,
+            placeholder: 'All groups',
+            plugins: ['dropdown_input'],
+            closeAfterSelect: true,
+            hideSelected: false,
+            render: {
+                option: renderCalendarGroupOption,
+                item: renderCalendarGroupOption,
+            },
+            onChange: function(value) {
+                const params = new URLSearchParams(window.location.search);
+                params.set('year', String(year));
+                params.set('month', String(month));
+                params.set('adult', filterAdult ? 'true' : 'false');
+                if (value) {
+                    params.set('group', value);
+                } else {
+                    params.delete('group');
+                }
+                window.location.search = params.toString();
+            },
+        });
+    }
+
+    const toggleAdult = document.getElementById('calendarToggleAdult');
+    if (toggleAdult) {
+        toggleAdult.addEventListener('click', function() {
+            const params = new URLSearchParams(window.location.search);
+            params.set('year', String(year));
+            params.set('month', String(month));
+            params.set('adult', filterAdult ? 'false' : 'true');
+            if (filterGroup) {
+                params.set('group', filterGroup);
+            }
+            window.location.search = params.toString();
+        });
+    }
+
+    const dayButtons = document.querySelectorAll('.calendar-day[data-date]');
+    const agendaGroups = document.querySelectorAll('.calendar-agenda-group');
+    const agendaTitle = document.getElementById('calendarAgendaTitle');
+    const agendaSubtitle = document.getElementById('calendarAgendaSubtitle');
+    const agendaReset = document.getElementById('calendarAgendaReset');
+    const monthLabel = '{{ month_name|escapejs }} {{ year }}';
+    let selectedDate = null;
+
+    function formatAgendaDate(dateKey) {
+        const parts = dateKey.split('-');
+        const date = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+        return date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+    }
+
+    function setSelectedDate(dateKey) {
+        selectedDate = dateKey;
+        dayButtons.forEach(function(button) {
+            button.classList.toggle('is-selected', button.dataset.date === dateKey);
+        });
+        agendaGroups.forEach(function(group) {
+            group.hidden = group.dataset.date !== dateKey;
+        });
+        if (agendaTitle) {
+            agendaTitle.textContent = formatAgendaDate(dateKey);
+        }
+        if (agendaSubtitle) {
+            agendaSubtitle.textContent = 'Showing events for this day';
+        }
+        if (agendaReset) {
+            agendaReset.hidden = false;
+        }
+    }
+
+    function clearSelectedDate() {
+        selectedDate = null;
+        dayButtons.forEach(function(button) {
+            button.classList.remove('is-selected');
+        });
+        agendaGroups.forEach(function(group) {
+            group.hidden = false;
+        });
+        if (agendaTitle) {
+            agendaTitle.textContent = monthLabel;
+        }
+        if (agendaSubtitle) {
+            agendaSubtitle.textContent = agendaGroups.length
+                ? 'Select a date to filter, or browse all events below'
+                : 'No events this month';
+        }
+        if (agendaReset) {
+            agendaReset.hidden = true;
+        }
+    }
+
+    dayButtons.forEach(function(button) {
+        button.addEventListener('click', function() {
+            const dateKey = button.dataset.date;
+            if (selectedDate === dateKey) {
+                clearSelectedDate();
+                return;
+            }
+            setSelectedDate(dateKey);
+        });
+    });
+
+    if (agendaReset) {
+        agendaReset.addEventListener('click', clearSelectedDate);
+    }
+});
 </script>
-{% endblock %} 
+{% endblock %}

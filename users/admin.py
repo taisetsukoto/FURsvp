@@ -1,6 +1,22 @@
 from django.contrib import admin
-from .models import Profile, GroupRole, AuditLog
+from .models import Profile, GroupRole, AuditLog, BlockedTerm
 from events.models import Group
+
+
+class BlockedTermAdmin(admin.ModelAdmin):
+    list_display = ('term', 'match_mode', 'source', 'is_active', 'updated_at')
+    list_filter = ('match_mode', 'source', 'is_active')
+    search_fields = ('term', 'notes')
+    ordering = ('term',)
+    readonly_fields = ('created_at', 'updated_at')
+
+    def save_model(self, request, obj, form, change):
+        if not change:
+            obj.source = BlockedTerm.SOURCE_MANUAL
+        super().save_model(request, obj, form, change)
+
+
+admin.site.register(BlockedTerm, BlockedTermAdmin)
 
 class GroupRoleInline(admin.TabularInline):
     model = GroupRole

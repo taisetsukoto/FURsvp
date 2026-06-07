@@ -178,6 +178,59 @@ class GroupDelegation(models.Model):
     def __str__(self):
         return f'{self.organizer.username} assigned {self.delegated_user.username} as an assistant for {self.group.name}'
 
+class BlockedTerm(models.Model):
+    """Offensive or trolling terms blocked in usernames and display names."""
+
+    MATCH_EXACT = 'exact'
+    MATCH_CONTAINS = 'contains'
+    MATCH_MODE_CHOICES = [
+        (MATCH_EXACT, 'Exact match'),
+        (MATCH_CONTAINS, 'Contains (substring)'),
+    ]
+
+    SOURCE_CMU = 'cmu'
+    SOURCE_MANUAL = 'manual'
+    SOURCE_CHOICES = [
+        (SOURCE_CMU, 'CMU bad-words list'),
+        (SOURCE_MANUAL, 'Added manually'),
+    ]
+
+    term = models.CharField(max_length=100)
+    match_mode = models.CharField(
+        max_length=10,
+        choices=MATCH_MODE_CHOICES,
+        default=MATCH_CONTAINS,
+        help_text='Exact: block only when the whole normalized value matches. Contains: block when the term appears within the value.',
+    )
+    source = models.CharField(
+        max_length=10,
+        choices=SOURCE_CHOICES,
+        default=SOURCE_MANUAL,
+    )
+    is_active = models.BooleanField(default=True)
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['term']
+        verbose_name = 'Blocked term'
+        verbose_name_plural = 'Blocked terms'
+        constraints = [
+            models.UniqueConstraint(
+                models.functions.Lower('term'),
+                name='users_blockedterm_term_unique_ci',
+            ),
+        ]
+
+    def __str__(self):
+        return self.term
+
+    def save(self, *args, **kwargs):
+        self.term = self.term.strip().lower()
+        super().save(*args, **kwargs)
+
+
 class BannedUser(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='banned_entries')
     group = models.ForeignKey('events.Group', on_delete=models.CASCADE, null=True, blank=True)
