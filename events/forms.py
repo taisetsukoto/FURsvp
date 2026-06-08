@@ -253,6 +253,8 @@ class RSVPForm(forms.ModelForm):
     def clean(self):
         cleaned_data = super().clean()
         status = cleaned_data.get('status')
+        if self.event and self.event.rsvps_locked:
+            raise forms.ValidationError('RSVPs are locked because this event has started.')
         # Enforce capacity: prevent selecting 'confirmed' when capacity is reached
         if self.event and status == 'confirmed' and self.event.capacity is not None:
             # Count confirmed RSVPs excluding the current instance (if updating)

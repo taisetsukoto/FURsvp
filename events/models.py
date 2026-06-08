@@ -4,7 +4,9 @@ from datetime import time
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.html import strip_tags
+from datetime import datetime
 import re
 
 class Group(models.Model):
@@ -133,6 +135,31 @@ class Event(models.Model):
 
     def get_absolute_url(self):
         return reverse('event_detail', args=[str(self.id)])
+
+    def _aware_datetime(self, event_date, event_time):
+        dt = datetime.combine(event_date, event_time or time(0, 0, 0))
+        if timezone.is_aware(timezone.now()):
+            dt = timezone.make_aware(dt, timezone.get_current_timezone())
+        return dt
+
+    def get_start_datetime(self):
+        return self._aware_datetime(self.date, self.start_time)
+
+    def get_end_datetime(self):
+        return self._aware_datetime(self.date, self.end_time)
+
+    def has_started(self, now=None):
+        now = now or timezone.now()
+        return now >= self.get_start_datetime()
+
+    def has_ended(self, now=None):
+        now = now or timezone.now()
+        return now > self.get_end_datetime()
+
+    @property
+    def rsvps_locked(self):
+        """Prevent RSVP changes once the event starts or is cancelled."""
+        return self.status != 'active' or self.has_started()
 
 class RSVP(models.Model):
     event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='rsvps')

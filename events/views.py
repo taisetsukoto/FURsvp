@@ -18,7 +18,7 @@ from django.db.models import Q
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 import calendar
 from django.forms.utils import ErrorList
-from events.utils import post_to_telegram_channel
+from events.utils import post_to_telegram_channel, RSVP_LOCK_MESSAGE
 from django.urls import reverse
 from django.conf import settings
 import os
@@ -246,13 +246,10 @@ def event_detail(request, event_id):
     event = get_object_or_404(Event, pk=event_id)
     rsvps = event.rsvps.all().select_related('user__profile')
     
-    # Calculate if event has passed
-    event_end_datetime = datetime.combine(event.date, event.end_time)
-    # Make event_end_datetime timezone-aware if USE_TZ is True in settings
-    if timezone.is_aware(timezone.now()):
-        event_end_datetime = timezone.make_aware(event_end_datetime, timezone.get_current_timezone())
-
-    event_has_passed = timezone.now() > event_end_datetime
+    # Calculate if event has started or passed
+    event_has_started = event.has_started()
+    event_has_passed = event.has_ended()
+    rsvps_locked = event.rsvps_locked
 
     # Get user's RSVP if they're logged in
     user_rsvp = None
@@ -338,6 +335,9 @@ def event_detail(request, event_id):
                 return redirect('event_detail', event_id=event.id)
 
         if 'remove_rsvp' in request.POST:
+            if rsvps_locked:
+                messages.error(request, RSVP_LOCK_MESSAGE, extra_tags='admin_notification')
+                return redirect('event_detail', event_id=event.id)
             if user_rsvp: # Ensure there is an RSVP to remove
                 with transaction.atomic():
                     was_confirmed = (user_rsvp.status == 'confirmed')
@@ -425,6 +425,10 @@ def event_detail(request, event_id):
             )
             return redirect('event_detail', event_id=event.id)
 
+        if rsvps_locked:
+            messages.error(request, RSVP_LOCK_MESSAGE, extra_tags='admin_notification')
+            return redirect('event_detail', event_id=event.id)
+
         form = RSVPForm(request.POST, instance=user_rsvp, event=event)
         if form.is_valid():
             new_status = form.cleaned_data['status']
@@ -499,6 +503,9 @@ def event_detail(request, event_id):
     elif 'update_rsvp_status_by_organizer' in request.POST:
         if not can_ban_user: # Use the new flag
             return JsonResponse({'status': 'error', 'message': 'Permission denied.'}, status=403)
+
+        if rsvps_locked:
+            return JsonResponse({'status': 'error', 'message': RSVP_LOCK_MESSAGE}, status=403)
         
         rsvp_id = request.POST.get('rsvp_id')
         new_status = request.POST.get('new_status')
@@ -627,6 +634,7 @@ def event_detail(request, event_id):
 
     # Determine if the RSVP form should be displayed
     show_rsvp_form = (
+        not rsvps_locked and
         not is_banned_from_event and
         ((not is_event_full or can_join_waitlist) or
          (user_rsvp is not None and user_rsvp.status != 'confirmed'))
@@ -665,6 +673,8 @@ def event_detail(request, event_id):
         'is_organizer': is_organizer_of_this_event,
         'is_site_admin': is_site_admin,
         'event_has_passed': event_has_passed,
+        'event_has_started': event_has_started,
+        'rsvps_locked': rsvps_locked,
         'confirmed_rsvps_count': confirmed_rsvps_count,
         'waitlisted_rsvps_count': waitlisted_rsvps_count,
         'is_event_full': is_event_full,
@@ -1254,6 +1264,9 @@ def telegram_bot_webhook(request):
             except Event.DoesNotExist:
                 send_telegram_message(chat_id, "Event not found.")
                 return JsonResponse({'ok': True})
+            if event.rsvps_locked:
+                send_telegram_message(chat_id, RSVP_LOCK_MESSAGE)
+                return JsonResponse({'ok': True})
             # Find user by Telegram username
             user = None
             if username:
@@ -1288,6 +1301,9 @@ def telegram_bot_webhook(request):
                     event = Event.objects.get(id=event_id, date__gte=today)
                 except Event.DoesNotExist:
                     send_telegram_message(chat_id, "Event not found.")
+                    return JsonResponse({'ok': True})
+                if event.rsvps_locked:
+                    send_telegram_message(chat_id, RSVP_LOCK_MESSAGE)
                     return JsonResponse({'ok': True})
                 # Find user by Telegram username
                 user = None
@@ -1414,6 +1430,8 @@ def rsvp_telegram(request, event_id):
         event = Event.objects.get(id=event_id)
     except Event.DoesNotExist:
         return HttpResponse('Event not found.', status=404)
+    if event.rsvps_locked:
+        return HttpResponse(RSVP_LOCK_MESSAGE, status=403)
     if user_is_banned_from_event(profile.user, event):
         return HttpResponse('You are banned from RSVPing to this event.', status=403)
     from events.models import RSVP
@@ -1430,6 +1448,28 @@ def blog(request):
         'bluesky_profile': profile,
     }
     return render(request, 'events/blog.html', context)
+
+
+def _event_not_ended_filter(now):
+    return (
+        Q(event__date__gt=now.date()) |
+        (Q(event__date=now.date()) & Q(event__end_time__gt=now.time()))
+    )
+
+
+@login_required
+def my_rsvps(request):
+    now = timezone.now()
+    base_qs = RSVP.objects.filter(user=request.user).select_related('event', 'event__group')
+    not_ended = _event_not_ended_filter(now)
+
+    upcoming_rsvps = base_qs.filter(not_ended).order_by('event__date', 'event__start_time')
+    past_rsvps = base_qs.exclude(not_ended).order_by('-event__date', '-event__start_time')
+
+    return render(request, 'events/my_rsvps.html', {
+        'upcoming_rsvps': upcoming_rsvps,
+        'past_rsvps': past_rsvps,
+    })
 
 
 def _user_can_manage_event(user, event):
