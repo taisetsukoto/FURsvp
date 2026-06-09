@@ -1598,6 +1598,116 @@
             color: var(--fursvp-link);
         }
 
+        /* Profile & auth: fix light-theme surfaces left white in dark mode */
+        .dark-mode .profile-tabs-shell {
+            background: var(--fursvp-surface-muted);
+            border: 1px solid var(--fursvp-border-subtle);
+        }
+
+        .dark-mode .profile-tabs .nav-link {
+            color: var(--fursvp-text-muted) !important;
+        }
+
+        .dark-mode .profile-tabs .nav-link:not(.active):hover {
+            color: var(--fursvp-text-secondary) !important;
+            background: rgba(255, 255, 255, 0.06) !important;
+        }
+
+        .dark-mode .profile-tabs .nav-link.active {
+            background: var(--fursvp-surface-elevated) !important;
+            color: var(--fursvp-text) !important;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+            border: 1px solid var(--fursvp-border);
+        }
+
+        .dark-mode .profile-tabs .nav-link.active .material-icons {
+            color: var(--fursvp-link) !important;
+        }
+
+        .dark-mode .profile-tabs .nav-link--danger:not(.active) {
+            color: var(--fursvp-text-muted) !important;
+        }
+
+        .dark-mode .profile-tabs .nav-link--danger:not(.active):hover {
+            color: #f87171 !important;
+            background: rgba(220, 38, 38, 0.12) !important;
+        }
+
+        .dark-mode .profile-tabs .nav-link--danger.active {
+            color: #fca5a5 !important;
+            background: rgba(127, 29, 29, 0.35) !important;
+            border-color: rgba(248, 113, 113, 0.25) !important;
+        }
+
+        .dark-mode .profile-tabs .nav-link--danger.active .material-icons {
+            color: #f87171 !important;
+        }
+
+        .dark-mode .auth-status-box--success {
+            background: rgba(4, 120, 87, 0.18);
+            border-color: rgba(52, 211, 153, 0.35);
+            color: #6ee7b7;
+        }
+
+        .dark-mode .auth-status-box--warning {
+            background: rgba(180, 83, 9, 0.18);
+            border-color: rgba(245, 158, 11, 0.35);
+            color: #fbbf24;
+        }
+
+        .dark-mode .auth-warning-box {
+            background: rgba(127, 29, 29, 0.25);
+            border-color: rgba(248, 113, 113, 0.35);
+            color: #fca5a5;
+        }
+
+        .dark-mode .auth-info-box {
+            background: rgba(30, 58, 95, 0.35);
+            border-color: rgba(147, 197, 253, 0.25);
+            color: var(--fursvp-text-secondary);
+        }
+
+        .dark-mode .auth-error-box {
+            background: rgba(127, 29, 29, 0.25);
+            border-color: rgba(248, 113, 113, 0.4);
+            color: #fca5a5;
+        }
+
+        .dark-mode .auth-btn-secondary {
+            background: var(--fursvp-surface-muted);
+            border-color: var(--fursvp-border);
+            color: var(--fursvp-link) !important;
+        }
+
+        .dark-mode .auth-btn-secondary:hover,
+        .dark-mode .auth-btn-secondary:focus {
+            background: var(--fursvp-surface-elevated);
+            border-color: var(--fursvp-accent);
+            color: var(--fursvp-link-hover) !important;
+        }
+
+        .dark-mode .profile-section-card {
+            background: var(--fursvp-surface-muted);
+            border-color: var(--fursvp-border-subtle);
+            box-shadow: none;
+        }
+
+        .dark-mode .profile-section-card--telegram {
+            background: rgba(30, 58, 95, 0.25);
+            border-color: rgba(147, 197, 253, 0.2);
+        }
+
+        .dark-mode .profile-btn-outline-danger {
+            background: transparent;
+            color: #f87171 !important;
+            border-color: rgba(248, 113, 113, 0.4);
+        }
+
+        .dark-mode .profile-btn-outline-danger:hover {
+            background: rgba(127, 29, 29, 0.25);
+            border-color: #f87171;
+        }
+
         .dark-mode .turnstile-wrap {
             background: var(--fursvp-surface-input);
             border-color: var(--fursvp-border);

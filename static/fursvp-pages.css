@@ -7594,6 +7594,15 @@
         transform: scale(1.07);
     }
 
+    .dark-mode .profile-avatar {
+        border-color: var(--fursvp-surface-elevated);
+        background: var(--fursvp-surface-muted);
+    }
+
+    .dark-mode .profile-edit-btn {
+        border: 2px solid var(--fursvp-surface);
+    }
+
     .profile-page-card .profile-section-card--telegram {
         margin-top: 0.5rem;
         margin-bottom: 1rem;
