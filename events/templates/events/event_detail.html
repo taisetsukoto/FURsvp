@@ -42,6 +42,13 @@
     {% endif %}
     {% endif %}
 
+    {% if event_has_started and not event_has_passed and event.status == 'active' %}
+    <div class="event-status-banner event-status-banner--muted">
+        <i class="material-icons">lock</i>
+        RSVPs are locked because this event has started.
+    </div>
+    {% endif %}
+
     {% if event_has_passed %}
     <div class="event-status-banner event-status-banner--muted">
         <i class="material-icons">info</i>
@@ -646,7 +653,7 @@
                     });
                 </script>
                 {% endif %}
-                {% if not event_has_passed and event.status == 'active' %}
+                {% if not rsvps_locked and event.status == 'active' %}
                 <div class="group-section-card profile-page-card mb-4">
                     <div class="group-section-header">
                         <div class="group-section-icon group-section-icon--rsvp">

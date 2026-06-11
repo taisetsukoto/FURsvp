@@ -5,6 +5,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>
+        (function () {
+            var stored = localStorage.getItem('fursvpDarkMode');
+            var dark = stored === 'true' ||
+                (stored === null && window.matchMedia('(prefers-color-scheme: dark)').matches);
+            if (dark) {
+                document.documentElement.setAttribute('data-bs-theme', 'dark');
+                document.documentElement.style.colorScheme = 'dark';
+                document.documentElement.style.backgroundColor = '#0f1117';
+            }
+        })();
+    </script>
     <title>{% block title %}FURsvp{% endblock %}</title>
     <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
@@ -25,6 +37,11 @@
 </head>
 
 <body>
+    <script>
+        if (document.documentElement.getAttribute('data-bs-theme') === 'dark') {
+            document.body.classList.add('dark-mode');
+        }
+    </script>
     <!-- Site Banner -->
     {% if banner_enabled and banner_text %}
     <div id="siteBanner" class="site-banner alert alert-{{ banner_type }} mb-0" role="alert" style="border-radius: 0; border: none;">
@@ -192,8 +209,8 @@
                     </li>
                     {% endif %}
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'blog' %}">
-                            <i class="material-icons">announcement</i> Blog
+                        <a class="nav-link{% if request.resolver_match.url_name == 'my_rsvps' %} active{% endif %}" href="{% url 'my_rsvps' %}">
+                            <i class="material-icons">event_available</i> My RSVPs
                         </a>
                     </li>
                     {% if user.group_roles.all or user.delegated_groups_as_delegate.exists %}
@@ -783,6 +800,9 @@
             var darkModeText = document.getElementById('darkModeText');
 
             function setDarkMode(enabled) {
+                document.documentElement.setAttribute('data-bs-theme', enabled ? 'dark' : 'light');
+                document.documentElement.style.colorScheme = enabled ? 'dark' : 'light';
+                document.documentElement.style.backgroundColor = enabled ? '#0f1117' : '';
                 if (enabled) {
                     document.body.classList.add('dark-mode');
                     darkModeIcon.textContent = 'light_mode';
@@ -803,7 +823,10 @@
                 }));
             }
 
-            setDarkMode(localStorage.getItem('fursvpDarkMode') === 'true');
+            var storedDark = localStorage.getItem('fursvpDarkMode');
+            var prefersDark = storedDark === 'true' ||
+                (storedDark === null && window.matchMedia('(prefers-color-scheme: dark)').matches);
+            setDarkMode(prefersDark);
 
             if (darkModeToggle) {
                 darkModeToggle.addEventListener('click', function () {

@@ -1,6 +1,6 @@
 from django.urls import path
 from . import views
-from .views import manage_group_leadership, telegram_bot_webhook, rsvp_telegram, blog
+from .views import manage_group_leadership, telegram_bot_webhook, rsvp_telegram, blog, my_rsvps
 
 urlpatterns = [
     path('', views.home, name='home'),
@@ -20,6 +20,7 @@ urlpatterns = [
     path('telegram/bot/', telegram_bot_webhook, name='telegram_bot_webhook'),
     path('event/<int:event_id>/rsvp_telegram/', rsvp_telegram, name='rsvp_telegram'),
     path('blog/', blog, name='blog'),
+    path('my-rsvps/', my_rsvps, name='my_rsvps'),
     path('event/<int:event_id>/organizer-tools/', views.organizer_tools, name='organizer_tools'),
     path('event/<int:event_id>/export-csv/', views.export_attendees_csv, name='export_attendees_csv'),
     path('event/<int:event_id>/generate-badges/', views.generate_badges, name='generate_badges'),
