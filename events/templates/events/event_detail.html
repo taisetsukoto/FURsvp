@@ -73,6 +73,7 @@
                     <span class="event-hero-chip">
                         <i class="material-icons">schedule</i>
                         {{ event.start_time|time:"g:i A" }}{% if event.end_time %} – {{ event.end_time|time:"g:i A" }}{% endif %}
+                        {% if event.timezone %} {{ event|event_timezone_abbr }}{% endif %}
                     </span>
                     <a href="{% url 'group_detail' event.group.id %}" class="event-hero-chip">
                         <i class="material-icons">groups</i>{{ event.group.name }}
@@ -119,7 +120,7 @@
                             <i class="material-icons">schedule</i>
                             <div>
                                 <span class="event-meta-label">Time</span>
-                                <span class="event-meta-value">{{ event.start_time|time:"g:i A" }}{% if event.end_time %} – {{ event.end_time|time:"g:i A" }}{% endif %}</span>
+                                <span class="event-meta-value">{{ event.start_time|time:"g:i A" }}{% if event.end_time %} – {{ event.end_time|time:"g:i A" }}{% endif %}{% if event.timezone %} {{ event|event_timezone_abbr }}{% endif %}</span>
                             </div>
                         </div>
                         {% if event.capacity %}

@@ -9,6 +9,15 @@ from django.utils.html import strip_tags
 from datetime import datetime
 import re
 
+from events.timezones import (
+    compute_event_schedule,
+    get_zone,
+    localize_in_zone,
+    timezone_abbreviation,
+    timezone_display_name,
+    timezone_name_for_location,
+)
+
 class Group(models.Model):
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True, help_text="Description of the group and its activities")
@@ -121,6 +130,24 @@ class Event(models.Model):
         blank=True,
         help_text="Describe how this event is accessible. If left blank, event is not marked as accessible."
     )
+    timezone = models.CharField(
+        max_length=63,
+        blank=True,
+        default='',
+        help_text='IANA timezone derived from the event location (event time).',
+    )
+    starts_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text='Event start instant in UTC, computed from local date/time and location.',
+    )
+    ends_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text='Event end instant in UTC, computed from local date/time and location.',
+    )
     
     def clean(self):
         if self.waitlist_enabled and self.capacity is None:
@@ -145,38 +172,24 @@ class Event(models.Model):
 
     @classmethod
     def active_not_ended_q(cls, now=None, prefix=''):
-        """Events still in progress or not yet started (by end date/time)."""
+        """Events still in progress or not yet started (by event-local end time)."""
         now = now or timezone.now()
-        today = now.date()
-        current_time = now.time()
-        end_date = cls._field(prefix, 'end_date')
-        date = cls._field(prefix, 'date')
-        end_time = cls._field(prefix, 'end_time')
+        starts_at = cls._field(prefix, 'starts_at')
+        ends_at = cls._field(prefix, 'ends_at')
         return (
-            models.Q(**{f'{end_date}__gt': today}) |
-            models.Q(**{f'{end_date}__isnull': True, f'{date}__gt': today}) |
-            (
-                (models.Q(**{end_date: today}) | models.Q(**{f'{end_date}__isnull': True, date: today})) &
-                models.Q(**{f'{end_time}__gt': current_time})
-            )
+            models.Q(**{f'{ends_at}__gt': now}) |
+            models.Q(**{f'{ends_at}__isnull': True, f'{starts_at}__gt': now})
         )
 
     @classmethod
     def active_ended_q(cls, now=None, prefix=''):
-        """Events whose end date/time has passed."""
+        """Events whose event-local end time has passed."""
         now = now or timezone.now()
-        today = now.date()
-        current_time = now.time()
-        end_date = cls._field(prefix, 'end_date')
-        date = cls._field(prefix, 'date')
-        end_time = cls._field(prefix, 'end_time')
+        ends_at = cls._field(prefix, 'ends_at')
+        starts_at = cls._field(prefix, 'starts_at')
         return (
-            models.Q(**{f'{end_date}__lt': today}) |
-            models.Q(**{f'{end_date}__isnull': True, f'{date}__lt': today}) |
-            (
-                (models.Q(**{end_date: today}) | models.Q(**{f'{end_date}__isnull': True, date: today})) &
-                models.Q(**{f'{end_time}__lte': current_time})
-            )
+            models.Q(**{f'{ends_at}__lte': now}) |
+            models.Q(**{f'{ends_at}__isnull': True, f'{starts_at}__lte': now})
         )
 
     @classmethod
@@ -189,16 +202,37 @@ class Event(models.Model):
             models.Q(**{f'{end_date}__isnull': True, f'{date}__gte': range_start})
         )
 
+    def sync_event_time(self):
+        """Recompute event timezone and UTC bounds from local schedule + location."""
+        starts_at, ends_at, tz_name = compute_event_schedule(self)
+        self.timezone = tz_name
+        self.starts_at = starts_at
+        self.ends_at = ends_at
+
+    def get_event_timezone_name(self):
+        return self.timezone or timezone_name_for_location(self.state, self.city)
+
+    def get_event_tz(self):
+        return get_zone(self.get_event_timezone_name())
+
+    def get_timezone_abbreviation(self, at=None):
+        return timezone_abbreviation(self.get_event_timezone_name(), at=at)
+
+    def get_timezone_display_name(self):
+        return timezone_display_name(self.get_event_timezone_name())
+
     def _aware_datetime(self, event_date, event_time):
         dt = datetime.combine(event_date, event_time or time(0, 0, 0))
-        if timezone.is_aware(timezone.now()):
-            dt = timezone.make_aware(dt, timezone.get_current_timezone())
-        return dt
+        return localize_in_zone(dt, self.get_event_timezone_name())
 
     def get_start_datetime(self):
+        if self.starts_at:
+            return self.starts_at
         return self._aware_datetime(self.date, self.start_time)
 
     def get_end_datetime(self):
+        if self.ends_at:
+            return self.ends_at
         return self._aware_datetime(self.effective_end_date, self.end_time)
 
     def has_started(self, now=None):
@@ -208,6 +242,10 @@ class Event(models.Model):
     def has_ended(self, now=None):
         now = now or timezone.now()
         return now > self.get_end_datetime()
+
+    def save(self, *args, **kwargs):
+        self.sync_event_time()
+        super().save(*args, **kwargs)
 
     @property
     def is_multi_day(self):

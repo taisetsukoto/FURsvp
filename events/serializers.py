@@ -65,7 +65,7 @@ class EventSerializer(serializers.ModelSerializer):
     class Meta:
         model = Event
         fields = [
-            'id', 'title', 'group', 'date', 'end_date', 'start_time', 'end_time',
+            'id', 'title', 'group', 'date', 'end_date', 'start_time', 'end_time', 'timezone',
             'start_timestamp', 'end_timestamp', 'description', 'address', 'city', 'state',
             'status', 'age_restriction', 'capacity', 'waitlist_enabled',
             'attendee_list_public', 'enable_rsvp_questions'
@@ -96,7 +96,7 @@ class EventDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Event
         fields = [
-            'id', 'title', 'group', 'date', 'end_date', 'start_time', 'end_time',
+            'id', 'title', 'group', 'date', 'end_date', 'start_time', 'end_time', 'timezone',
             'start_timestamp', 'end_timestamp', 'description', 'address', 'city', 'state',
             'status', 'age_restriction', 'capacity', 'waitlist_enabled',
             'attendee_list_public', 'enable_rsvp_questions',

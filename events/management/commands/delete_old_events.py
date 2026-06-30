@@ -15,7 +15,7 @@ class Command(BaseCommand):
         # fields within the ORM query might be more efficient, but this is broadly compatible.
         events_to_delete_pks = []
         for event in Event.objects.all():
-            event_end_datetime = event.get_end_datetime()
+            event_end_datetime = event.ends_at or event.get_end_datetime()
 
             if event_end_datetime < threshold_datetime:
                 events_to_delete_pks.append(event.pk)
