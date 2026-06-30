@@ -92,14 +92,23 @@
                         <p class="event-wizard-step-desc">When does your event start and end?</p>
                     </div>
                     <div class="event-editor-panel">
-                        <div class="event-editor-grid event-editor-grid--3">
+                        <div class="event-editor-grid event-editor-grid--4">
                             <div class="auth-field mb-0">
-                                <label for="{{ form.date.id_for_label }}" class="auth-form-label">Date</label>
+                                <label for="{{ form.date.id_for_label }}" class="auth-form-label">Start date</label>
                                 <div class="input-group auth-input-group">
                                     <span class="input-group-text"><i class="material-icons">calendar_today</i></span>
-                                    {{ form.date|attr:'placeholder:Select date' }}
+                                    {{ form.date|attr:'placeholder:Start date' }}
                                 </div>
                                 {% if form.date.errors %}<div class="invalid-feedback d-block">{{ form.date.errors }}</div>{% endif %}
+                            </div>
+                            <div class="auth-field mb-0">
+                                <label for="{{ form.end_date.id_for_label }}" class="auth-form-label">End date <span class="text-muted">(optional)</span></label>
+                                <div class="input-group auth-input-group">
+                                    <span class="input-group-text"><i class="material-icons">event</i></span>
+                                    {{ form.end_date|attr:'placeholder:Same as start' }}
+                                </div>
+                                {% if form.end_date.errors %}<div class="invalid-feedback d-block">{{ form.end_date.errors }}</div>{% endif %}
+                                <div class="auth-field-help">Leave blank for single-day events.</div>
                             </div>
                             <div class="auth-field mb-0">
                                 <label for="{{ form.start_time.id_for_label }}" class="auth-form-label">Start time</label>
@@ -295,7 +304,7 @@
         const STEP_TITLES = ['Basics', 'Schedule', 'Location', 'Accessibility', 'Questions', 'Agreements'];
         const FIELD_STEPS = {
             title: 1, group: 1, description: 1,
-            date: 2, start_time: 2, end_time: 2, age_restriction: 2, capacity: 2, waitlist_enabled: 2, attendee_list_public: 2,
+            date: 2, end_date: 2, start_time: 2, end_time: 2, age_restriction: 2, capacity: 2, waitlist_enabled: 2, attendee_list_public: 2,
             address: 3, city: 3, state: 3,
             accessibility_details: 4,
             question1_text: 5, question2_text: 5, question3_text: 5,
@@ -343,8 +352,14 @@
             if (stepNum === 2) {
                 const waitlist = document.getElementById('{{ form.waitlist_enabled.id_for_label }}');
                 const capacity = document.getElementById('{{ form.capacity.id_for_label }}');
+                const startDate = document.getElementById('{{ form.date.id_for_label }}');
+                const endDate = document.getElementById('{{ form.end_date.id_for_label }}');
                 if (waitlist && waitlist.checked && capacity && !capacity.value.trim()) {
                     capacity.classList.add('is-invalid');
+                    valid = false;
+                }
+                if (startDate && endDate && endDate.value && startDate.value && endDate.value < startDate.value) {
+                    endDate.classList.add('is-invalid');
                     valid = false;
                 }
             }
@@ -666,7 +681,7 @@
             setTimeout(initTinyMCE, 100);
         });
 
-        flatpickr("#{{ form.date.id_for_label }}", {
+        const startDatePicker = flatpickr("#{{ form.date.id_for_label }}", {
             dateFormat: "Y-m-d",
             minDate: "today",
             disableMobile: "true",
@@ -677,6 +692,27 @@
             altInputClass: "form-control",
             onChange: function (selectedDates, dateStr) {
                 document.getElementById("{{ form.date.id_for_label }}").value = dateStr;
+                if (endDatePicker) {
+                    endDatePicker.set('minDate', dateStr || 'today');
+                    const endVal = document.getElementById("{{ form.end_date.id_for_label }}").value;
+                    if (endVal && dateStr && endVal < dateStr) {
+                        endDatePicker.clear();
+                    }
+                }
+            }
+        });
+
+        const endDatePicker = flatpickr("#{{ form.end_date.id_for_label }}", {
+            dateFormat: "Y-m-d",
+            minDate: "today",
+            disableMobile: "true",
+            theme: "light",
+            allowInput: true,
+            altInput: true,
+            altFormat: "F j, Y",
+            altInputClass: "form-control",
+            onChange: function (selectedDates, dateStr) {
+                document.getElementById("{{ form.end_date.id_for_label }}").value = dateStr;
             }
         });
 

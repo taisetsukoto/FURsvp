@@ -1,6 +1,7 @@
 {% extends 'events/base.html' %}
 {% load users_extras %}
 {% load static %}
+{% load dict_extras %}
 {% block title %}{{ event.title }} - FURsvp{% endblock %}
 {% load widget_tweaks %}
 
@@ -66,6 +67,10 @@
                 <h1 class="event-hero-title">{{ event.title }}</h1>
                 <div class="event-hero-chips">
                     <span class="event-hero-chip">
+                        <i class="material-icons">calendar_today</i>
+                        {{ event|event_date_label }}
+                    </span>
+                    <span class="event-hero-chip">
                         <i class="material-icons">schedule</i>
                         {{ event.start_time|time:"g:i A" }}{% if event.end_time %} – {{ event.end_time|time:"g:i A" }}{% endif %}
                     </span>
@@ -107,7 +112,7 @@
                             <i class="material-icons">calendar_today</i>
                             <div>
                                 <span class="event-meta-label">Date</span>
-                                <span class="event-meta-value">{{ event.date|date:"F j, Y" }}</span>
+                                <span class="event-meta-value">{{ event|event_date_label }}</span>
                             </div>
                         </div>
                         <div class="event-meta-item">
@@ -418,14 +423,22 @@
 
                                     <div class="event-editor-panel">
                                         <h6 class="event-editor-section-label">Date &amp; time</h6>
-                                        <div class="event-editor-grid event-editor-grid--3">
+                                        <div class="event-editor-grid event-editor-grid--4">
                                             <div class="auth-field mb-0">
-                                                <label for="{{ event_form.date.id_for_label }}" class="auth-form-label">Date</label>
+                                                <label for="{{ event_form.date.id_for_label }}" class="auth-form-label">Start date</label>
                                                 <div class="input-group auth-input-group">
                                                     <span class="input-group-text"><i class="material-icons">calendar_today</i></span>
-                                                    {% render_field event_form.date class="form-control flatpickr" placeholder="MM/DD/YYYY" %}
+                                                    {% render_field event_form.date class="form-control flatpickr" placeholder="Start date" %}
                                                 </div>
                                                 {% if event_form.date.errors %}<div class="invalid-feedback d-block">{{ event_form.date.errors }}</div>{% endif %}
+                                            </div>
+                                            <div class="auth-field mb-0">
+                                                <label for="{{ event_form.end_date.id_for_label }}" class="auth-form-label">End date</label>
+                                                <div class="input-group auth-input-group">
+                                                    <span class="input-group-text"><i class="material-icons">event</i></span>
+                                                    {% render_field event_form.end_date class="form-control flatpickr" placeholder="Same as start" %}
+                                                </div>
+                                                {% if event_form.end_date.errors %}<div class="invalid-feedback d-block">{{ event_form.end_date.errors }}</div>{% endif %}
                                             </div>
                                             <div class="auth-field mb-0">
                                                 <label for="{{ event_form.start_time.id_for_label }}" class="auth-form-label">Start time</label>
@@ -633,6 +646,10 @@
                 <script>
                     document.addEventListener('DOMContentLoaded', function () {
                         flatpickr('.flatpickr[name="date"]', {
+                            dateFormat: 'm/d/Y',
+                            allowInput: true,
+                        });
+                        flatpickr('.flatpickr[name="end_date"]', {
                             dateFormat: 'm/d/Y',
                             allowInput: true,
                         });

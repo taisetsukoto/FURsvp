@@ -869,6 +869,9 @@
 .event-editor-grid--3 {
     grid-template-columns: repeat(3, 1fr);
 }
+.event-editor-grid--4 {
+    grid-template-columns: repeat(2, 1fr);
+}
 .event-editor-perms {
     display: flex;
     flex-wrap: wrap;
@@ -975,7 +978,8 @@
 }
 @media (max-width: 768px) {
     .event-editor-grid,
-    .event-editor-grid--3 {
+    .event-editor-grid--3,
+    .event-editor-grid--4 {
         grid-template-columns: 1fr;
     }
     .event-editor-actions {

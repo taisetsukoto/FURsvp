@@ -32,7 +32,7 @@
             <div class="home-event-card-meta">
                 <span>
                     <i class="material-icons">schedule</i>
-                    {{ event.date|date:"l, M j" }}{% if event.start_time %} · {{ event.start_time|time:"g:i A" }}{% endif %}
+                    {{ event|event_date_label }}{% if event.start_time %} · {{ event.start_time|time:"g:i A" }}{% endif %}
                 </span>
                 {% if event.city %}
                 <span>
@@ -110,7 +110,7 @@
                 <div class="home-event-card-meta">
                     <span>
                         <i class="material-icons">schedule</i>
-                        {{ event.date|date:"l, M j" }}{% if event.start_time %} · {{ event.start_time|time:"g:i A" }}{% endif %}
+                        {{ event|event_date_label }}{% if event.start_time %} · {{ event.start_time|time:"g:i A" }}{% endif %}
                     </span>
                     {% if event.city %}
                     <span>

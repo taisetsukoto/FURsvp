@@ -34,29 +34,28 @@ class Group(models.Model):
         return GroupRole.objects.filter(group=self).order_by('assigned_at')
     
     def get_upcoming_events(self):
-        from django.utils import timezone
-        from datetime import datetime
         now = timezone.now()
         return self.event_set.filter(
-            models.Q(date__gt=now.date()) | 
-            (models.Q(date=now.date()) & models.Q(end_time__gt=now.time())),
-            status='active'
+            Event.active_not_ended_q(now),
+            status='active',
         ).order_by('date', 'start_time')
     
     def get_past_events(self):
-        from django.utils import timezone
-        from datetime import datetime
         now = timezone.now()
         return self.event_set.filter(
-            models.Q(date__lt=now.date()) | 
-            (models.Q(date=now.date()) & models.Q(end_time__lt=now.time())),
-            status='active'
+            Event.active_ended_q(now),
+            status='active',
         ).order_by('-date', '-start_time')
 
 class Event(models.Model):
     title = models.CharField(max_length=200)
     group = models.ForeignKey(Group, on_delete=models.CASCADE)
-    date = models.DateField()
+    date = models.DateField(help_text='First day of the event.')
+    end_date = models.DateField(
+        null=True,
+        blank=True,
+        help_text='Last day of the event. Defaults to the start date when unset.',
+    )
     start_time = models.TimeField(null=True, blank=True, default=time(0, 0, 0))
     end_time = models.TimeField(null=True, blank=True, default=time(0, 0, 0))
     description = models.TextField(blank=True)
@@ -136,6 +135,60 @@ class Event(models.Model):
     def get_absolute_url(self):
         return reverse('event_detail', args=[str(self.id)])
 
+    @property
+    def effective_end_date(self):
+        return self.end_date or self.date
+
+    @classmethod
+    def _field(cls, prefix, name):
+        return f'{prefix}{name}' if prefix else name
+
+    @classmethod
+    def active_not_ended_q(cls, now=None, prefix=''):
+        """Events still in progress or not yet started (by end date/time)."""
+        now = now or timezone.now()
+        today = now.date()
+        current_time = now.time()
+        end_date = cls._field(prefix, 'end_date')
+        date = cls._field(prefix, 'date')
+        end_time = cls._field(prefix, 'end_time')
+        return (
+            models.Q(**{f'{end_date}__gt': today}) |
+            models.Q(**{f'{end_date}__isnull': True, f'{date}__gt': today}) |
+            (
+                (models.Q(**{end_date: today}) | models.Q(**{f'{end_date}__isnull': True, date: today})) &
+                models.Q(**{f'{end_time}__gt': current_time})
+            )
+        )
+
+    @classmethod
+    def active_ended_q(cls, now=None, prefix=''):
+        """Events whose end date/time has passed."""
+        now = now or timezone.now()
+        today = now.date()
+        current_time = now.time()
+        end_date = cls._field(prefix, 'end_date')
+        date = cls._field(prefix, 'date')
+        end_time = cls._field(prefix, 'end_time')
+        return (
+            models.Q(**{f'{end_date}__lt': today}) |
+            models.Q(**{f'{end_date}__isnull': True, f'{date}__lt': today}) |
+            (
+                (models.Q(**{end_date: today}) | models.Q(**{f'{end_date}__isnull': True, date: today})) &
+                models.Q(**{f'{end_time}__lte': current_time})
+            )
+        )
+
+    @classmethod
+    def overlaps_date_range_q(cls, range_start, range_end, prefix=''):
+        """Events overlapping [range_start, range_end) — for calendar views."""
+        end_date = cls._field(prefix, 'end_date')
+        date = cls._field(prefix, 'date')
+        return models.Q(**{f'{date}__lt': range_end}) & (
+            models.Q(**{f'{end_date}__gte': range_start}) |
+            models.Q(**{f'{end_date}__isnull': True, f'{date}__gte': range_start})
+        )
+
     def _aware_datetime(self, event_date, event_time):
         dt = datetime.combine(event_date, event_time or time(0, 0, 0))
         if timezone.is_aware(timezone.now()):
@@ -146,7 +199,7 @@ class Event(models.Model):
         return self._aware_datetime(self.date, self.start_time)
 
     def get_end_datetime(self):
-        return self._aware_datetime(self.date, self.end_time)
+        return self._aware_datetime(self.effective_end_date, self.end_time)
 
     def has_started(self, now=None):
         now = now or timezone.now()
@@ -155,6 +208,10 @@ class Event(models.Model):
     def has_ended(self, now=None):
         now = now or timezone.now()
         return now > self.get_end_datetime()
+
+    @property
+    def is_multi_day(self):
+        return self.effective_end_date > self.date
 
     @property
     def rsvps_locked(self):

@@ -84,7 +84,7 @@ class EventForm(forms.ModelForm):
     class Meta:
         model = Event
         fields = [
-            'title', 'group', 'date', 'start_time', 'end_time',
+            'title', 'group', 'date', 'end_date', 'start_time', 'end_time',
             'address', 'city', 'state', 'age_restriction', 'description',
             'capacity', 'waitlist_enabled', 'attendee_list_public', 'enable_rsvp_questions',
             'question1_text', 'question2_text', 'question3_text',
@@ -94,6 +94,7 @@ class EventForm(forms.ModelForm):
             'title': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Event Title'}),
             'group': forms.Select(attrs={'class': 'form-select', 'placeholder': 'Select Group'}),
             'date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'end_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
             'start_time': forms.TimeInput(attrs={'type': 'time', 'class': 'form-control'}),
             'end_time': forms.TimeInput(attrs={'type': 'time', 'class': 'form-control'}),
             'address': forms.TextInput(attrs={'class': 'form-control'}),
@@ -119,6 +120,8 @@ class EventForm(forms.ModelForm):
             if instance.date:
                 # Format for Flatpickr: m/d/Y (no leading zeros)
                 self.initial['date'] = f"{instance.date.month}/{instance.date.day}/{instance.date.year}"
+            if instance.end_date and instance.end_date != instance.date:
+                self.initial['end_date'] = f"{instance.end_date.month}/{instance.end_date.day}/{instance.end_date.year}"
             if instance.start_time:
                 self.initial['start_time'] = instance.start_time.strftime('%I:%M %p')
             if instance.end_time:
@@ -174,15 +177,29 @@ class EventForm(forms.ModelForm):
         cleaned_data = super().clean()
         waitlist_enabled = cleaned_data.get('waitlist_enabled')
         capacity = cleaned_data.get('capacity')
+        start_date = cleaned_data.get('date')
+        end_date = cleaned_data.get('end_date')
 
         if waitlist_enabled and not capacity:
             self.add_error('waitlist_enabled', 'Capacity must be set when waitlist is enabled.')
             self.add_error('capacity', 'Capacity must be set when waitlist is enabled.')
-        
+
+        if start_date and end_date and end_date < start_date:
+            self.add_error('end_date', 'End date cannot be before the start date.')
+
+        if start_date and end_date and end_date == start_date:
+            cleaned_data['end_date'] = None
+
         return cleaned_data
 
     def save(self, commit=True):
         instance = super().save(commit=False)
+        if instance.end_date == instance.date:
+            instance.end_date = None
+        instance.enable_rsvp_questions = any(
+            (getattr(instance, f'question{i}_text') or '').strip()
+            for i in range(1, 4)
+        )
         instance.clean()  # Call the model's clean method
         if commit:
             instance.save()
