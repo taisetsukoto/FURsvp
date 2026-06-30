@@ -1471,9 +1471,6 @@ def twofa_enable(request):
     secret_bytes = binascii.unhexlify(hex_secret)
     base32_key = base64.b32encode(secret_bytes).decode('utf-8').replace('=', '')
 
-    print(f"[2FA DEBUG] Using hex secret: {hex_secret}")
-    print(f"[2FA DEBUG] Using base32 key: {base32_key}")
-
     if request.method == 'POST':
         form = TOTPDeviceForm(data=request.POST, user=request.user, key=key)
         if form.is_valid():
@@ -1489,7 +1486,6 @@ def twofa_enable(request):
     issuer = "FURsvp"
     label = quote(f"{request.user.email}")
     otpauth_url = f"otpauth://totp/{issuer}:{label}?secret={base32_key}&issuer={quote(issuer)}"
-    print(f"[2FA DEBUG] otpauth URL: {otpauth_url}")
 
     # Generate QR code image
     qr = qrcode.QRCode(box_size=10, border=2)
