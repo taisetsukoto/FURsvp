@@ -1009,6 +1009,302 @@
     border-color: var(--fursvp-border) !important;
 }
 
+/* Event create wizard */
+.event-wizard-page .event-editor-page-header {
+    border-radius: 1rem 1rem 0 0;
+}
+
+.event-wizard-progress {
+    background: var(--fursvp-surface);
+    border-left: 1px solid #e8eef5;
+    border-right: 1px solid #e8eef5;
+    padding: 1rem 1.25rem;
+    overflow-x: auto;
+}
+
+.event-wizard-progress-list {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.35rem;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    min-width: 560px;
+}
+
+.event-wizard-progress-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.45rem;
+    text-align: center;
+    position: relative;
+    cursor: pointer;
+}
+
+.event-wizard-progress-item:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    top: 15px;
+    left: calc(50% + 18px);
+    width: calc(100% - 36px);
+    height: 2px;
+    background: #e2e8f0;
+    z-index: 0;
+}
+
+.event-wizard-progress-item.completed:not(:last-child)::after,
+.event-wizard-progress-item.active:not(:last-child)::after {
+    background: #93c5fd;
+}
+
+.event-wizard-progress-dot {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: #f1f5f9;
+    border: 2px solid #e2e8f0;
+    font-size: 0.8125rem;
+    font-weight: 800;
+    color: #94a3b8;
+    transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.12s;
+}
+
+.event-wizard-progress-item.active .event-wizard-progress-dot {
+    background: linear-gradient(135deg, #2563eb, #3b82f6);
+    border-color: #2563eb;
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+}
+
+.event-wizard-progress-item.completed .event-wizard-progress-dot {
+    background: #eff6ff;
+    border-color: #2563eb;
+    color: #2563eb;
+}
+
+.event-wizard-progress-label {
+    font-size: 0.6875rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #94a3b8;
+    line-height: 1.2;
+}
+
+.event-wizard-progress-item.active .event-wizard-progress-label {
+    color: #2563eb;
+}
+
+.event-wizard-progress-item.completed .event-wizard-progress-label {
+    color: #64748b;
+}
+
+.event-wizard-body {
+    border-radius: 0 0 1rem 1rem;
+}
+
+.event-wizard-step {
+    display: none;
+}
+
+.event-wizard-step.active {
+    display: block;
+    animation: eventWizardFadeIn 0.25s ease;
+}
+
+@keyframes eventWizardFadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.event-wizard-step-header {
+    margin-bottom: 1rem;
+}
+
+.event-wizard-step-heading {
+    margin: 0 0 0.35rem;
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: #0f172a;
+    letter-spacing: -0.01em;
+}
+
+.event-wizard-step-desc {
+    margin: 0;
+    font-size: 0.9rem;
+    color: #64748b;
+    line-height: 1.5;
+    max-width: 36rem;
+}
+
+.event-wizard-step .event-editor-panel:last-child {
+    margin-bottom: 0;
+}
+
+.event-wizard-nav {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.65rem;
+    margin-top: 1.25rem;
+    padding-top: 1.15rem;
+    border-top: 1px solid #e8eef5;
+}
+
+.event-wizard-nav-spacer {
+    flex: 1;
+}
+
+.event-wizard-cancel {
+    text-decoration: none;
+}
+
+.event-wizard-submit {
+    background: linear-gradient(135deg, #059669, #10b981) !important;
+}
+
+.event-wizard-submit:hover {
+    background: linear-gradient(135deg, #047857, #059669) !important;
+}
+
+.event-wizard-alert {
+    padding: 0.85rem 1rem;
+    margin-bottom: 1rem;
+    border-radius: 0.75rem;
+    background: #fef2f2;
+    border: 1px solid #fecaca;
+    color: #b91c1c;
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
+.event-wizard-review-hint {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    margin-top: 0.85rem;
+    padding: 0.85rem 1rem;
+    border-radius: 0.75rem;
+    background: #eff6ff;
+    border: 1px solid #bfdbfe;
+    color: #1e40af;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    line-height: 1.45;
+}
+
+.event-wizard-review-hint .material-icons {
+    font-size: 1.15rem;
+    flex-shrink: 0;
+    margin-top: 0.05rem;
+}
+
+.event-wizard-form .is-invalid,
+.event-wizard-form .form-control.is-invalid,
+.event-wizard-form .form-select.is-invalid {
+    border-color: #dc3545 !important;
+    box-shadow: 0 0 0 2px rgba(220, 53, 69, 0.12);
+}
+
+@media (max-width: 768px) {
+    .event-wizard-progress {
+        padding: 0.85rem 1rem;
+    }
+
+    .event-wizard-progress-label {
+        display: none;
+    }
+
+    .event-wizard-progress-list {
+        min-width: 0;
+    }
+
+    .event-wizard-nav {
+        flex-direction: column-reverse;
+        align-items: stretch;
+    }
+
+    .event-wizard-nav-spacer {
+        display: none;
+    }
+
+    .event-wizard-nav .event-editor-btn {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+.dark-mode .event-wizard-progress {
+    background: var(--fursvp-surface) !important;
+    border-color: var(--fursvp-border) !important;
+}
+
+.dark-mode .event-wizard-progress-item:not(:last-child)::after {
+    background: var(--fursvp-border) !important;
+}
+
+.dark-mode .event-wizard-progress-item.completed:not(:last-child)::after,
+.dark-mode .event-wizard-progress-item.active:not(:last-child)::after {
+    background: #2563eb !important;
+}
+
+.dark-mode .event-wizard-progress-dot {
+    background: var(--fursvp-surface-elevated) !important;
+    border-color: var(--fursvp-border) !important;
+    color: var(--fursvp-text-muted) !important;
+}
+
+.dark-mode .event-wizard-progress-item.active .event-wizard-progress-dot {
+    background: linear-gradient(135deg, #2563eb, #3b82f6) !important;
+    color: #fff !important;
+}
+
+.dark-mode .event-wizard-progress-item.completed .event-wizard-progress-dot {
+    background: #1e3054 !important;
+    border-color: #2563eb !important;
+    color: #93c5fd !important;
+}
+
+.dark-mode .event-wizard-progress-label {
+    color: var(--fursvp-text-muted) !important;
+}
+
+.dark-mode .event-wizard-progress-item.active .event-wizard-progress-label {
+    color: #60a5fa !important;
+}
+
+.dark-mode .event-wizard-step-heading {
+    color: var(--fursvp-text) !important;
+}
+
+.dark-mode .event-wizard-step-desc {
+    color: var(--fursvp-text-muted) !important;
+}
+
+.dark-mode .event-wizard-nav {
+    border-top-color: var(--fursvp-border) !important;
+}
+
+.dark-mode .event-wizard-review-hint {
+    background: #1e3054 !important;
+    border-color: var(--fursvp-border) !important;
+    color: #93c5fd !important;
+}
+
+.dark-mode .event-wizard-alert {
+    background: #3f1d1d !important;
+    border-color: #7f1d1d !important;
+    color: #fca5a5 !important;
+}
+
 /* ===== event_detail.html (block 1) ===== */
 .card-body img {
         max-width: 100% !important;
