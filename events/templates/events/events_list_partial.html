@@ -1,8 +1,12 @@
 {% load dict_extras %}
-<div class="row" id="eventsGrid" style="display: flex;">
+<div class="home-events-grid" id="eventsGrid">
     {% for event in events %}
-    <div class="col-md-6 col-lg-4 mb-3">
-        <a href="{% url 'event_detail' event.id %}" class="home-event-card">
+    <a href="{% url 'event_detail' event.id %}" class="home-event-card">
+        <div class="home-event-card-date">
+            <span class="home-event-card-day">{{ event.date|date:"j" }}</span>
+            <span class="home-event-card-month">{{ event.date|date:"M" }}</span>
+        </div>
+        <div class="home-event-card-body">
             <div class="home-event-card-header">
                 <span class="home-event-card-group">
                     <i class="material-icons">groups</i>
@@ -27,8 +31,8 @@
             <h3 class="home-event-card-title">{{ event.title }}</h3>
             <div class="home-event-card-meta">
                 <span>
-                    <i class="material-icons">calendar_today</i>
-                    {{ event.date|date:"M j, Y" }}{% if event.start_time %} · {{ event.start_time|time:"g:i A" }}{% endif %}
+                    <i class="material-icons">schedule</i>
+                    {{ event.date|date:"l, M j" }}{% if event.start_time %} · {{ event.start_time|time:"g:i A" }}{% endif %}
                 </span>
                 {% if event.city %}
                 <span>
@@ -41,9 +45,9 @@
                 <span class="home-event-badge home-event-badge--rsvp">
                     <i class="material-icons">people</i>
                     {% if event.capacity %}
-                        {{ event.confirmed_count|default:0 }}/{{ event.capacity }} RSVPs
+                        {{ event.confirmed_count|default:0 }}/{{ event.capacity }}
                     {% else %}
-                        {{ event.confirmed_count|default:0 }} RSVPs
+                        {{ event.confirmed_count|default:0 }}
                     {% endif %}
                 </span>
                 {% if event.age_restriction == 'mature' %}
@@ -56,14 +60,18 @@
                 </span>
                 {% endif %}
             </div>
-        </a>
-    </div>
-    {% empty %}
-    <div class="col-12">
-        <div class="home-events-empty">
-            <i class="material-icons">event_busy</i>
-            <p>No upcoming events found.</p>
         </div>
+    </a>
+    {% empty %}
+    <div class="home-events-empty home-events-empty--full">
+        <div class="home-events-empty-icon">
+            <i class="material-icons">event_busy</i>
+        </div>
+        <h3 class="home-events-empty-title">No upcoming events</h3>
+        <p class="home-events-empty-text">Check back soon, or browse groups to find events near you.</p>
+        <a href="{% url 'groups_list' %}" class="home-events-empty-link">
+            <i class="material-icons">groups</i> Browse Groups
+        </a>
     </div>
     {% endfor %}
 </div>
@@ -72,6 +80,10 @@
     <div class="home-event-list">
         {% for event in events %}
         <a href="{% url 'event_detail' event.id %}" class="home-event-list-item">
+            <div class="home-event-list-date">
+                <span class="home-event-card-day">{{ event.date|date:"j" }}</span>
+                <span class="home-event-card-month">{{ event.date|date:"M" }}</span>
+            </div>
             <div class="home-event-list-body">
                 <div class="home-event-card-header">
                     <span class="home-event-card-group">
@@ -97,8 +109,8 @@
                 <h3 class="home-event-card-title">{{ event.title }}</h3>
                 <div class="home-event-card-meta">
                     <span>
-                        <i class="material-icons">calendar_today</i>
-                        {{ event.date|date:"M j, Y" }}{% if event.start_time %} · {{ event.start_time|time:"g:i A" }}{% endif %}
+                        <i class="material-icons">schedule</i>
+                        {{ event.date|date:"l, M j" }}{% if event.start_time %} · {{ event.start_time|time:"g:i A" }}{% endif %}
                     </span>
                     {% if event.city %}
                     <span>
@@ -111,9 +123,9 @@
                     <span class="home-event-badge home-event-badge--rsvp">
                         <i class="material-icons">people</i>
                         {% if event.capacity %}
-                            {{ event.confirmed_count|default:0 }}/{{ event.capacity }} RSVPs
+                            {{ event.confirmed_count|default:0 }}/{{ event.capacity }}
                         {% else %}
-                            {{ event.confirmed_count|default:0 }} RSVPs
+                            {{ event.confirmed_count|default:0 }}
                         {% endif %}
                     </span>
                     {% if event.age_restriction == 'mature' %}
@@ -127,18 +139,24 @@
         </a>
         {% empty %}
         <div class="home-events-empty">
-            <i class="material-icons">event_busy</i>
-            <p>No upcoming events found.</p>
+            <div class="home-events-empty-icon">
+                <i class="material-icons">event_busy</i>
+            </div>
+            <h3 class="home-events-empty-title">No upcoming events</h3>
+            <p class="home-events-empty-text">Check back soon, or browse groups to find events near you.</p>
+            <a href="{% url 'groups_list' %}" class="home-events-empty-link">
+                <i class="material-icons">groups</i> Browse Groups
+            </a>
         </div>
         {% endfor %}
     </div>
 </div>
 
-<div id="loadingSpinner" class="text-center py-4" style="display: none;">
-    <div class="spinner-border text-primary" role="status" style="width: 2rem; height: 2rem;">
+<div id="loadingSpinner" class="home-events-loading" style="display: none;">
+    <div class="spinner-border text-primary" role="status">
         <span class="visually-hidden">Loading...</span>
     </div>
-    <p class="mt-2 mb-0 text-muted" style="font-size: 0.875rem;">Loading events...</p>
+    <p>Loading events…</p>
 </div>
 
 {% if paginator.num_pages > 1 %}
