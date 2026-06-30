@@ -52,6 +52,20 @@ from django.urls import reverse_lazy
 
 # Create your views here.
 
+@require_POST
+@ensure_csrf_cookie
+def store_client_ip(request):
+    """Store the browser-detected public IP when Docker hides the real client address."""
+    from fursvp.ip_utils import is_trusted_proxy, store_client_ip_in_session
+
+    if not is_trusted_proxy(request.META.get('REMOTE_ADDR')):
+        return JsonResponse({'ok': False}, status=403)
+
+    if store_client_ip_in_session(request, request.POST.get('ip', '')):
+        return JsonResponse({'ok': True})
+    return JsonResponse({'ok': False}, status=400)
+
+
 def register(request):
     remote_ip = get_client_ip(request)
     if request.method == 'POST':
@@ -309,8 +323,7 @@ def ban_user(request, user_id):
                     action='user_unbanned',
                     description=f'Unbanned {target_user.username} from site-wide access',
                     target_user=target_user,
-                    ip_address=request.META.get('REMOTE_ADDR'),
-                    user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                    request=request,
                     additional_data={
                         'ban_type': 'sitewide',
                         'reason': 'Unbanned from admin panel'
@@ -331,8 +344,7 @@ def ban_user(request, user_id):
                     description=f'Unbanned {target_user.username} from group {group.name}',
                     target_user=target_user,
                     group=group,
-                    ip_address=request.META.get('REMOTE_ADDR'),
-                    user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                    request=request,
                     additional_data={
                         'ban_type': 'group',
                         'group_name': group.name,
@@ -355,8 +367,7 @@ def ban_user(request, user_id):
                         action='user_banned',
                         description=f'Banned {target_user.username} from site-wide access',
                         target_user=target_user,
-                        ip_address=request.META.get('REMOTE_ADDR'),
-                        user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                        request=request,
                         additional_data={
                             'ban_type': 'sitewide',
                             'reason': reason or 'Banned from admin panel',
@@ -392,8 +403,7 @@ def ban_user(request, user_id):
                         description=f'Banned {target_user.username} from group {group.name}',
                         target_user=target_user,
                         group=group,
-                        ip_address=request.META.get('REMOTE_ADDR'),
-                        user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                        request=request,
                         additional_data={
                             'ban_type': 'group',
                             'group_name': group.name,
@@ -466,8 +476,7 @@ def ban_group_user(request):
                 description=f'Banned {target_user.username} from group {group.name}',
                 target_user=target_user,
                 group=group,
-                ip_address=request.META.get('REMOTE_ADDR'),
-                user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                request=request,
                 additional_data={
                     'ban_type': 'group',
                     'group_name': group.name,
@@ -673,8 +682,7 @@ def administration(request):
                             action='user_profile_updated',
                             description=f'Updated profile for user {user_obj.username}',
                             target_user=user_obj,
-                            ip_address=request.META.get('REMOTE_ADDR'),
-                            user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                            request=request,
                             additional_data={
                                 'old_data': old_data,
                                 'new_data': new_data,
@@ -708,8 +716,7 @@ def administration(request):
                         action='group_created',
                         description=f'Created new group: {group.name}',
                         group=group,
-                        ip_address=request.META.get('REMOTE_ADDR'),
-                        user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                        request=request,
                         additional_data={
                             'group_name': group.name,
                             'group_description': group.description,
@@ -739,8 +746,7 @@ def administration(request):
                                 action='group_renamed',
                                 description=f'Renamed group from "{old_name}" to "{group.name}"',
                                 group=group,
-                                ip_address=request.META.get('REMOTE_ADDR'),
-                                user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                                request=request,
                                 additional_data={
                                     'old_name': old_name,
                                     'new_name': group.name
@@ -764,8 +770,7 @@ def administration(request):
                         user=request.user,
                         action='group_deleted',
                         description=f'Deleted group: {group_name}',
-                        ip_address=request.META.get('REMOTE_ADDR'),
-                        user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                        request=request,
                         additional_data={
                             'group_name': group_name,
                             'group_id': group_id
@@ -801,8 +806,7 @@ def administration(request):
                 user=request.user,
                 action='bulk_notification_sent',
                 description=f'Sent bulk notification to {users.count()} users: {message[:100]}{"..." if len(message) > 100 else ""}',
-                ip_address=request.META.get('REMOTE_ADDR'),
-                user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                request=request,
                 additional_data={
                     'message': message,
                     'link': link,
@@ -842,8 +846,7 @@ def administration(request):
                         user=request.user,
                         action='banner_updated',
                         description=f'Updated site banner with {banner_type} style: {banner_text[:100]}{"..." if len(banner_text) > 100 else ""}',
-                        ip_address=request.META.get('REMOTE_ADDR'),
-                        user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                        request=request,
                         additional_data={
                             'banner_text': banner_text,
                             'banner_type': banner_type,
@@ -856,8 +859,7 @@ def administration(request):
                         user=request.user,
                         action='banner_disabled',
                         description='Disabled site banner',
-                        ip_address=request.META.get('REMOTE_ADDR'),
-                        user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                        request=request,
                         additional_data={
                             'banner_enabled': banner_enabled
                         }
@@ -882,8 +884,7 @@ def administration(request):
                     user=request.user,
                     action='other',
                     description=f'Added blocked term: {term_obj.term}',
-                    ip_address=get_client_ip(request),
-                    user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                    request=request,
                     additional_data={
                         'term': term_obj.term,
                         'match_mode': term_obj.match_mode,
@@ -920,8 +921,7 @@ def administration(request):
                     user=request.user,
                     action='other',
                     description=f'Deleted blocked term: {term_label}',
-                    ip_address=get_client_ip(request),
-                    user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                    request=request,
                     additional_data={'term': term_label},
                 )
                 messages.success(request, f'Deleted blocked term "{term_label}".', extra_tags='admin_notification')
@@ -941,8 +941,7 @@ def administration(request):
                     user=request.user,
                     action='other',
                     description='Re-imported CMU blocked terms list',
-                    ip_address=get_client_ip(request),
-                    user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                    request=request,
                 )
             except Exception as exc:
                 messages.error(request, f'CMU import failed: {exc}', extra_tags='admin_notification')
@@ -1001,8 +1000,7 @@ def delete_bluesky_post(request):
             user=request.user,
             action='blog_post_deleted',
             description=f'Deleted blog post from Bluesky',
-            ip_address=request.META.get('REMOTE_ADDR'),
-            user_agent=request.META.get('HTTP_USER_AGENT', ''),
+            request=request,
             additional_data={
                 'uri': uri,
                 'platform': 'Bluesky'
@@ -1252,8 +1250,7 @@ def post_to_bluesky(request):
                     user=request.user,
                     action='blog_post_created',
                     description=f'Created blog post: {title}',
-                    ip_address=request.META.get('REMOTE_ADDR'),
-                    user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                    request=request,
                     additional_data={
                         'title': title,
                         'content_length': len(content),

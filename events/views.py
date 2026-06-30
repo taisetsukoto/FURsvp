@@ -350,8 +350,7 @@ def event_detail(request, event_id):
                         group=event.group,
                         event=event,
                         target_user=request.user,
-                        ip_address=request.META.get('REMOTE_ADDR'),
-                        user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                        request=request,
                         additional_data={
                             'previous_status': user_rsvp.status,
                             'was_confirmed': was_confirmed
@@ -395,8 +394,7 @@ def event_detail(request, event_id):
                 description=f'Deleted event: {event_title}',
                 group=event.group,
                 event=event,
-                ip_address=request.META.get('REMOTE_ADDR'),
-                user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                request=request,
                 additional_data={
                     'event_title': event_title,
                     'event_date': event.date.isoformat(),
@@ -447,8 +445,7 @@ def event_detail(request, event_id):
                     group=event.group,
                     event=event,
                     target_user=request.user,
-                    ip_address=request.META.get('REMOTE_ADDR'),
-                    user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                    request=request,
                     additional_data={
                         'old_status': user_rsvp.status,
                         'new_status': new_status,
@@ -464,8 +461,7 @@ def event_detail(request, event_id):
                     group=event.group,
                     event=event,
                     target_user=request.user,
-                    ip_address=request.META.get('REMOTE_ADDR'),
-                    user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                    request=request,
                     additional_data={
                         'status': new_status,
                         'rsvp_id': rsvp.id
@@ -536,8 +532,7 @@ def event_detail(request, event_id):
                     group=event.group,
                     event=event,
                     target_user=rsvp_to_update.user,
-                    ip_address=request.META.get('REMOTE_ADDR'),
-                    user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                    request=request,
                     additional_data={
                         'old_status': old_status,
                         'new_status': new_status,
@@ -722,8 +717,7 @@ def create_event(request):
                 description=f'Created new event: {event.title}',
                 group=event.group,
                 event=event,
-                ip_address=request.META.get('REMOTE_ADDR'),
-                user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                request=request,
                 additional_data={
                     'event_title': event.title,
                     'event_date': event.date.isoformat(),
@@ -794,8 +788,7 @@ def edit_event(request, event_id):
                 description=f'Updated event: {event.title}',
                 group=event.group,
                 event=event,
-                ip_address=request.META.get('REMOTE_ADDR'),
-                user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                request=request,
                 additional_data={
                     'old_data': old_data,
                     'new_data': {
