@@ -5,6 +5,7 @@ from .views import CustomPasswordResetView, CustomPasswordResetDoneView, CustomP
 
 urlpatterns = [
     path('register/', views.register, name='register'),
+    path('client-ip/', views.store_client_ip, name='store_client_ip'),
     path('register/success/', views.registration_success, name='registration_success'),
     path('pending-approval/', views.pending_approval, name='pending_approval'),
     path('login/', views.custom_login, name='login'),

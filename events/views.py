@@ -90,12 +90,11 @@ def home(request):
     search_query = request.GET.get('search', '').strip()
     state_filter = request.GET.get('state', '').strip()
     
-    # Base queryset - filter out events that have already passed and cancelled events
+    # Base queryset - show events until they end (not just until they start)
     now = timezone.now()
     events = Event.objects.filter(
-        models.Q(date__gt=now.date()) | 
-        (models.Q(date=now.date()) & models.Q(end_time__gt=now.time())),
-        status='active'  # Only show active events
+        Event.active_not_ended_q(now),
+        status='active',
     )
 
     if filter_adult == 'false':
@@ -184,17 +183,22 @@ def home(request):
             end_date = datetime(year, month + 1, 1).date()
         
         month_events = events.filter(
-            date__gte=start_date,
-            date__lt=end_date
+            Event.overlaps_date_range_q(start_date, end_date),
         ).order_by('date', 'start_time')
         
-        # Group events by date
+        # Group events by each day they span within this month
         events_by_date = {}
+        month_last_day = end_date - timedelta(days=1)
         for event in month_events:
-            date_key = event.date.strftime('%Y-%m-%d')
-            if date_key not in events_by_date:
-                events_by_date[date_key] = []
-            events_by_date[date_key].append(event)
+            span_start = max(event.date, start_date)
+            span_end = min(event.effective_end_date, month_last_day)
+            current = span_start
+            while current <= span_end:
+                date_key = current.strftime('%Y-%m-%d')
+                if date_key not in events_by_date:
+                    events_by_date[date_key] = []
+                events_by_date[date_key].append(event)
+                current += timedelta(days=1)
         
         # Navigation
         prev_month = month - 1 if month > 1 else 12
@@ -350,8 +354,7 @@ def event_detail(request, event_id):
                         group=event.group,
                         event=event,
                         target_user=request.user,
-                        ip_address=request.META.get('REMOTE_ADDR'),
-                        user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                        request=request,
                         additional_data={
                             'previous_status': user_rsvp.status,
                             'was_confirmed': was_confirmed
@@ -395,8 +398,7 @@ def event_detail(request, event_id):
                 description=f'Deleted event: {event_title}',
                 group=event.group,
                 event=event,
-                ip_address=request.META.get('REMOTE_ADDR'),
-                user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                request=request,
                 additional_data={
                     'event_title': event_title,
                     'event_date': event.date.isoformat(),
@@ -447,8 +449,7 @@ def event_detail(request, event_id):
                     group=event.group,
                     event=event,
                     target_user=request.user,
-                    ip_address=request.META.get('REMOTE_ADDR'),
-                    user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                    request=request,
                     additional_data={
                         'old_status': user_rsvp.status,
                         'new_status': new_status,
@@ -464,8 +465,7 @@ def event_detail(request, event_id):
                     group=event.group,
                     event=event,
                     target_user=request.user,
-                    ip_address=request.META.get('REMOTE_ADDR'),
-                    user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                    request=request,
                     additional_data={
                         'status': new_status,
                         'rsvp_id': rsvp.id
@@ -536,8 +536,7 @@ def event_detail(request, event_id):
                     group=event.group,
                     event=event,
                     target_user=rsvp_to_update.user,
-                    ip_address=request.META.get('REMOTE_ADDR'),
-                    user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                    request=request,
                     additional_data={
                         'old_status': old_status,
                         'new_status': new_status,
@@ -722,8 +721,7 @@ def create_event(request):
                 description=f'Created new event: {event.title}',
                 group=event.group,
                 event=event,
-                ip_address=request.META.get('REMOTE_ADDR'),
-                user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                request=request,
                 additional_data={
                     'event_title': event.title,
                     'event_date': event.date.isoformat(),
@@ -794,8 +792,7 @@ def edit_event(request, event_id):
                 description=f'Updated event: {event.title}',
                 group=event.group,
                 event=event,
-                ip_address=request.META.get('REMOTE_ADDR'),
-                user_agent=request.META.get('HTTP_USER_AGENT', ''),
+                request=request,
                 additional_data={
                     'old_data': old_data,
                     'new_data': {
@@ -1101,8 +1098,7 @@ def event_calendar(request):
         end_date = datetime(year, month + 1, 1).date()
 
     events_qs = Event.objects.filter(
-        date__gte=start_date,
-        date__lt=end_date,
+        Event.overlaps_date_range_q(start_date, end_date),
         status='active',
     ).select_related('group').annotate(
         confirmed_count=models.Count('rsvps', filter=models.Q(rsvps__status='confirmed'))
@@ -1142,9 +1138,15 @@ def event_calendar(request):
             event.user_rsvp_list = []
 
     events_by_date = {}
+    month_last_day = end_date - timedelta(days=1)
     for event in month_events:
-        date_key = event.date.strftime('%Y-%m-%d')
-        events_by_date.setdefault(date_key, []).append(event)
+        span_start = max(event.date, start_date)
+        span_end = min(event.effective_end_date, month_last_day)
+        current = span_start
+        while current <= span_end:
+            date_key = current.strftime('%Y-%m-%d')
+            events_by_date.setdefault(date_key, []).append(event)
+            current += timedelta(days=1)
 
     prev_month = month - 1 if month > 1 else 12
     prev_year = year if month > 1 else year - 1
@@ -1451,10 +1453,7 @@ def blog(request):
 
 
 def _event_not_ended_filter(now):
-    return (
-        Q(event__date__gt=now.date()) |
-        (Q(event__date=now.date()) & Q(event__end_time__gt=now.time()))
-    )
+    return Event.active_not_ended_q(now, prefix='event__')
 
 
 @login_required

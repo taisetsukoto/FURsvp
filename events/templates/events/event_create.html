@@ -4,188 +4,289 @@
 
 {% block content %}
 <div class="container py-4">
-    <div class="event-editor-page">
+    <div class="event-editor-page event-wizard-page">
         <div class="event-editor-page-header">
             <div class="event-editor-page-header-icon">
                 <i class="material-icons">event_available</i>
             </div>
             <div>
                 <h1 class="event-editor-page-title">Create New Event</h1>
-                <p class="event-editor-page-subtitle">Fill in the details below to publish your event</p>
+                <p class="event-editor-page-subtitle">Step <span id="wizardCurrentLabel">1</span> of 6 — <span id="wizardStepTitle">Basics</span></p>
             </div>
         </div>
 
-        <form method="post" class="needs-validation event-editor-form" novalidate>
+        <nav class="event-wizard-progress" aria-label="Event creation progress">
+            <ol class="event-wizard-progress-list">
+                <li class="event-wizard-progress-item active" data-step="1">
+                    <span class="event-wizard-progress-dot">1</span>
+                    <span class="event-wizard-progress-label">Basics</span>
+                </li>
+                <li class="event-wizard-progress-item" data-step="2">
+                    <span class="event-wizard-progress-dot">2</span>
+                    <span class="event-wizard-progress-label">Schedule</span>
+                </li>
+                <li class="event-wizard-progress-item" data-step="3">
+                    <span class="event-wizard-progress-dot">3</span>
+                    <span class="event-wizard-progress-label">Location</span>
+                </li>
+                <li class="event-wizard-progress-item" data-step="4">
+                    <span class="event-wizard-progress-dot">4</span>
+                    <span class="event-wizard-progress-label">Accessibility</span>
+                </li>
+                <li class="event-wizard-progress-item" data-step="5">
+                    <span class="event-wizard-progress-dot">5</span>
+                    <span class="event-wizard-progress-label">Questions</span>
+                </li>
+                <li class="event-wizard-progress-item" data-step="6">
+                    <span class="event-wizard-progress-dot">6</span>
+                    <span class="event-wizard-progress-label">Agreements</span>
+                </li>
+            </ol>
+        </nav>
+
+        <form method="post" class="needs-validation event-editor-form event-wizard-form" id="createEventWizardForm" novalidate>
             {% csrf_token %}
-            <div class="event-editor-body">
-                <div class="event-editor-panel">
-                    <h6 class="event-editor-section-label">Basic info</h6>
-                    <div class="auth-field">
-                        <label for="{{ form.title.id_for_label }}" class="auth-form-label">Event title</label>
-                        <div class="input-group auth-input-group">
-                            <span class="input-group-text"><i class="material-icons">event_note</i></span>
-                            {{ form.title }}
-                        </div>
-                        {% if form.title.errors %}<div class="invalid-feedback d-block">{{ form.title.errors }}</div>{% endif %}
-                    </div>
-                    <div class="auth-field mb-0">
-                        <label for="{{ form.group.id_for_label }}" class="auth-form-label">Group</label>
-                        <div class="input-group auth-input-group">
-                            <span class="input-group-text"><i class="material-icons">groups</i></span>
-                            {{ form.group|add_class:'form-select' }}
-                        </div>
-                        {% if form.group.errors %}<div class="invalid-feedback d-block">{{ form.group.errors }}</div>{% endif %}
-                    </div>
-                </div>
+            <div class="event-editor-body event-wizard-body">
 
-                <div class="event-editor-panel">
-                    <h6 class="event-editor-section-label">Date &amp; time</h6>
-                    <div class="event-editor-grid event-editor-grid--3">
-                        <div class="auth-field mb-0">
-                            <label for="{{ form.date.id_for_label }}" class="auth-form-label">Date</label>
+                {% if form.non_field_errors %}
+                <div class="event-wizard-alert" role="alert">
+                    {{ form.non_field_errors }}
+                </div>
+                {% endif %}
+
+                <!-- Step 1: Title, group, description -->
+                <div class="event-wizard-step active" data-step="1" data-step-title="Basics">
+                    <div class="event-wizard-step-header">
+                        <h2 class="event-wizard-step-heading">Event basics</h2>
+                        <p class="event-wizard-step-desc">Give your event a name, pick a group, and describe what attendees can expect.</p>
+                    </div>
+                    <div class="event-editor-panel">
+                        <div class="auth-field">
+                            <label for="{{ form.title.id_for_label }}" class="auth-form-label">Event title</label>
                             <div class="input-group auth-input-group">
-                                <span class="input-group-text"><i class="material-icons">calendar_today</i></span>
-                                {{ form.date|attr:'placeholder:Select date' }}
+                                <span class="input-group-text"><i class="material-icons">event_note</i></span>
+                                {{ form.title }}
                             </div>
+                            {% if form.title.errors %}<div class="invalid-feedback d-block">{{ form.title.errors }}</div>{% endif %}
                         </div>
-                        <div class="auth-field mb-0">
-                            <label for="{{ form.start_time.id_for_label }}" class="auth-form-label">Start time</label>
+                        <div class="auth-field">
+                            <label for="{{ form.group.id_for_label }}" class="auth-form-label">Group</label>
                             <div class="input-group auth-input-group">
-                                <span class="input-group-text"><i class="material-icons">schedule</i></span>
-                                {{ form.start_time|attr:'placeholder:Start time'|attr:'required' }}
+                                <span class="input-group-text"><i class="material-icons">groups</i></span>
+                                {{ form.group|add_class:'form-select' }}
                             </div>
+                            {% if form.group.errors %}<div class="invalid-feedback d-block">{{ form.group.errors }}</div>{% endif %}
                         </div>
                         <div class="auth-field mb-0">
-                            <label for="{{ form.end_time.id_for_label }}" class="auth-form-label">End time</label>
+                            <label for="{{ form.description.id_for_label }}" class="auth-form-label">Description</label>
+                            {{ form.description }}
+                            {% if form.description.errors %}<div class="invalid-feedback d-block">{{ form.description.errors }}</div>{% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 2: Date & time -->
+                <div class="event-wizard-step" data-step="2" data-step-title="Schedule">
+                    <div class="event-wizard-step-header">
+                        <h2 class="event-wizard-step-heading">Date &amp; time</h2>
+                        <p class="event-wizard-step-desc">When does your event start and end? Times use the local timezone for the event location (set on the next step).</p>
+                    </div>
+                    <div class="event-editor-panel">
+                        <div class="event-editor-grid event-editor-grid--4">
+                            <div class="auth-field mb-0">
+                                <label for="{{ form.date.id_for_label }}" class="auth-form-label">Start date</label>
+                                <div class="input-group auth-input-group">
+                                    <span class="input-group-text"><i class="material-icons">calendar_today</i></span>
+                                    {{ form.date|attr:'placeholder:Start date' }}
+                                </div>
+                                {% if form.date.errors %}<div class="invalid-feedback d-block">{{ form.date.errors }}</div>{% endif %}
+                            </div>
+                            <div class="auth-field mb-0">
+                                <label for="{{ form.end_date.id_for_label }}" class="auth-form-label">End date <span class="text-muted">(optional)</span></label>
+                                <div class="input-group auth-input-group">
+                                    <span class="input-group-text"><i class="material-icons">event</i></span>
+                                    {{ form.end_date|attr:'placeholder:Same as start' }}
+                                </div>
+                                {% if form.end_date.errors %}<div class="invalid-feedback d-block">{{ form.end_date.errors }}</div>{% endif %}
+                                <div class="auth-field-help">Leave blank for single-day events.</div>
+                            </div>
+                            <div class="auth-field mb-0">
+                                <label for="{{ form.start_time.id_for_label }}" class="auth-form-label">Start time</label>
+                                <div class="input-group auth-input-group">
+                                    <span class="input-group-text"><i class="material-icons">schedule</i></span>
+                                    {{ form.start_time|attr:'placeholder:Start time'|attr:'required' }}
+                                </div>
+                                {% if form.start_time.errors %}<div class="invalid-feedback d-block">{{ form.start_time.errors }}</div>{% endif %}
+                            </div>
+                            <div class="auth-field mb-0">
+                                <label for="{{ form.end_time.id_for_label }}" class="auth-form-label">End time</label>
+                                <div class="input-group auth-input-group">
+                                    <span class="input-group-text"><i class="material-icons">schedule</i></span>
+                                    {{ form.end_time|attr:'placeholder:End time'|attr:'required' }}
+                                </div>
+                                {% if form.end_time.errors %}<div class="invalid-feedback d-block">{{ form.end_time.errors }}</div>{% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="event-editor-panel">
+                        <h6 class="event-editor-section-label">Event settings</h6>
+                        <div class="event-editor-grid">
+                            <div class="auth-field mb-0">
+                                <label for="{{ form.age_restriction.id_for_label }}" class="auth-form-label">Age restriction</label>
+                                <div class="input-group auth-input-group">
+                                    <span class="input-group-text"><i class="material-icons">block</i></span>
+                                    {{ form.age_restriction|add_class:'form-select' }}
+                                </div>
+                                {% if form.age_restriction.errors %}<div class="invalid-feedback d-block">{{ form.age_restriction.errors }}</div>{% endif %}
+                            </div>
+                            <div class="auth-field mb-0">
+                                <label for="{{ form.capacity.id_for_label }}" class="auth-form-label">Capacity <span class="text-muted">(optional)</span></label>
+                                <div class="input-group auth-input-group">
+                                    <span class="input-group-text"><i class="material-icons">people_alt</i></span>
+                                    {{ form.capacity|attr:'placeholder:No limit' }}
+                                </div>
+                                {% if form.capacity.errors %}<div class="invalid-feedback d-block">{{ form.capacity.errors }}</div>{% endif %}
+                            </div>
+                        </div>
+                        <div class="event-editor-perms mt-3">
+                            <label class="event-editor-perm">
+                                {{ form.waitlist_enabled }}
+                                <span>Enable waitlist</span>
+                            </label>
+                            {% if form.waitlist_enabled.errors %}<div class="invalid-feedback d-block">{{ form.waitlist_enabled.errors }}</div>{% endif %}
+                            <label class="event-editor-perm">
+                                {{ form.attendee_list_public }}
+                                <span>Public attendee list</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 3: Location -->
+                <div class="event-wizard-step" data-step="3" data-step-title="Location">
+                    <div class="event-wizard-step-header">
+                        <h2 class="event-wizard-step-heading">Location</h2>
+                        <p class="event-wizard-step-desc">Where will your event take place? The state sets the event timezone used for start/end times. All fields are optional for online or TBA events.</p>
+                    </div>
+                    <div class="event-editor-panel">
+                        <div class="auth-field">
+                            <label for="{{ form.address.id_for_label }}" class="auth-form-label">Street address</label>
                             <div class="input-group auth-input-group">
-                                <span class="input-group-text"><i class="material-icons">schedule</i></span>
-                                {{ form.end_time|attr:'placeholder:End time'|attr:'required' }}
+                                <span class="input-group-text"><i class="material-icons">place</i></span>
+                                {{ form.address|attr:'placeholder:Street address' }}
+                                <button type="button" id="locationButton" class="input-group-text input-group-text--action" title="Use my location">
+                                    <i class="material-icons">my_location</i>
+                                </button>
+                            </div>
+                            {% if form.address.errors %}<div class="invalid-feedback d-block">{{ form.address.errors }}</div>{% endif %}
+                        </div>
+                        <div class="event-editor-grid">
+                            <div class="auth-field mb-0">
+                                <label for="{{ form.city.id_for_label }}" class="auth-form-label">City</label>
+                                <div class="input-group auth-input-group">
+                                    <span class="input-group-text"><i class="material-icons">location_city</i></span>
+                                    {{ form.city|attr:'placeholder:City' }}
+                                </div>
+                                {% if form.city.errors %}<div class="invalid-feedback d-block">{{ form.city.errors }}</div>{% endif %}
+                            </div>
+                            <div class="auth-field mb-0">
+                                <label for="{{ form.state.id_for_label }}" class="auth-form-label">State</label>
+                                <div class="input-group auth-input-group">
+                                    <span class="input-group-text"><i class="material-icons">map</i></span>
+                                    {{ form.state|add_class:'form-select' }}
+                                </div>
+                                {% if form.state.errors %}<div class="invalid-feedback d-block">{{ form.state.errors }}</div>{% endif %}
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <div class="event-editor-panel">
-                    <h6 class="event-editor-section-label">Location</h6>
-                    <div class="auth-field">
-                        <label for="{{ form.address.id_for_label }}" class="auth-form-label">Street address</label>
-                        <div class="input-group auth-input-group">
-                            <span class="input-group-text"><i class="material-icons">place</i></span>
-                            {{ form.address|attr:'placeholder:Street address' }}
-                            <button type="button" id="locationButton" class="input-group-text input-group-text--action" title="Use my location">
-                                <i class="material-icons">my_location</i>
-                            </button>
-                        </div>
+                <!-- Step 4: Accessibility -->
+                <div class="event-wizard-step" data-step="4" data-step-title="Accessibility">
+                    <div class="event-wizard-step-header">
+                        <h2 class="event-wizard-step-heading">Accessibility</h2>
+                        <p class="event-wizard-step-desc">Help attendees know what to expect. Leave blank if not applicable.</p>
                     </div>
-                    <div class="event-editor-grid">
+                    <div class="event-editor-panel">
                         <div class="auth-field mb-0">
-                            <label for="{{ form.city.id_for_label }}" class="auth-form-label">City</label>
-                            <div class="input-group auth-input-group">
-                                <span class="input-group-text"><i class="material-icons">location_city</i></span>
-                                {{ form.city|attr:'placeholder:City' }}
-                            </div>
+                            <label for="{{ form.accessibility_details.id_for_label }}" class="auth-form-label">Accessibility details</label>
+                            {{ form.accessibility_details }}
+                            <div class="auth-field-help">Examples: wheelchair access, ASL interpreter, scent-free policy, quiet room.</div>
+                            {% if form.accessibility_details.errors %}<div class="invalid-feedback d-block">{{ form.accessibility_details.errors }}</div>{% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 5: RSVP questions -->
+                <div class="event-wizard-step" data-step="5" data-step-title="Questions" id="rsvp-questions-section">
+                    <div class="event-wizard-step-header">
+                        <h2 class="event-wizard-step-heading">RSVP questions</h2>
+                        <p class="event-wizard-step-desc">Ask custom questions when people RSVP. Leave blank to skip.</p>
+                    </div>
+                    <div class="event-editor-panel">
+                        <div class="auth-field">
+                            <label for="{{ form.question1_text.id_for_label }}" class="auth-form-label">Question 1</label>
+                            {{ form.question1_text }}
+                            <div class="auth-field-help">Leave blank to disable.</div>
+                            {% if form.question1_text.errors %}<div class="invalid-feedback d-block">{{ form.question1_text.errors }}</div>{% endif %}
+                        </div>
+                        <div class="auth-field">
+                            <label for="{{ form.question2_text.id_for_label }}" class="auth-form-label">Question 2</label>
+                            {{ form.question2_text }}
+                            <div class="auth-field-help">Leave blank to disable.</div>
+                            {% if form.question2_text.errors %}<div class="invalid-feedback d-block">{{ form.question2_text.errors }}</div>{% endif %}
                         </div>
                         <div class="auth-field mb-0">
-                            <label for="{{ form.state.id_for_label }}" class="auth-form-label">State</label>
-                            <div class="input-group auth-input-group">
-                                <span class="input-group-text"><i class="material-icons">map</i></span>
-                                {{ form.state|add_class:'form-select' }}
-                            </div>
+                            <label for="{{ form.question3_text.id_for_label }}" class="auth-form-label">Question 3</label>
+                            {{ form.question3_text }}
+                            <div class="auth-field-help">Leave blank to disable.</div>
+                            {% if form.question3_text.errors %}<div class="invalid-feedback d-block">{{ form.question3_text.errors }}</div>{% endif %}
                         </div>
                     </div>
                 </div>
 
-                <div class="event-editor-panel">
-                    <h6 class="event-editor-section-label">Event settings</h6>
-                    <div class="event-editor-grid">
-                        <div class="auth-field mb-0">
-                            <label for="{{ form.age_restriction.id_for_label }}" class="auth-form-label">Age restriction</label>
-                            <div class="input-group auth-input-group">
-                                <span class="input-group-text"><i class="material-icons">block</i></span>
-                                {{ form.age_restriction|add_class:'form-select' }}
-                            </div>
+                <!-- Step 6: Agreements -->
+                <div class="event-wizard-step" data-step="6" data-step-title="Agreements">
+                    <div class="event-wizard-step-header">
+                        <h2 class="event-wizard-step-heading">Review &amp; agree</h2>
+                        <p class="event-wizard-step-desc">Confirm the required agreements before publishing your event.</p>
+                    </div>
+                    <div class="event-editor-panel">
+                        <div class="event-editor-agreements">
+                            <label class="event-editor-agreement">
+                                {{ form.eula_agreement }}
+                                <span>{{ form.eula_agreement.label }}
+                                    <a href="{% url 'eula' %}" target="_blank" rel="noopener">View EULA</a>
+                                </span>
+                            </label>
+                            {% if form.eula_agreement.errors %}<div class="invalid-feedback d-block">{{ form.eula_agreement.errors }}</div>{% endif %}
+                            <label class="event-editor-agreement">
+                                {{ form.state_agreement }}
+                                <span>{{ form.state_agreement.label }}</span>
+                            </label>
+                            {% if form.state_agreement.errors %}<div class="invalid-feedback d-block">{{ form.state_agreement.errors }}</div>{% endif %}
                         </div>
-                        <div class="auth-field mb-0">
-                            <label for="{{ form.capacity.id_for_label }}" class="auth-form-label">Capacity <span class="text-muted">(optional)</span></label>
-                            <div class="input-group auth-input-group">
-                                <span class="input-group-text"><i class="material-icons">people_alt</i></span>
-                                {{ form.capacity|attr:'placeholder:No limit' }}
-                            </div>
-                            {% if form.capacity.errors %}<div class="invalid-feedback d-block">{{ form.capacity.errors }}</div>{% endif %}
-                        </div>
                     </div>
-                    <div class="event-editor-perms mt-3">
-                        <label class="event-editor-perm">
-                            {{ form.waitlist_enabled }}
-                            <span>Enable waitlist</span>
-                        </label>
-                        <label class="event-editor-perm">
-                            {{ form.attendee_list_public }}
-                            <span>Public attendee list</span>
-                        </label>
+                    <div class="event-wizard-review-hint">
+                        <i class="material-icons">info</i>
+                        <span>You can edit your event after it's published from the event page.</span>
                     </div>
                 </div>
 
-                <div class="event-editor-panel">
-                    <h6 class="event-editor-section-label">Accessibility</h6>
-                    <div class="auth-field mb-0">
-                        <label for="{{ form.accessibility_details.id_for_label }}" class="auth-form-label">Accessibility details</label>
-                        {{ form.accessibility_details }}
-                        <div class="auth-field-help">Leave blank if not accessible.</div>
-                    </div>
-                </div>
-
-                <div class="event-editor-panel" id="rsvp-questions-section">
-                    <h6 class="event-editor-section-label">RSVP questions</h6>
-                    <div class="auth-field">
-                        <label for="{{ form.question1_text.id_for_label }}" class="auth-form-label">Question 1</label>
-                        {{ form.question1_text }}
-                        <div class="auth-field-help">Leave blank to disable.</div>
-                    </div>
-                    <div class="auth-field">
-                        <label for="{{ form.question2_text.id_for_label }}" class="auth-form-label">Question 2</label>
-                        {{ form.question2_text }}
-                        <div class="auth-field-help">Leave blank to disable.</div>
-                    </div>
-                    <div class="auth-field mb-0">
-                        <label for="{{ form.question3_text.id_for_label }}" class="auth-form-label">Question 3</label>
-                        {{ form.question3_text }}
-                        <div class="auth-field-help">Leave blank to disable.</div>
-                    </div>
-                </div>
-
-                <div class="event-editor-panel">
-                    <h6 class="event-editor-section-label">Description</h6>
-                    <div class="auth-field mb-0">
-                        {{ form.description }}
-                    </div>
-                </div>
-
-                <div class="event-editor-panel">
-                    <h6 class="event-editor-section-label">Required agreements</h6>
-                    <div class="event-editor-agreements">
-                        <label class="event-editor-agreement">
-                            {{ form.eula_agreement }}
-                            <span>{{ form.eula_agreement.label }}
-                                <a href="{% url 'eula' %}" target="_blank" rel="noopener">View EULA</a>
-                            </span>
-                        </label>
-                        {% if form.eula_agreement.errors %}<div class="invalid-feedback d-block">{{ form.eula_agreement.errors }}</div>{% endif %}
-                        <label class="event-editor-agreement">
-                            {{ form.state_agreement }}
-                            <span>{{ form.state_agreement.label }}</span>
-                        </label>
-                        {% if form.state_agreement.errors %}<div class="invalid-feedback d-block">{{ form.state_agreement.errors }}</div>{% endif %}
-                    </div>
-                </div>
-
-                <div class="event-editor-actions">
-                    <button type="submit" class="event-editor-btn">
+                <div class="event-wizard-nav">
+                    <button type="button" class="event-editor-btn event-editor-btn--secondary" id="wizardBack" disabled>
+                        <i class="material-icons">arrow_back</i> Back
+                    </button>
+                    <div class="event-wizard-nav-spacer"></div>
+                    <a href="{% url 'home' %}" class="event-editor-btn event-editor-btn--secondary event-wizard-cancel">
+                        Cancel
+                    </a>
+                    <button type="button" class="event-editor-btn" id="wizardNext">
+                        Next <i class="material-icons">arrow_forward</i>
+                    </button>
+                    <button type="submit" class="event-editor-btn event-wizard-submit" id="wizardSubmit" hidden>
                         <i class="material-icons">add</i> Create event
                     </button>
-                    <a href="{% url 'home' %}" class="event-editor-btn event-editor-btn--secondary">
-                        <i class="material-icons">arrow_back</i> Cancel
-                    </a>
                 </div>
             </div>
         </form>
@@ -199,6 +300,142 @@
 <script src="https://cdn.jsdelivr.net/npm/tinymce@7.9.1/tinymce.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function () {
+        const TOTAL_STEPS = 6;
+        const STEP_TITLES = ['Basics', 'Schedule', 'Location', 'Accessibility', 'Questions', 'Agreements'];
+        const FIELD_STEPS = {
+            title: 1, group: 1, description: 1,
+            date: 2, end_date: 2, start_time: 2, end_time: 2, age_restriction: 2, capacity: 2, waitlist_enabled: 2, attendee_list_public: 2,
+            address: 3, city: 3, state: 3,
+            accessibility_details: 4,
+            question1_text: 5, question2_text: 5, question3_text: 5,
+            eula_agreement: 6, state_agreement: 6,
+        };
+
+        let currentStep = 1;
+        const form = document.getElementById('createEventWizardForm');
+        const steps = Array.from(document.querySelectorAll('.event-wizard-step'));
+        const progressItems = Array.from(document.querySelectorAll('.event-wizard-progress-item'));
+        const backBtn = document.getElementById('wizardBack');
+        const nextBtn = document.getElementById('wizardNext');
+        const submitBtn = document.getElementById('wizardSubmit');
+        const currentLabel = document.getElementById('wizardCurrentLabel');
+        const stepTitleEl = document.getElementById('wizardStepTitle');
+
+        function syncTinyMCE() {
+            if (window.tinymce) tinymce.triggerSave();
+        }
+
+        function getStepFields(stepEl) {
+            return Array.from(stepEl.querySelectorAll('input, select, textarea')).filter(el => {
+                if (el.type === 'hidden') return false;
+                if (el.closest('.tox-tinymce')) return false;
+                return !el.disabled;
+            });
+        }
+
+        function validateStep(stepNum) {
+            const stepEl = steps.find(s => parseInt(s.dataset.step, 10) === stepNum);
+            if (!stepEl) return true;
+
+            syncTinyMCE();
+            let valid = true;
+            const fields = getStepFields(stepEl);
+
+            fields.forEach(field => {
+                field.classList.remove('is-invalid');
+                if (!field.checkValidity()) {
+                    field.classList.add('is-invalid');
+                    valid = false;
+                }
+            });
+
+            if (stepNum === 2) {
+                const waitlist = document.getElementById('{{ form.waitlist_enabled.id_for_label }}');
+                const capacity = document.getElementById('{{ form.capacity.id_for_label }}');
+                const startDate = document.getElementById('{{ form.date.id_for_label }}');
+                const endDate = document.getElementById('{{ form.end_date.id_for_label }}');
+                if (waitlist && waitlist.checked && capacity && !capacity.value.trim()) {
+                    capacity.classList.add('is-invalid');
+                    valid = false;
+                }
+                if (startDate && endDate && endDate.value && startDate.value && endDate.value < startDate.value) {
+                    endDate.classList.add('is-invalid');
+                    valid = false;
+                }
+            }
+
+            if (!valid) {
+                const firstInvalid = stepEl.querySelector('.is-invalid');
+                if (firstInvalid) firstInvalid.focus();
+            }
+            return valid;
+        }
+
+        function goToStep(stepNum) {
+            currentStep = Math.max(1, Math.min(TOTAL_STEPS, stepNum));
+            steps.forEach(step => {
+                step.classList.toggle('active', parseInt(step.dataset.step, 10) === currentStep);
+            });
+            progressItems.forEach(item => {
+                const num = parseInt(item.dataset.step, 10);
+                item.classList.toggle('active', num === currentStep);
+                item.classList.toggle('completed', num < currentStep);
+            });
+            currentLabel.textContent = currentStep;
+            stepTitleEl.textContent = STEP_TITLES[currentStep - 1];
+            backBtn.disabled = currentStep === 1;
+            nextBtn.hidden = currentStep === TOTAL_STEPS;
+            submitBtn.hidden = currentStep !== TOTAL_STEPS;
+        }
+
+        backBtn.addEventListener('click', () => goToStep(currentStep - 1));
+
+        nextBtn.addEventListener('click', () => {
+            if (validateStep(currentStep)) goToStep(currentStep + 1);
+        });
+
+        progressItems.forEach(item => {
+            item.addEventListener('click', () => {
+                const target = parseInt(item.dataset.step, 10);
+                if (target < currentStep) {
+                    goToStep(target);
+                    return;
+                }
+                for (let s = currentStep; s < target; s++) {
+                    if (!validateStep(s)) {
+                        goToStep(s);
+                        return;
+                    }
+                }
+                goToStep(target);
+            });
+        });
+
+        form.addEventListener('submit', (e) => {
+            syncTinyMCE();
+            for (let s = 1; s <= TOTAL_STEPS; s++) {
+                if (!validateStep(s)) {
+                    e.preventDefault();
+                    goToStep(s);
+                    return;
+                }
+            }
+        });
+
+        {% if form.errors %}
+        (function () {
+            const errorFields = [{% for field in form.errors %}'{{ field }}'{% if not forloop.last %}, {% endif %}{% endfor %}];
+            let firstErrorStep = TOTAL_STEPS;
+            errorFields.forEach(name => {
+                const step = FIELD_STEPS[name];
+                if (step && step < firstErrorStep) firstErrorStep = step;
+            });
+            goToStep(firstErrorStep);
+        })();
+        {% else %}
+        goToStep(1);
+        {% endif %}
+
         const addressInput = document.getElementById('{{ form.address.id_for_label }}');
         const stateInput = document.getElementById('{{ form.state.id_for_label }}');
         const cityInput = document.getElementById('{{ form.city.id_for_label }}');
@@ -210,10 +447,7 @@
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(
                 (position) => {
-                    userLocation = {
-                        lat: position.coords.latitude,
-                        lon: position.coords.longitude
-                    };
+                    userLocation = { lat: position.coords.latitude, lon: position.coords.longitude };
                 },
                 (error) => console.error('Error getting location:', error)
             );
@@ -283,19 +517,11 @@
                 const existingCity = cityInput.value.trim();
                 const existingState = stateInput.value.trim();
                 let searchQuery = query;
-                if (existingCity && existingState) {
-                    searchQuery = `${query} ${existingCity} ${existingState}`;
-                }
+                if (existingCity && existingState) searchQuery = `${query} ${existingCity} ${existingState}`;
                 let searchUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}&countrycodes=us&addressdetails=1&limit=10`;
-                if (userLocation) {
-                    searchUrl += `&lat=${userLocation.lat}&lon=${userLocation.lon}&radius=50000`;
-                }
+                if (userLocation) searchUrl += `&lat=${userLocation.lat}&lon=${userLocation.lon}&radius=50000`;
                 fetch(searchUrl, {
-                    headers: {
-                        'Accept': 'application/json',
-                        'User-Agent': 'FURsvp/1.0',
-                        'Referer': window.location.origin
-                    }
+                    headers: { 'Accept': 'application/json', 'User-Agent': 'FURsvp/1.0', 'Referer': window.location.origin }
                 })
                 .then(response => {
                     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
@@ -318,9 +544,7 @@
                                 streetAddress = address.house_number + ' ' + streetAddress;
                                 fullAddress = address.house_number + ' ' + fullAddress;
                             }
-                            if (address.city || address.town || address.village) {
-                                fullAddress += ', ' + (address.city || address.town || address.village);
-                            }
+                            if (address.city || address.town || address.village) fullAddress += ', ' + (address.city || address.town || address.village);
                             if (address.state) fullAddress += ', ' + address.state;
                         }
                         if (streetAddress) {
@@ -371,14 +595,7 @@
                         try {
                             const response = await fetch(
                                 `https://nominatim.openstreetmap.org/reverse?format=json&lat=${position.coords.latitude}&lon=${position.coords.longitude}&addressdetails=1&zoom=10`,
-                                {
-                                    method: 'GET',
-                                    headers: {
-                                        'Accept': 'application/json',
-                                        'User-Agent': 'FURsvp/1.0',
-                                        'Referer': window.location.origin
-                                    }
-                                }
+                                { method: 'GET', headers: { 'Accept': 'application/json', 'User-Agent': 'FURsvp/1.0', 'Referer': window.location.origin } }
                             );
                             if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                             const data = await response.json();
@@ -449,9 +666,7 @@
                         input.onchange = function () {
                             const file = this.files[0];
                             const reader = new FileReader();
-                            reader.onload = function () {
-                                callback(reader.result, { alt: file.name });
-                            };
+                            reader.onload = function () { callback(reader.result, { alt: file.name }); };
                             reader.readAsDataURL(file);
                         };
                         input.click();
@@ -466,7 +681,7 @@
             setTimeout(initTinyMCE, 100);
         });
 
-        flatpickr("#{{ form.date.id_for_label }}", {
+        const startDatePicker = flatpickr("#{{ form.date.id_for_label }}", {
             dateFormat: "Y-m-d",
             minDate: "today",
             disableMobile: "true",
@@ -477,6 +692,27 @@
             altInputClass: "form-control",
             onChange: function (selectedDates, dateStr) {
                 document.getElementById("{{ form.date.id_for_label }}").value = dateStr;
+                if (endDatePicker) {
+                    endDatePicker.set('minDate', dateStr || 'today');
+                    const endVal = document.getElementById("{{ form.end_date.id_for_label }}").value;
+                    if (endVal && dateStr && endVal < dateStr) {
+                        endDatePicker.clear();
+                    }
+                }
+            }
+        });
+
+        const endDatePicker = flatpickr("#{{ form.end_date.id_for_label }}", {
+            dateFormat: "Y-m-d",
+            minDate: "today",
+            disableMobile: "true",
+            theme: "light",
+            allowInput: true,
+            altInput: true,
+            altFormat: "F j, Y",
+            altInputClass: "form-control",
+            onChange: function (selectedDates, dateStr) {
+                document.getElementById("{{ form.end_date.id_for_label }}").value = dateStr;
             }
         });
 
@@ -496,9 +732,7 @@
                 if (endTimePicker) {
                     endTimePicker.set('minTime', dateStr);
                     const endTime = endTimePicker.selectedDates[0];
-                    if (endTime && endTime < selectedDates[0]) {
-                        endTimePicker.setDate(selectedDates[0]);
-                    }
+                    if (endTime && endTime < selectedDates[0]) endTimePicker.setDate(selectedDates[0]);
                 }
             }
         });

@@ -84,8 +84,14 @@ class AuditLog(models.Model):
         return f"{self.user.username if self.user else 'System'} - {self.get_action_display()} - {self.timestamp.strftime('%Y-%m-%d %H:%M:%S')}"
     
     @classmethod
-    def log_action(cls, user, action, description, target_user=None, group=None, event=None, ip_address=None, user_agent=None, additional_data=None):
-        """Convenience method to create an audit log entry"""
+    def log_action(cls, user, action, description, request=None, target_user=None, group=None, event=None, ip_address=None, user_agent=None, additional_data=None):
+        """Convenience method to create an audit log entry."""
+        if request is not None:
+            from fursvp.ip_utils import get_client_ip
+            if ip_address is None:
+                ip_address = get_client_ip(request)
+            if not user_agent:
+                user_agent = request.META.get('HTTP_USER_AGENT', '')
         return cls.objects.create(
             user=user,
             action=action,
