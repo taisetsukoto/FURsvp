@@ -699,6 +699,7 @@
                         endDatePicker.clear();
                     }
                 }
+                updateEndTimeConstraints();
             }
         });
 
@@ -713,10 +714,40 @@
             altInputClass: "form-control",
             onChange: function (selectedDates, dateStr) {
                 document.getElementById("{{ form.end_date.id_for_label }}").value = dateStr;
+                updateEndTimeConstraints();
             }
         });
 
-        const startTimePicker = flatpickr("#{{ form.start_time.id_for_label }}", {
+        let startTimePicker;
+        let endTimePicker;
+
+        function isMultiDayEvent() {
+            const startDate = document.getElementById("{{ form.date.id_for_label }}").value;
+            const endDate = document.getElementById("{{ form.end_date.id_for_label }}").value;
+            return Boolean(startDate && endDate && endDate > startDate);
+        }
+
+        function updateEndTimeConstraints() {
+            if (!endTimePicker) return;
+
+            if (isMultiDayEvent()) {
+                endTimePicker.set('minTime', null);
+                return;
+            }
+
+            const startTimeStr = document.getElementById("{{ form.start_time.id_for_label }}").value;
+            if (startTimeStr && startTimePicker && startTimePicker.selectedDates[0]) {
+                endTimePicker.set('minTime', startTimeStr);
+                const endTime = endTimePicker.selectedDates[0];
+                if (endTime && endTime < startTimePicker.selectedDates[0]) {
+                    endTimePicker.setDate(startTimeStr);
+                }
+            } else {
+                endTimePicker.set('minTime', null);
+            }
+        }
+
+        startTimePicker = flatpickr("#{{ form.start_time.id_for_label }}", {
             enableTime: true,
             noCalendar: true,
             dateFormat: "H:i",
@@ -729,15 +760,11 @@
             altInputClass: "form-control",
             onChange: function (selectedDates, dateStr) {
                 document.getElementById("{{ form.start_time.id_for_label }}").value = dateStr;
-                if (endTimePicker) {
-                    endTimePicker.set('minTime', dateStr);
-                    const endTime = endTimePicker.selectedDates[0];
-                    if (endTime && endTime < selectedDates[0]) endTimePicker.setDate(selectedDates[0]);
-                }
+                updateEndTimeConstraints();
             }
         });
 
-        const endTimePicker = flatpickr("#{{ form.end_time.id_for_label }}", {
+        endTimePicker = flatpickr("#{{ form.end_time.id_for_label }}", {
             enableTime: true,
             noCalendar: true,
             dateFormat: "H:i",
@@ -752,6 +779,8 @@
                 document.getElementById("{{ form.end_time.id_for_label }}").value = dateStr;
             }
         });
+
+        updateEndTimeConstraints();
     });
 </script>
 {% endblock %}
