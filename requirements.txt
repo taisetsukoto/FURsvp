@@ -6,7 +6,6 @@ django-csp
 django-q2
 django-sslserver
 django-tinymce
-django-turnstile
 django-two-factor-auth
 django-widget-tweaks
 djangorestframework
@@ -14,8 +13,6 @@ drf_yasg
 feedparser
 gunicorn
 phonenumbers
-reportlab
-svglib
 Pillow
 psycopg2-binary
 python-dotenv

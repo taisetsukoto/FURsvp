@@ -172,6 +172,18 @@ code {
     font-size: 1.4em;
 }
 
+/* Better breadcrumbs */
+.breadcrumb {
+    background: transparent;
+    padding: 15px 0;
+    margin-bottom: 20px;
+}
+
+.breadcrumb-item + .breadcrumb-item::before {
+    content: "›";
+    color: #6c757d;
+}
+
 /* Responsive improvements */
 @media (max-width: 768px) {
     .welcome-section h1 {

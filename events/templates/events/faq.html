@@ -298,4 +298,25 @@
         </div>
     </div>
 </div>
+
+<style>
+.accordion-button:not(.collapsed) {
+    background-color: var(--primary-color);
+    color: black;
+}
+
+.accordion-button:focus {
+    box-shadow: none;
+    border-color: rgba(0,0,0,.125);
+}
+
+.accordion-button::after {
+    background-size: 1.2rem;
+    transition: all 0.2s ease-in-out;
+}
+
+.accordion-button:not(.collapsed)::after {
+    filter: brightness(0) invert(0);
+}
+</style>
 {% endblock %} 

@@ -5,7 +5,6 @@ from django.contrib.auth.backends import BaseBackend
 from django.contrib.auth.models import User
 from django.conf import settings
 from .models import Profile
-from .content_moderation import is_text_blocked
 
 
 class TelegramBackend(BaseBackend):
@@ -90,14 +89,12 @@ class TelegramBackend(BaseBackend):
         first_name = telegram_data.get('first_name', '')
         last_name = telegram_data.get('last_name', '')
         
-        # Generate unique username if Telegram username is taken or blocked
+        # Generate unique username if Telegram username is taken
         base_username = username or f"telegram_{telegram_id}"
-        if is_text_blocked(base_username):
-            base_username = f"telegram_{telegram_id}"
         username = base_username
         counter = 1
         
-        while User.objects.filter(username=username).exists() or is_text_blocked(username):
+        while User.objects.filter(username=username).exists():
             username = f"{base_username}_{counter}"
             counter += 1
         
@@ -110,17 +107,14 @@ class TelegramBackend(BaseBackend):
             password=None  # No password for Telegram users
         )
         
-        display_name = f"{first_name} {last_name}".strip() or username
-        if is_text_blocked(display_name):
-            display_name = username
         # Create profile with Telegram data
         profile = Profile.objects.create(
             user=user,
             telegram_id=int(telegram_id),
             telegram_username=telegram_data.get('username'),
-            display_name=display_name
+            display_name=f"{first_name} {last_name}".strip() or username
         )
-
+        
         return user
     
     def get_user(self, user_id):

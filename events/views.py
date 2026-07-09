@@ -4,11 +4,11 @@ from django.utils import timezone
 from datetime import timedelta, datetime
 from django.contrib.auth.decorators import login_required
 from .forms import EventForm, RSVPForm, Group
-from users.models import Profile, GroupDelegation, BannedUser, Notification, GroupRole, AuditLog
+from users.models import Profile, GroupDelegation, BannedUser, Notification, GroupRole
 from django.contrib import messages
 from django.db import models, transaction
 from django.http import JsonResponse, HttpResponseForbidden, HttpResponse
-from users.utils import create_notification, user_is_banned_from_event, user_event_ban_message, user_is_banned_from_group
+from users.utils import create_notification
 import feedparser
 from django.views.generic import ListView, DetailView
 import pytz
@@ -18,9 +18,8 @@ from django.db.models import Q
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 import calendar
 from django.forms.utils import ErrorList
-from events.utils import post_to_telegram_channel, RSVP_LOCK_MESSAGE
+from events.utils import post_to_telegram_channel
 from django.urls import reverse
-from django.conf import settings
 import os
 import json
 import requests
@@ -30,9 +29,9 @@ from django.views.decorators.http import require_GET
 # Create your views here.
 
 def get_telegram_feed(channel='', limit=5):
-    if not channel or not str(channel).strip():
-        return []
     url = f"https://rss.tabithahanegan.com/telegram/channel/{channel}"
+    if url == "https://rss.tabithahanegan.com/telegram/channel/None":
+        url = ""
     feed = feedparser.parse(url)
     entries = feed.entries[:limit]
     eastern = pytz.timezone('America/New_York')
@@ -79,7 +78,7 @@ def home(request):
     # Get sort parameters from request
     sort_by = request.GET.get('sort', 'date')  # Default sort by date
     sort_order = request.GET.get('order', 'asc')  # Default ascending order
-    filter_adult = request.GET.get('adult', 'false')
+    filter_adult = request.GET.get('adult', 'true') # Default to show adult events
     view_type = request.GET.get('view', 'list')  # Default to list view
     page = request.GET.get('page', 1)  # Default to first page
     
@@ -90,11 +89,12 @@ def home(request):
     search_query = request.GET.get('search', '').strip()
     state_filter = request.GET.get('state', '').strip()
     
-    # Base queryset - show events until they end (not just until they start)
+    # Base queryset - filter out events that have already passed and cancelled events
     now = timezone.now()
     events = Event.objects.filter(
-        Event.active_not_ended_q(now),
-        status='active',
+        models.Q(date__gt=now.date()) | 
+        (models.Q(date=now.date()) & models.Q(end_time__gt=now.time())),
+        status='active'  # Only show active events
     )
 
     if filter_adult == 'false':
@@ -183,22 +183,17 @@ def home(request):
             end_date = datetime(year, month + 1, 1).date()
         
         month_events = events.filter(
-            Event.overlaps_date_range_q(start_date, end_date),
+            date__gte=start_date,
+            date__lt=end_date
         ).order_by('date', 'start_time')
         
-        # Group events by each day they span within this month
+        # Group events by date
         events_by_date = {}
-        month_last_day = end_date - timedelta(days=1)
         for event in month_events:
-            span_start = max(event.date, start_date)
-            span_end = min(event.effective_end_date, month_last_day)
-            current = span_start
-            while current <= span_end:
-                date_key = current.strftime('%Y-%m-%d')
-                if date_key not in events_by_date:
-                    events_by_date[date_key] = []
-                events_by_date[date_key].append(event)
-                current += timedelta(days=1)
+            date_key = event.date.strftime('%Y-%m-%d')
+            if date_key not in events_by_date:
+                events_by_date[date_key] = []
+            events_by_date[date_key].append(event)
         
         # Navigation
         prev_month = month - 1 if month > 1 else 12
@@ -250,10 +245,13 @@ def event_detail(request, event_id):
     event = get_object_or_404(Event, pk=event_id)
     rsvps = event.rsvps.all().select_related('user__profile')
     
-    # Calculate if event has started or passed
-    event_has_started = event.has_started()
-    event_has_passed = event.has_ended()
-    rsvps_locked = event.rsvps_locked
+    # Calculate if event has passed
+    event_end_datetime = datetime.combine(event.date, event.end_time)
+    # Make event_end_datetime timezone-aware if USE_TZ is True in settings
+    if timezone.is_aware(timezone.now()):
+        event_end_datetime = timezone.make_aware(event_end_datetime, timezone.get_current_timezone())
+
+    event_has_passed = timezone.now() > event_end_datetime
 
     # Get user's RSVP if they're logged in
     user_rsvp = None
@@ -278,18 +276,18 @@ def event_detail(request, event_id):
         user_rsvp = event.rsvps.filter(user=request.user).first()
 
     can_ban_user = is_organizer_of_this_event or is_site_admin
-    if not can_ban_user and request.user.is_authenticated and event.group:
-        can_ban_user = GroupRole.objects.filter(user=request.user, group=event.group).exists()
     can_view_contact_info = is_organizer_of_this_event or is_site_admin or can_access_group_contact_info
     can_cancel_event = is_organizer_of_this_event or is_site_admin
 
-    # Check if the current user is banned from this event (group, organizer, or sitewide)
-    is_banned_from_event = False
-    ban_message = None
-    if request.user.is_authenticated:
-        is_banned_from_event = user_is_banned_from_event(request.user, event)
-        if is_banned_from_event:
-            ban_message = user_event_ban_message(request.user, event)
+    # Check if the user is banned by this event's organizer (for any group)
+    is_banned_by_organizer = False
+    if request.user.is_authenticated and event.organizer:
+        is_banned_by_organizer = BannedUser.objects.filter(user=request.user, organizer=event.organizer).exists()
+
+    # Check if the user is banned from this specific group
+    is_banned_from_group = False
+    if request.user.is_authenticated and event.group:
+        is_banned_from_group = BannedUser.objects.filter(user=request.user, group=event.group).exists()
 
     # Calculate confirmed RSVPs and waitlisted RSVPs
     confirmed_rsvps_count = event.rsvps.filter(status='confirmed').count()
@@ -322,6 +320,11 @@ def event_detail(request, event_id):
                         )
 
     if request.method == 'POST' and request.user.is_authenticated:
+        # Prevent banned users from RSVPing
+        if is_banned_by_organizer or is_banned_from_group:
+            messages.error(request, 'You are banned from RSVPing to events by this organizer or group.', extra_tags='admin_notification')
+            return redirect('event_detail', event_id=event.id)
+
         if 'cancel_event' in request.POST and can_cancel_event:
             with transaction.atomic():
                 event.status = 'cancelled'
@@ -339,28 +342,9 @@ def event_detail(request, event_id):
                 return redirect('event_detail', event_id=event.id)
 
         if 'remove_rsvp' in request.POST:
-            if rsvps_locked:
-                messages.error(request, RSVP_LOCK_MESSAGE, extra_tags='admin_notification')
-                return redirect('event_detail', event_id=event.id)
             if user_rsvp: # Ensure there is an RSVP to remove
                 with transaction.atomic():
                     was_confirmed = (user_rsvp.status == 'confirmed')
-                    
-                    # Log the RSVP removal
-                    AuditLog.log_action(
-                        user=request.user,
-                        action='rsvp_deleted',
-                        description=f'Removed RSVP for {event.title}',
-                        group=event.group,
-                        event=event,
-                        target_user=request.user,
-                        request=request,
-                        additional_data={
-                            'previous_status': user_rsvp.status,
-                            'was_confirmed': was_confirmed
-                        }
-                    )
-                    
                     user_rsvp.delete()
                     create_notification(request.user, f'You have removed your RSVP for {event.title}.', link=event.get_absolute_url())
                     # Telegram webhook for public RSVP removal
@@ -390,23 +374,6 @@ def event_detail(request, event_id):
         if 'delete_event' in request.POST and can_ban_user:
             event_title = event.title
             event_url = request.build_absolute_uri(event.get_absolute_url())
-            
-            # Log the event deletion before deleting
-            AuditLog.log_action(
-                user=request.user,
-                action='event_deleted',
-                description=f'Deleted event: {event_title}',
-                group=event.group,
-                event=event,
-                request=request,
-                additional_data={
-                    'event_title': event_title,
-                    'event_date': event.date.isoformat(),
-                    'event_group': event.group.name if event.group else None,
-                    'event_url': event_url
-                }
-            )
-            
             event.delete()
             create_notification(request.user, f'Event "{event_title}" has been deleted.', link='/') # Link to home since event is deleted
             # Telegram webhook for event deletion
@@ -419,18 +386,6 @@ def event_detail(request, event_id):
                 post_to_telegram_channel(event.group.telegram_webhook_channel, msg, parse_mode="Markdown")
             return redirect('home')
             
-        if is_banned_from_event:
-            messages.error(
-                request,
-                ban_message or 'You are banned from RSVPing to this event.',
-                extra_tags='admin_notification',
-            )
-            return redirect('event_detail', event_id=event.id)
-
-        if rsvps_locked:
-            messages.error(request, RSVP_LOCK_MESSAGE, extra_tags='admin_notification')
-            return redirect('event_detail', event_id=event.id)
-
         form = RSVPForm(request.POST, instance=user_rsvp, event=event)
         if form.is_valid():
             new_status = form.cleaned_data['status']
@@ -438,40 +393,6 @@ def event_detail(request, event_id):
             rsvp.event = event
             rsvp.user = request.user
             rsvp.save()
-            
-            # Log the RSVP action
-            if user_rsvp:
-                # This is an update
-                AuditLog.log_action(
-                    user=request.user,
-                    action='rsvp_updated',
-                    description=f'Updated RSVP status to {rsvp.get_status_display()} for {event.title}',
-                    group=event.group,
-                    event=event,
-                    target_user=request.user,
-                    request=request,
-                    additional_data={
-                        'old_status': user_rsvp.status,
-                        'new_status': new_status,
-                        'rsvp_id': rsvp.id
-                    }
-                )
-            else:
-                # This is a new RSVP
-                AuditLog.log_action(
-                    user=request.user,
-                    action='rsvp_created',
-                    description=f'Created RSVP with status {rsvp.get_status_display()} for {event.title}',
-                    group=event.group,
-                    event=event,
-                    target_user=request.user,
-                    request=request,
-                    additional_data={
-                        'status': new_status,
-                        'rsvp_id': rsvp.id
-                    }
-                )
-            
             create_notification(request.user, f'Your RSVP status has been updated to {rsvp.get_status_display()!s} for {event.title}.', link=event.get_absolute_url())
             # Telegram webhook for public RSVP (any status)
             if event.attendee_list_public and event.group and getattr(event.group, 'telegram_webhook_channel', None):
@@ -503,9 +424,6 @@ def event_detail(request, event_id):
     elif 'update_rsvp_status_by_organizer' in request.POST:
         if not can_ban_user: # Use the new flag
             return JsonResponse({'status': 'error', 'message': 'Permission denied.'}, status=403)
-
-        if rsvps_locked:
-            return JsonResponse({'status': 'error', 'message': RSVP_LOCK_MESSAGE}, status=403)
         
         rsvp_id = request.POST.get('rsvp_id')
         new_status = request.POST.get('new_status')
@@ -515,35 +433,11 @@ def event_detail(request, event_id):
 
         try:
             rsvp_to_update = event.rsvps.get(id=rsvp_id)
-            if new_status == 'confirmed' and event.capacity is not None:
-                current_confirmed = event.rsvps.filter(status='confirmed')
-                if rsvp_to_update.pk:
-                    current_confirmed = current_confirmed.exclude(pk=rsvp_to_update.pk)
-                if current_confirmed.count() >= event.capacity:
-                    response_data = {'status': 'error', 'message': 'Cannot confirm: event is at capacity.'}
-                    return JsonResponse(response_data, status=400)
-
+            
             with transaction.atomic():
                 old_status = rsvp_to_update.status
                 rsvp_to_update.status = new_status
                 rsvp_to_update.save()
-
-                # Log the organizer RSVP status change
-                AuditLog.log_action(
-                    user=request.user,
-                    action='rsvp_status_changed',
-                    description=f'Changed {rsvp_to_update.user.username}\'s RSVP status from {old_status} to {new_status} for {event.title}',
-                    group=event.group,
-                    event=event,
-                    target_user=rsvp_to_update.user,
-                    request=request,
-                    additional_data={
-                        'old_status': old_status,
-                        'new_status': new_status,
-                        'rsvp_id': rsvp_to_update.id,
-                        'changed_by': request.user.username
-                    }
-                )
 
                 message = f"{rsvp_to_update.user.username}'s RSVP for {event.title} updated to {rsvp_to_update.get_status_display()}."
                 create_notification(request.user, message, link=event.get_absolute_url())
@@ -602,7 +496,17 @@ def event_detail(request, event_id):
     rsvps_queryset = event.rsvps.all().select_related('user__profile').order_by('timestamp')
 
     for rsvp in rsvps_queryset:
-        is_banned = user_is_banned_from_event(rsvp.user, event) if rsvp.user else False
+        is_banned = False
+        # Check for group ban first
+        if event.group:
+            is_banned = BannedUser.objects.filter(user=rsvp.user, group=event.group).exists()
+        # If not group banned, check for organizer ban (if event has an organizer)
+        if not is_banned and event.organizer:
+            is_banned = BannedUser.objects.filter(user=rsvp.user, organizer=event.organizer).exists()
+        # If not group or organizer banned, check for site-wide ban
+        if not is_banned:
+            is_banned = BannedUser.objects.filter(user=rsvp.user, group__isnull=True, organizer__isnull=True).exists()
+
         all_rsvps_data.append({'rsvp': rsvp, 'is_banned': is_banned})
 
     # Group RSVPs by status for template display
@@ -632,12 +536,8 @@ def event_detail(request, event_id):
     # (is_organizer is already calculated above)
 
     # Determine if the RSVP form should be displayed
-    show_rsvp_form = (
-        not rsvps_locked and
-        not is_banned_from_event and
-        ((not is_event_full or can_join_waitlist) or
-         (user_rsvp is not None and user_rsvp.status != 'confirmed'))
-    )
+    show_rsvp_form = (not is_event_full or can_join_waitlist) or \
+                     (user_rsvp is not None and user_rsvp.status != 'confirmed')
 
     # Determine attendee list visibility
     can_view_attendee_list = (
@@ -672,8 +572,6 @@ def event_detail(request, event_id):
         'is_organizer': is_organizer_of_this_event,
         'is_site_admin': is_site_admin,
         'event_has_passed': event_has_passed,
-        'event_has_started': event_has_started,
-        'rsvps_locked': rsvps_locked,
         'confirmed_rsvps_count': confirmed_rsvps_count,
         'waitlisted_rsvps_count': waitlisted_rsvps_count,
         'is_event_full': is_event_full,
@@ -692,8 +590,6 @@ def event_detail(request, event_id):
         'can_view_attendee_list': can_view_attendee_list,
         'edit_event_errors': edit_event_errors,
         'edit_event_post': edit_event_post,
-        'is_banned_from_event': is_banned_from_event,
-        'ban_message': ban_message,
     }
     return render(request, 'events/event_detail.html', context)
 
@@ -713,24 +609,6 @@ def create_event(request):
             event = form.save(commit=False)
             event.organizer = request.user
             event.save()
-            
-            # Log the event creation
-            AuditLog.log_action(
-                user=request.user,
-                action='event_created',
-                description=f'Created new event: {event.title}',
-                group=event.group,
-                event=event,
-                request=request,
-                additional_data={
-                    'event_title': event.title,
-                    'event_date': event.date.isoformat(),
-                    'event_group': event.group.name,
-                    'event_capacity': event.capacity,
-                    'event_status': event.status
-                }
-            )
-            
             # Telegram webhook for new event
             group = event.group
             if group and getattr(group, 'telegram_webhook_channel', None):
@@ -745,9 +623,7 @@ def create_event(request):
                 post_to_telegram_channel(group.telegram_webhook_channel, msg, parse_mode="Markdown")
             return redirect('event_detail', event_id=event.id)
     else:
-        group_id = request.GET.get('group')
-        initial = {'group': group_id} if group_id else None
-        form = EventForm(user=request.user, initial=initial)
+        form = EventForm(user=request.user)
     return render(request, 'events/event_create.html', {'form': form})
 
 @login_required
@@ -770,42 +646,10 @@ def edit_event(request, event_id):
     if request.method == 'POST':
         form = EventForm(request.POST, instance=event, user=request.user)
         if form.is_valid():
-            # Store old data for comparison
-            old_data = {
-                'title': event.title,
-                'date': event.date.isoformat(),
-                'description': event.description,
-                'capacity': event.capacity,
-                'status': event.status,
-                'group': event.group.name if event.group else None
-            }
-            
             event = form.save(commit=False)
             if not event.organizer:
                 event.organizer = request.user
             event.save()
-            
-            # Log the event update
-            AuditLog.log_action(
-                user=request.user,
-                action='event_updated',
-                description=f'Updated event: {event.title}',
-                group=event.group,
-                event=event,
-                request=request,
-                additional_data={
-                    'old_data': old_data,
-                    'new_data': {
-                        'title': event.title,
-                        'date': event.date.isoformat(),
-                        'description': event.description,
-                        'capacity': event.capacity,
-                        'status': event.status,
-                        'group': event.group.name if event.group else None
-                    }
-                }
-            )
-            
             create_notification(request.user, f'Event for {event.title} updated successfully!', link=event.get_absolute_url())
             for rsvp in event.rsvps.select_related('user').all():
                 if rsvp.user and rsvp.user != request.user:
@@ -870,45 +714,17 @@ def group_detail(request, group_id):
     assistants = []
     
     # Get upcoming and past events
-    upcoming_events = list(group.get_upcoming_events().annotate(
-        confirmed_count=models.Count('rsvps', filter=models.Q(rsvps__status='confirmed'))
-    ))
-    past_events = list(group.get_past_events()[:10].annotate(
-        confirmed_count=models.Count('rsvps', filter=models.Q(rsvps__status='confirmed'))
-    ))
-
-    all_group_events = upcoming_events + past_events
-    if request.user.is_authenticated and all_group_events:
-        user_rsvps = RSVP.objects.filter(
-            event_id__in=[event.id for event in all_group_events],
-            user=request.user,
-        )
-        rsvp_by_event = {rsvp.event_id: rsvp for rsvp in user_rsvps}
-        for event in all_group_events:
-            rsvp = rsvp_by_event.get(event.id)
-            event.user_rsvp_list = [rsvp] if rsvp else []
-    else:
-        for event in all_group_events:
-            event.user_rsvp_list = []
+    upcoming_events = group.get_upcoming_events()
+    past_events = group.get_past_events()[:10]  # Limit to 10 most recent past events
     
     # Check if user can edit this group
     can_edit_group = False
-    can_manage_bans = False
-    can_post = False
     if request.user.is_authenticated:
         can_edit_group = (
             request.user.is_superuser or 
             GroupRole.objects.filter(user=request.user, group=group).filter(
                 Q(can_post=True) | Q(can_manage_leadership=True)
             ).exists()
-        )
-        can_manage_bans = (
-            request.user.is_superuser or
-            GroupRole.objects.filter(user=request.user, group=group).exists()
-        )
-        can_post = (
-            request.user.is_superuser or
-            GroupRole.objects.filter(user=request.user, group=group, can_post=True).exists()
         )
     
     # Handle POST requests
@@ -957,7 +773,6 @@ def group_detail(request, group_id):
             try:
                 role = GroupRole.objects.get(pk=role_id, group=group)
                 role.custom_label = request.POST.get('custom_label', role.custom_label)
-                role.can_post = bool(request.POST.get('can_post'))
                 role.can_manage_leadership = bool(request.POST.get('can_manage_leadership'))
                 role.save()
                 messages.success(request, 'Leader updated successfully.')
@@ -982,19 +797,6 @@ def group_detail(request, group_id):
     # Leadership roles and form
     leadership_roles = GroupRole.objects.filter(group=group).select_related('user')
     leadership_form = GroupRoleForm(group=group)
-    group_banned_users = []
-    is_banned_from_group = False
-    group_ban_message = None
-    if request.user.is_authenticated:
-        is_banned_from_group = user_is_banned_from_group(request.user, group)
-        if is_banned_from_group:
-            group_ban_message = f'You are banned from RSVPing to events hosted by {group.name}.'
-    if can_manage_bans:
-        group_banned_users = (
-            BannedUser.objects.filter(group=group)
-            .select_related('user__profile', 'banned_by__profile')
-            .order_by('-banned_at')
-        )
     
     context = {
         'group': group,
@@ -1003,11 +805,6 @@ def group_detail(request, group_id):
         'upcoming_events': upcoming_events,
         'past_events': past_events,
         'can_edit_group': can_edit_group,
-        'can_manage_bans': can_manage_bans,
-        'can_post': can_post,
-        'group_banned_users': group_banned_users,
-        'is_banned_from_group': is_banned_from_group,
-        'group_ban_message': group_ban_message,
         'telegram_feed': telegram_feed,
         'leadership_roles': leadership_roles,
         'leadership_form': leadership_form,
@@ -1082,98 +879,54 @@ def groups_list(request):
     return render(request, 'events/groups_list.html', context)
 
 def event_calendar(request):
+    # Get year and month from request, default to current
     year = int(request.GET.get('year', timezone.now().year))
     month = int(request.GET.get('month', timezone.now().month))
-    filter_adult = request.GET.get('adult', 'false')
-    filter_group = request.GET.get('group', '').strip()
-
+    # Set first weekday to Sunday
     calendar.setfirstweekday(calendar.SUNDAY)
+    # Create calendar object
     cal = calendar.monthcalendar(year, month)
+    # Get month name
     month_name = calendar.month_name[month]
-
+    # Get events for this month
     start_date = datetime(year, month, 1).date()
     if month == 12:
         end_date = datetime(year + 1, 1, 1).date()
     else:
         end_date = datetime(year, month + 1, 1).date()
-
-    events_qs = Event.objects.filter(
-        Event.overlaps_date_range_q(start_date, end_date),
-        status='active',
-    ).select_related('group').annotate(
-        confirmed_count=models.Count('rsvps', filter=models.Q(rsvps__status='confirmed'))
+    events = Event.objects.filter(
+        date__gte=start_date,
+        date__lt=end_date,
+        status='active'
     ).order_by('date', 'start_time')
-
-    if filter_adult == 'false':
-        events_qs = events_qs.exclude(age_restriction__in=['adult', 'mature'])
-
-    calendar_groups = Group.objects.filter(
-        id__in=events_qs.values_list('group_id', flat=True).distinct()
-    ).order_by('name')
-
-    calendar_groups_options = [
-        {
-            'value': str(group.id),
-            'text': group.name,
-            'logo': f'data:image/png;base64,{group.logo_base64}' if group.logo_base64 else '',
-        }
-        for group in calendar_groups
-    ]
-
-    if filter_group:
-        events_qs = events_qs.filter(group_id=filter_group)
-
-    month_events = list(events_qs)
-    if request.user.is_authenticated and month_events:
-        user_rsvps = RSVP.objects.filter(
-            user=request.user,
-            event_id__in=[event.id for event in month_events],
-        )
-        rsvp_by_event = {rsvp.event_id: rsvp for rsvp in user_rsvps}
-        for event in month_events:
-            rsvp = rsvp_by_event.get(event.id)
-            event.user_rsvp_list = [rsvp] if rsvp else []
-    else:
-        for event in month_events:
-            event.user_rsvp_list = []
-
+    # Group events by date
     events_by_date = {}
-    month_last_day = end_date - timedelta(days=1)
-    for event in month_events:
-        span_start = max(event.date, start_date)
-        span_end = min(event.effective_end_date, month_last_day)
-        current = span_start
-        while current <= span_end:
-            date_key = current.strftime('%Y-%m-%d')
-            events_by_date.setdefault(date_key, []).append(event)
-            current += timedelta(days=1)
-
+    for event in events:
+        date_key = event.date.strftime('%Y-%m-%d')
+        if date_key not in events_by_date:
+            events_by_date[date_key] = []
+        events_by_date[date_key].append(event)
+    # Navigation
     prev_month = month - 1 if month > 1 else 12
     prev_year = year if month > 1 else year - 1
     next_month = month + 1 if month < 12 else 1
     next_year = year if month < 12 else year + 1
-
+    
     eastern = pytz.timezone('America/New_York')
     today = timezone.now().astimezone(eastern).date()
-
     context = {
         'calendar': cal,
         'month_name': month_name,
         'year': year,
         'month': month,
-        'month_events': month_events,
-        'month_event_count': len(month_events),
         'events_by_date': events_by_date,
         'prev_month': prev_month,
         'prev_year': prev_year,
         'next_month': next_month,
         'next_year': next_year,
         'today': today,
-        'filter_adult': filter_adult,
-        'filter_group': filter_group,
-        'calendar_groups_options': calendar_groups_options,
     }
-
+    
     return render(request, 'events/event_calendar.html', context)
 
 @login_required
@@ -1266,9 +1019,6 @@ def telegram_bot_webhook(request):
             except Event.DoesNotExist:
                 send_telegram_message(chat_id, "Event not found.")
                 return JsonResponse({'ok': True})
-            if event.rsvps_locked:
-                send_telegram_message(chat_id, RSVP_LOCK_MESSAGE)
-                return JsonResponse({'ok': True})
             # Find user by Telegram username
             user = None
             if username:
@@ -1304,9 +1054,6 @@ def telegram_bot_webhook(request):
                 except Event.DoesNotExist:
                     send_telegram_message(chat_id, "Event not found.")
                     return JsonResponse({'ok': True})
-                if event.rsvps_locked:
-                    send_telegram_message(chat_id, RSVP_LOCK_MESSAGE)
-                    return JsonResponse({'ok': True})
                 # Find user by Telegram username
                 user = None
                 if username:
@@ -1327,32 +1074,18 @@ def telegram_bot_webhook(request):
                         send_telegram_message(chat_id, "You do not have an RSVP for this event.")
                     return JsonResponse({'ok': True})
                 # Set RSVP status
-                desired_status = 'not_attending' if status == 'no' else ('waitlisted' if status == 'waitlist' else ('maybe' if status == 'maybe' else 'confirmed'))
-                rsvp, created = RSVP.objects.get_or_create(event=event, user=user, defaults={'status': desired_status})
-
-                # Enforce capacity rules for confirmed status
-                if desired_status == 'confirmed':
-                    confirmed_qs = RSVP.objects.filter(event=event, status='confirmed')
-                    if rsvp.pk:
-                        confirmed_qs = confirmed_qs.exclude(pk=rsvp.pk)
-                    if event.capacity is not None and confirmed_qs.count() >= event.capacity:
-                        if event.waitlist_enabled:
-                            rsvp.status = 'waitlisted'
-                            rsvp.save()
-                            send_telegram_message(chat_id, f"Event is full — you've been added to the waitlist for <b>{event.title}</b>.", parse_mode="HTML")
-                            return JsonResponse({'ok': True})
-                        else:
-                            send_telegram_message(chat_id, f"Cannot confirm — <b>{event.title}</b> is at capacity.", parse_mode="HTML")
-                            return JsonResponse({'ok': True})
-
-                # For non-confirmed desired statuses or when capacity allows
+                rsvp, created = RSVP.objects.get_or_create(event=event, user=user, defaults={'status': status if status != 'no' else 'not_attending'})
                 if not created:
-                    rsvp.status = desired_status
+                    if status == 'waitlist':
+                        rsvp.status = 'waitlisted'
+                    elif status == 'maybe':
+                        rsvp.status = 'maybe'
+                    elif status == 'no':
+                        rsvp.status = 'not_attending'
+                    else:
+                        rsvp.status = 'confirmed'
                     rsvp.save()
-
-                # Build the user-facing status text
-                display_text = 'Waitlisted' if desired_status == 'waitlisted' else (desired_status.capitalize() if desired_status != 'not_attending' else 'Not Attending')
-                send_telegram_message(chat_id, f"Your RSVP status for <b>{event.title}</b> is now <b>{display_text}</b>.", parse_mode="HTML")
+                send_telegram_message(chat_id, f"Your RSVP status for <b>{event.title}</b> is now <b>{'Waitlisted' if status == 'waitlist' else status.capitalize() if status != 'no' else 'Not Attending'}</b>.", parse_mode="HTML")
                 return JsonResponse({'ok': True})
         # RSVP list (unchanged)
         if data_str.startswith("rsvplist_"):
@@ -1432,10 +1165,6 @@ def rsvp_telegram(request, event_id):
         event = Event.objects.get(id=event_id)
     except Event.DoesNotExist:
         return HttpResponse('Event not found.', status=404)
-    if event.rsvps_locked:
-        return HttpResponse(RSVP_LOCK_MESSAGE, status=403)
-    if user_is_banned_from_event(profile.user, event):
-        return HttpResponse('You are banned from RSVPing to this event.', status=403)
     from events.models import RSVP
     rsvp, created = RSVP.objects.get_or_create(event=event, user=profile.user, defaults={'status': 'confirmed'})
     if not created:
@@ -1450,520 +1179,3 @@ def blog(request):
         'bluesky_profile': profile,
     }
     return render(request, 'events/blog.html', context)
-
-
-def _event_not_ended_filter(now):
-    return Event.active_not_ended_q(now, prefix='event__')
-
-
-@login_required
-def my_rsvps(request):
-    now = timezone.now()
-    base_qs = RSVP.objects.filter(user=request.user).select_related('event', 'event__group')
-    not_ended = _event_not_ended_filter(now)
-
-    upcoming_rsvps = base_qs.filter(not_ended).order_by('event__date', 'event__start_time')
-    past_rsvps = base_qs.exclude(not_ended).order_by('-event__date', '-event__start_time')
-
-    return render(request, 'events/my_rsvps.html', {
-        'upcoming_rsvps': upcoming_rsvps,
-        'past_rsvps': past_rsvps,
-    })
-
-
-def _user_can_manage_event(user, event):
-    if user == event.organizer or user.is_superuser:
-        return True
-    if not event.group:
-        return False
-    if GroupRole.objects.filter(user=user, group=event.group).exists():
-        return True
-    return GroupDelegation.objects.filter(delegated_user=user, group=event.group).exists()
-
-
-def _ordered_organizer_rsvps(event, order_param=None):
-    """Return confirmed/waitlisted RSVPs in badge order (custom or RSVP timestamp)."""
-    base_qs = (
-        event.rsvps.filter(status__in=['confirmed', 'waitlisted'])
-        .select_related('user__profile')
-    )
-    if not order_param:
-        return list(base_qs.order_by('timestamp'))
-
-    try:
-        ids = [int(x) for x in order_param.split(',') if x.strip()]
-    except ValueError:
-        return list(base_qs.order_by('timestamp'))
-
-    rsvp_map = {rsvp.id: rsvp for rsvp in base_qs}
-    ordered = [rsvp_map[rsvp_id] for rsvp_id in ids if rsvp_id in rsvp_map]
-    seen = {rsvp.id for rsvp in ordered}
-    for rsvp in base_qs.order_by('timestamp'):
-        if rsvp.id not in seen:
-            ordered.append(rsvp)
-    return ordered
-
-
-def _rsvp_attendee_name(rsvp):
-    if rsvp.user:
-        profile = rsvp.user.profile if hasattr(rsvp.user, 'profile') else None
-        return profile.get_display_name() if profile else rsvp.user.username
-    return rsvp.name or 'Anonymous'
-
-
-@login_required
-def export_attendees_csv(request, event_id):
-    """Export attendee data as CSV"""
-    import csv
-
-    event = get_object_or_404(Event, pk=event_id)
-
-    if not _user_can_manage_event(request.user, event):
-        return HttpResponseForbidden("You don't have permission to export attendees.")
-
-    response = HttpResponse(content_type='text/csv')
-    safe_title = event.title.replace(' ', '_')
-    response['Content-Disposition'] = f'attachment; filename="attendees_{safe_title}_{event.date}.csv"'
-
-    headers = [
-        'Badge Number', 'Name', 'Username', 'Status', 'Email', 'Telegram', 'Discord',
-        'Accessibility Needs', 'Rank/Role', 'RSVP Date',
-    ]
-    question_fields = []
-    for idx, text in enumerate(
-        (event.question1_text, event.question2_text, event.question3_text), start=1
-    ):
-        if text and text.strip():
-            headers.append(text.strip())
-            question_fields.append(f'question{idx}')
-
-    writer = csv.writer(response)
-    writer.writerow(headers)
-
-    rsvps = _ordered_organizer_rsvps(event, request.GET.get('order'))
-
-    for idx, rsvp in enumerate(rsvps, start=1):
-        if rsvp.user:
-            profile = rsvp.user.profile if hasattr(rsvp.user, 'profile') else None
-            email = rsvp.user.email
-            telegram = profile.telegram_username if profile else ''
-            discord = profile.discord_username if profile else ''
-        else:
-            email = ''
-            telegram = ''
-            discord = ''
-
-        row = [
-            idx,
-            _rsvp_attendee_name(rsvp),
-            rsvp.user.username if rsvp.user else '',
-            rsvp.get_status_display(),
-            email,
-            telegram,
-            discord,
-            'Yes' if rsvp.accessibility_needs else 'No',
-            rsvp.custom_rank or '',
-            rsvp.timestamp.strftime('%Y-%m-%d %H:%M') if rsvp.timestamp else '',
-        ]
-        for field in question_fields:
-            row.append(getattr(rsvp, field) or '')
-        writer.writerow(row)
-
-    return response
-
-@login_required
-def generate_badges(request, event_id):
-    """Generate printable Avery 5162 badges with QR codes (no border)."""
-    from reportlab.lib.pagesizes import letter
-    from reportlab.lib.units import inch
-    from reportlab.pdfgen import canvas
-    from reportlab.lib.utils import ImageReader
-    from reportlab.pdfbase import pdfmetrics
-    from reportlab.pdfbase.ttfonts import TTFont
-    from io import BytesIO
-    import qrcode
-
-    try:
-        fonts_dir = os.path.join(settings.BASE_DIR, 'static', 'fonts')
-        baloo2_bold_path = os.path.join(fonts_dir, 'Baloo2-Bold.ttf')
-        baloo2_extrabold_path = os.path.join(fonts_dir, 'Baloo2-ExtraBold.ttf')
-
-        if os.path.exists(baloo2_bold_path):
-            pdfmetrics.registerFont(TTFont('Baloo2-Bold', baloo2_bold_path))
-        if os.path.exists(baloo2_extrabold_path):
-            pdfmetrics.registerFont(TTFont('Baloo2-ExtraBold', baloo2_extrabold_path))
-            name_font = 'Baloo2-ExtraBold'
-        else:
-            name_font = 'Baloo2-Bold'
-
-        font_name = 'Baloo2-Bold'
-        if not os.path.exists(baloo2_bold_path):
-            font_name = 'Helvetica-Bold'
-            name_font = 'Helvetica-Bold'
-    except Exception:
-        font_name = 'Helvetica-Bold'
-        name_font = 'Helvetica-Bold'
-
-    event = get_object_or_404(Event, pk=event_id)
-
-    if not _user_can_manage_event(request.user, event):
-        return HttpResponseForbidden("You don't have permission to generate badges.")
-
-    rsvps = _ordered_organizer_rsvps(event, request.GET.get('order'))
-
-    response = HttpResponse(content_type='application/pdf')
-    response['Content-Disposition'] = f'attachment; filename="badge_labels_{event.title.replace(" ", "_")}.pdf"'
-
-    p = canvas.Canvas(response, pagesize=letter)
-    width, height = letter
-
-    # Avery 5162: 4" x 1-1/3" labels, 14 per sheet (2 columns x 7 rows)
-    labels_per_row = 2
-    labels_per_col = 7
-    badge_width = 4.0 * inch
-    badge_height = (4.0 / 3.0) * inch
-    horizontal_pitch = 4.188 * inch
-    vertical_pitch = (4.0 / 3.0) * inch
-    left_margin = 0.156 * inch
-    top_margin = 0.833 * inch
-
-    for idx, rsvp in enumerate(rsvps):
-        if idx > 0 and idx % (labels_per_row * labels_per_col) == 0:
-            p.showPage()
-
-        col = idx % labels_per_row
-        row = (idx // labels_per_row) % labels_per_col
-        x = left_margin + col * horizontal_pitch
-        y = height - top_margin - (row * vertical_pitch) - badge_height
-
-        name = _rsvp_attendee_name(rsvp)
-        badge_num = idx + 1
-
-        check_in_url = request.build_absolute_uri(reverse('checkin_attendee', kwargs={'event_id': event.id, 'rsvp_id': rsvp.id}))
-        qr = qrcode.QRCode(version=1, box_size=3, border=1)
-        qr.add_data(check_in_url)
-        qr.make(fit=True)
-        qr_img = qr.make_image(fill_color='black', back_color='white')
-
-        qr_buffer = BytesIO()
-        qr_img.save(qr_buffer, format='PNG')
-        qr_buffer.seek(0)
-        qr_reader = ImageReader(qr_buffer)
-
-        qr_size = 0.30 * inch
-        # Keep original QR position for consistency
-        p.drawImage(qr_reader, x + 12, y + badge_height - qr_size - 10, qr_size, qr_size)
-
-        # Draw accessibility indicator if needed (same as prior behavior)
-        if rsvp.accessibility_needs:
-            from svglib.svglib import svg2rlg
-            from reportlab.graphics import renderPDF
-            icon_size = 0.30 * inch
-            icon_x = x + 12 + qr_size + 6
-            icon_y = y + badge_height - qr_size - 10
-
-            # Draw black background
-            p.setFillColorRGB(0, 0, 0)
-            p.rect(icon_x, icon_y, icon_size, icon_size, fill=1, stroke=0)
-
-            try:
-                svg_path = os.path.join(settings.BASE_DIR, 'static', 'accessible.svg')
-                if os.path.exists(svg_path):
-                    drawing = svg2rlg(svg_path)
-                    if drawing:
-                        from reportlab.graphics.shapes import Path
-                        from reportlab.lib import colors
-
-                        def make_white(group):
-                            for item in group.contents:
-                                if hasattr(item, 'fillColor'):
-                                    item.fillColor = colors.white
-                                if hasattr(item, 'strokeColor'):
-                                    item.strokeColor = colors.white
-                                if hasattr(item, 'contents'):
-                                    make_white(item)
-
-                        make_white(drawing)
-
-                        target_size = icon_size * 1.25
-                        scale_factor = target_size / max(drawing.width, drawing.height)
-                        scaled_width = drawing.width * scale_factor
-                        scaled_height = drawing.height * scale_factor
-                        offset_x = (icon_size - scaled_width) / 2
-                        offset_y = (icon_size - scaled_height) / 2
-
-                        drawing.width = scaled_width
-                        drawing.height = scaled_height
-                        drawing.scale(scale_factor, scale_factor)
-                        renderPDF.draw(drawing, p, icon_x + offset_x, icon_y + offset_y)
-                else:
-                    p.saveState()
-                    p.setFillColorRGB(1, 1, 1)
-                    center_x = icon_x + icon_size / 2
-                    center_y = icon_y + icon_size / 2
-                    p.circle(center_x + icon_size * 0.12, center_y + icon_size * 0.25, icon_size * 0.13, fill=1)
-                    p.setLineWidth(icon_size * 0.10)
-                    p.line(center_x - icon_size * 0.20, center_y + icon_size * 0.08,
-                           center_x + icon_size * 0.30, center_y + icon_size * 0.08)
-                    p.circle(center_x + icon_size * 0.02, center_y - icon_size * 0.08, icon_size * 0.24, fill=0, stroke=1)
-                    p.restoreState()
-            except Exception as e:
-                p.saveState()
-                p.setFillColorRGB(1, 1, 1)
-                center_x = icon_x + icon_size / 2
-                center_y = icon_y + icon_size / 2
-                p.circle(center_x + icon_size * 0.12, center_y + icon_size * 0.25, icon_size * 0.13, fill=1)
-                p.setLineWidth(icon_size * 0.10)
-                p.line(center_x - icon_size * 0.20, center_y + icon_size * 0.08,
-                       center_x + icon_size * 0.30, center_y + icon_size * 0.08)
-                p.circle(center_x + icon_size * 0.02, center_y - icon_size * 0.08, icon_size * 0.24, fill=0, stroke=1)
-                p.restoreState()
-
-        font_size = 28
-        p.setFont(name_font, font_size)
-        text_width = p.stringWidth(name, name_font, font_size)
-
-        # Downsize name if too wide
-        if text_width > badge_width - 0.4 * inch:
-            font_size = 20
-            p.setFont(name_font, font_size)
-            text_width = p.stringWidth(name, name_font, font_size)
-        if text_width > badge_width - 0.4 * inch:
-            font_size = 16
-            p.setFont(name_font, font_size)
-            text_width = p.stringWidth(name, name_font, font_size)
-
-        # Truncate with ellipsis if still too wide
-        if text_width > badge_width - 0.4 * inch:
-            available = badge_width - 0.4 * inch
-            truncated = name
-            while truncated and p.stringWidth(truncated + '...', name_font, font_size) > available:
-                truncated = truncated[:-1]
-            name = truncated + '...' if truncated else '...'
-            text_width = p.stringWidth(name, name_font, font_size)
-
-        name_x = x + (badge_width / 2)
-        name_y = y + (badge_height / 2) - (font_size * 0.3)
-        if rsvp.custom_rank:
-            name_y += font_size * 0.15
-        p.drawCentredString(name_x, name_y, name)
-
-        if rsvp.custom_rank:
-            rank_font_size = 11
-            p.setFont(font_name, rank_font_size)
-            rank_label = rsvp.custom_rank.upper()
-            if p.stringWidth(rank_label, font_name, rank_font_size) > badge_width - 0.4 * inch:
-                while rank_label and p.stringWidth(rank_label + '...', font_name, rank_font_size) > badge_width - 0.4 * inch:
-                    rank_label = rank_label[:-1]
-                rank_label = (rank_label + '...') if rank_label else '...'
-            p.drawCentredString(name_x, name_y - font_size * 0.55, rank_label)
-
-        p.setFont(font_name, 12)
-        status_label = rsvp.get_status_display().upper()
-        p.drawString(x + 0.12 * inch, y + 0.12 * inch, f'{badge_num}')
-        p.drawString(x + badge_width - p.stringWidth(status_label, font_name, 10) - 0.12 * inch, y + 0.12 * inch, status_label)
-
-    p.save()
-    return response
-
-@login_required
-def checkin_attendee(request, event_id, rsvp_id):
-    """Check-in page accessible via QR code on badges"""
-    event = get_object_or_404(Event, pk=event_id)
-    rsvp = get_object_or_404(RSVP, pk=rsvp_id, event=event)
-    
-    # Check permissions
-    is_organizer = request.user == event.organizer or request.user.is_superuser
-    can_access_group = False
-    if event.group:
-        can_access_group = GroupRole.objects.filter(user=request.user, group=event.group).exists()
-        if not can_access_group:
-            can_access_group = GroupDelegation.objects.filter(delegated_user=request.user, group=event.group).exists()
-    
-    if not (is_organizer or can_access_group):
-        return HttpResponseForbidden("You don't have permission to check in attendees.")
-    
-    if request.method == 'POST':
-        # Mark as checked in (we'll add a checked_in field to RSVP model)
-        # For now, just show success message
-        messages.success(request, f'Successfully checked in {rsvp.user.profile.get_display_name() if rsvp.user and hasattr(rsvp.user, "profile") else rsvp.name}')
-        return redirect('event_detail', event_id=event.id)
-    
-    context = {
-        'event': event,
-        'rsvp': rsvp,
-        'attendee_name': rsvp.user.profile.get_display_name() if rsvp.user and hasattr(rsvp.user, 'profile') else (rsvp.name or 'Anonymous'),
-    }
-    return render(request, 'events/checkin.html', context)
-
-@login_required
-def generate_checkin_sheet(request, event_id):
-    """Generate a printable check-in sheet with names and checkboxes"""
-    from reportlab.lib.pagesizes import letter
-    from reportlab.lib.units import inch
-    from reportlab.pdfgen import canvas
-    from reportlab.lib import colors
-    
-    event = get_object_or_404(Event, pk=event_id)
-    
-    # Check permissions
-    is_organizer = request.user == event.organizer or request.user.is_superuser
-    can_access_group = False
-    if event.group:
-        can_access_group = GroupRole.objects.filter(user=request.user, group=event.group).exists()
-        if not can_access_group:
-            can_access_group = GroupDelegation.objects.filter(delegated_user=request.user, group=event.group).exists()
-    
-    if not (is_organizer or can_access_group):
-        return HttpResponseForbidden("You don't have permission to generate check-in sheets.")
-
-    rsvps = _ordered_organizer_rsvps(event, request.GET.get('order'))
-    
-    # Create PDF
-    response = HttpResponse(content_type='application/pdf')
-    response['Content-Disposition'] = f'attachment; filename="checkin_sheet_{event.title.replace(" ", "_")}.pdf"'
-    
-    p = canvas.Canvas(response, pagesize=letter)
-    width, height = letter
-    
-    # Header
-    p.setFont("Helvetica-Bold", 18)
-    p.drawString(50, height - 50, f"Check-in Sheet: {event.title}")
-    
-    p.setFont("Helvetica", 12)
-    p.drawString(50, height - 75, f"Date: {event.date.strftime('%B %d, %Y')}")
-    p.drawString(50, height - 95, f"Total Attendees: {len(rsvps)}")
-    
-    # Draw line
-    p.line(50, height - 105, width - 50, height - 105)
-    
-    # Starting position for attendee list
-    y_position = height - 135
-    line_height = 45  # Increased to accommodate more info
-    checkbox_size = 18
-    
-    for idx, rsvp in enumerate(rsvps, start=1):
-        # Check if we need a new page
-        if y_position < 100:
-            p.showPage()
-            # Repeat header on new page
-            p.setFont("Helvetica-Bold", 18)
-            p.drawString(50, height - 50, f"Check-in Sheet: {event.title} (cont.)")
-            p.line(50, height - 65, width - 50, height - 65)
-            y_position = height - 95
-        
-        # Draw checkbox
-        p.rect(50, y_position - checkbox_size + 4, checkbox_size, checkbox_size)
-        
-        # Get attendee info
-        if rsvp.user:
-            profile = rsvp.user.profile if hasattr(rsvp.user, 'profile') else None
-            name = profile.get_display_name() if profile else rsvp.user.username
-            email = rsvp.user.email
-            discord = profile.discord_username if profile else None
-            telegram = profile.telegram_username if profile else None
-        else:
-            name = rsvp.name or 'Anonymous'
-            email = ''
-            discord = None
-            telegram = None
-        
-        # Draw badge number
-        p.setFont("Helvetica-Bold", 12)
-        p.drawString(80, y_position, f"#{idx}")
-        
-        # Draw name
-        p.setFont("Helvetica-Bold", 14)
-        name_display = name[:45]  # Truncate if too long
-        
-        # Add custom rank badge if present
-        if rsvp.custom_rank:
-            name_display += f"  [{rsvp.custom_rank}]"
-        
-        p.drawString(120, y_position, name_display[:55])
-        
-        # Draw status and email on second line
-        p.setFont("Helvetica", 10)
-        status_text = f"Status: {rsvp.get_status_display()}"
-        if email:
-            status_text += f"  |  {email[:35]}"
-        p.drawString(120, y_position - 12, status_text)
-        
-        # Draw additional info on third line
-        info_parts = []
-        if rsvp.accessibility_needs:
-            info_parts.append("♿ Accessibility")
-        if discord:
-            info_parts.append(f"Discord: {discord[:20]}")
-        if telegram:
-            info_parts.append(f"TG: @{telegram[:15]}")
-        
-        if info_parts:
-            p.setFont("Helvetica", 9)
-            p.drawString(120, y_position - 24, "  |  ".join(info_parts)[:70])
-        
-        y_position -= line_height
-    
-    p.save()
-    return response
-
-@login_required
-def update_badge_settings(request, event_id, rsvp_id):
-    """AJAX endpoint to update badge settings for an attendee"""
-    if request.method != 'POST':
-        return JsonResponse({'status': 'error', 'message': 'POST required'}, status=400)
-    
-    event = get_object_or_404(Event, pk=event_id)
-    rsvp = get_object_or_404(RSVP, pk=rsvp_id, event=event)
-    
-    # Check permissions
-    is_organizer = request.user == event.organizer or request.user.is_superuser
-    can_access_group = False
-    if event.group:
-        can_access_group = GroupRole.objects.filter(user=request.user, group=event.group).exists()
-        if not can_access_group:
-            can_access_group = GroupDelegation.objects.filter(delegated_user=request.user, group=event.group).exists()
-    
-    if not (is_organizer or can_access_group):
-        return JsonResponse({'status': 'error', 'message': 'Permission denied'}, status=403)
-    
-    # Update fields
-    if 'accessibility_needs' in request.POST:
-        rsvp.accessibility_needs = request.POST.get('accessibility_needs') == 'true'
-    
-    if 'custom_rank' in request.POST:
-        custom_rank = request.POST.get('custom_rank', '').strip()
-        rsvp.custom_rank = custom_rank if custom_rank else None
-    
-    rsvp.save()
-    
-    return JsonResponse({
-        'status': 'success',
-        'message': 'Badge settings updated',
-        'accessibility_needs': rsvp.accessibility_needs,
-        'custom_rank': rsvp.custom_rank or ''
-    })
-
-@login_required
-def organizer_tools(request, event_id):
-    """Organizer tools page for managing badges and exports"""
-    event = get_object_or_404(Event, pk=event_id)
-    
-    # Check permissions
-    is_organizer = request.user == event.organizer or request.user.is_superuser
-    can_access_group = False
-    if event.group:
-        can_access_group = GroupRole.objects.filter(user=request.user, group=event.group).exists()
-        if not can_access_group:
-            can_access_group = GroupDelegation.objects.filter(delegated_user=request.user, group=event.group).exists()
-    
-    if not (is_organizer or can_access_group):
-        return HttpResponseForbidden("You don't have permission to access organizer tools.")
-
-    rsvps = _ordered_organizer_rsvps(event)
-    
-    context = {
-        'event': event,
-        'rsvps': rsvps,
-    }
-    return render(request, 'events/organizer_tools.html', context)

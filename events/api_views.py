@@ -161,11 +161,13 @@ class GroupViewSet(viewsets.ReadOnlyModelViewSet):
         
         if event_type == 'upcoming':
             events = events.filter(
-                Event.active_not_ended_q(now)
+                Q(date__gt=now.date()) | 
+                (Q(date=now.date()) & Q(end_time__gt=now.time()))
             ).order_by('date', 'start_time')
         elif event_type == 'past':
             events = events.filter(
-                Event.active_ended_q(now)
+                Q(date__lt=now.date()) | 
+                (Q(date=now.date()) & Q(end_time__lt=now.time()))
             ).order_by('-date', '-start_time')
         else:
             events = events.order_by('date', 'start_time')
@@ -210,11 +212,13 @@ class EventViewSet(viewsets.ReadOnlyModelViewSet):
             
             if event_type == 'upcoming':
                 queryset = queryset.filter(
-                    Event.active_not_ended_q(now)
+                    Q(date__gt=now.date()) | 
+                    (Q(date=now.date()) & Q(end_time__gt=now.time()))
                 )
             elif event_type == 'past':
                 queryset = queryset.filter(
-                    Event.active_ended_q(now)
+                    Q(date__lt=now.date()) | 
+                    (Q(date=now.date()) & Q(end_time__lt=now.time()))
                 )
         
         # Filter by location
@@ -239,7 +243,7 @@ class EventViewSet(viewsets.ReadOnlyModelViewSet):
         event = self.get_object()
         
         # Check if attendee list is public
-        if not event.attendee_list_public and not request.user.is_staff:
+        if not event.attendee_list_public and not request.user.is_authenticated:
             return Response(
                 {'error': 'Attendee list is not public for this event'},
                 status=status.HTTP_403_FORBIDDEN
@@ -255,7 +259,7 @@ class EventViewSet(viewsets.ReadOnlyModelViewSet):
         event = self.get_object()
         
         # Check if attendee list is public
-        if not event.attendee_list_public and not request.user.is_staff:
+        if not event.attendee_list_public and not request.user.is_authenticated:
             return Response(
                 {'error': 'Attendee list is not public for this event'},
                 status=status.HTTP_403_FORBIDDEN
@@ -270,7 +274,8 @@ class EventViewSet(viewsets.ReadOnlyModelViewSet):
         """Get upcoming events"""
         now = timezone.now()
         events = self.get_queryset().filter(
-            Event.active_not_ended_q(now)
+            Q(date__gt=now.date()) | 
+            (Q(date=now.date()) & Q(end_time__gt=now.time()))
         ).order_by('date', 'start_time')
         
         serializer = self.get_serializer(events, many=True)
@@ -284,6 +289,7 @@ class EventViewSet(viewsets.ReadOnlyModelViewSet):
         
         serializer = self.get_serializer(events, many=True)
         return Response(serializer.data)
+
 
 class CustomAPIRootView(APIView):
     api_root_dict = None
