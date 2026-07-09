@@ -678,7 +678,7 @@
         .auth-tab-title {
             font-size: 1.1rem;
             font-weight: 700;
-            color: #1e293b;
+            color: var(--fursvp-text);
             margin: 0 0 0.25rem;
         }
 
@@ -1590,8 +1590,77 @@
             border-color: var(--fursvp-accent);
         }
 
-        .dark-mode .auth-input-group .form-control {
+        .dark-mode .auth-input-group .form-control,
+        .dark-mode .auth-input-group .form-select {
+            color: var(--fursvp-text) !important;
+            background-color: transparent !important;
+            --bs-form-select-color: var(--fursvp-text);
+            --bs-form-select-bg: transparent;
+            --bs-form-select-bg-img: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%239aa0a6' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+        }
+
+        .dark-mode .auth-input-group .form-control::placeholder {
+            color: var(--fursvp-text-placeholder) !important;
+            opacity: 1 !important;
+        }
+
+        .dark-mode .auth-input-group .form-select option {
+            background: var(--fursvp-surface);
             color: var(--fursvp-text);
+        }
+
+        .dark-mode .auth-input-group .input-group-text {
+            background: transparent !important;
+            color: var(--fursvp-link) !important;
+            border: none !important;
+        }
+
+        .dark-mode .auth-field-help {
+            color: var(--fursvp-text-muted) !important;
+        }
+
+        .dark-mode .auth-tab-title {
+            color: var(--fursvp-text);
+        }
+
+        .dark-mode .auth-tab-desc {
+            color: var(--fursvp-text-muted);
+        }
+
+        .dark-mode .auth-check-field {
+            background: var(--fursvp-surface-input);
+            border-color: var(--fursvp-border);
+        }
+
+        .dark-mode .auth-check-field .form-check-label {
+            color: var(--fursvp-text-secondary);
+        }
+
+        .dark-mode .admin-search-meta {
+            color: var(--fursvp-text-muted);
+        }
+
+        .dark-mode .admin-search-meta strong {
+            color: var(--fursvp-text-secondary);
+        }
+
+        .dark-mode .admin-search-clear:hover {
+            color: var(--fursvp-text-muted) !important;
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .dark-mode .moderation-header .auth-tab-title,
+        .dark-mode .moderation-stat-value {
+            color: var(--fursvp-text) !important;
+        }
+
+        .dark-mode .moderation-help strong {
+            color: var(--fursvp-text-secondary) !important;
+        }
+
+        .dark-mode .table thead th {
+            background-color: var(--fursvp-surface-muted) !important;
+            color: var(--fursvp-text-secondary) !important;
         }
 
         .dark-mode .auth-footer-link {

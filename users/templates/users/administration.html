@@ -141,6 +141,7 @@
                                                 {% if profile_form.can_post_blog %}
                                                     {{ profile_form.can_post_blog.as_hidden }}
                                                 {% endif %}
+                                                <input type="hidden" name="profile_{{ user_obj.id }}-update_groups" value="0" class="admin-groups-update-flag">
                                                 {{ profile_form.admin_groups|add_class:"tomselect-allowed-groups form-select form-select-sm"|attr:"multiple:true" }}
                                             {% endwith %}
                                         </td>
@@ -378,7 +379,7 @@
                             <input type="hidden" name="ban_type" value="sitewide">
                             <div class="auth-field">
                                 <label for="banUsernameInput" class="auth-form-label">User to ban</label>
-                                <select class="form-control" id="banUsernameInput" name="user_id" placeholder="Search for a user..." required></select>
+                                <select class="form-control admin-select tomselect-ban-user" id="banUsernameInput" name="user_id" placeholder="Search for a user..." required></select>
                             </div>
                             <div class="auth-field">
                                 <label for="banReasonInput" class="auth-form-label">Reason (optional)</label>
@@ -1048,12 +1049,20 @@
 {% block extra_js %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
+        function markGroupsRowModified(element) {
+            const row = element.closest('tr');
+            const flag = row ? row.querySelector('.admin-groups-update-flag') : null;
+            if (flag) {
+                flag.value = '1';
+            }
+        }
+
         if (window.TomSelect) {
             document.querySelectorAll('select.tomselect-allowed-groups').forEach(function(element) {
                 if (element.tomselect) {
                     return;
                 }
-                new TomSelect(element, {
+                const tomSelect = new TomSelect(element, {
                     plugins: {
                         remove_button: {
                             title: 'Remove group',
@@ -1063,6 +1072,22 @@
                     dropdownParent: 'body',
                     create: false,
                     maxOptions: 1000,
+                    onChange: function() {
+                        markGroupsRowModified(element);
+                    },
+                });
+                element.tomselect = tomSelect;
+            });
+        }
+
+        const groupAssignmentsForm = document.querySelector('button[name="promote_users_submit"]')?.closest('form');
+        if (groupAssignmentsForm) {
+            groupAssignmentsForm.addEventListener('submit', function() {
+                document.querySelectorAll('select.tomselect-allowed-groups').forEach(function(element) {
+                    if (element.tomselect) {
+                        element.disabled = false;
+                        element.tomselect.sync();
+                    }
                 });
             });
         }

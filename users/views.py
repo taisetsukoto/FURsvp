@@ -659,36 +659,36 @@ def administration(request):
         if 'promote_users_submit' in request.POST:
             success_count = 0
             error_count = 0
+            skipped_count = 0
             for user_obj in users_to_promote:
+                prefix = f'profile_{user_obj.id}'
+                if request.POST.get(f'{prefix}-update_groups') != '1':
+                    skipped_count += 1
+                    continue
                 try:
                     user_obj.profile.refresh_from_db()
-                    profile_form = UserProfileForm(request.POST, instance=user_obj.profile, prefix=f'profile_{user_obj.id}')
+                    profile_form = UserProfileForm(request.POST, instance=user_obj.profile, prefix=prefix)
                     if profile_form.is_valid():
-                        old_data = {
-                            'admin_groups': list(
-                                GroupRole.objects.filter(user=user_obj).values_list('group__name', flat=True)
-                            )
-                        }
-                        profile_form.save()
-                        new_data = {
-                            'admin_groups': list(
-                                GroupRole.objects.filter(user=user_obj).values_list('group__name', flat=True)
-                            )
-                        }
-                        
-                        # Log the profile update
-                        AuditLog.log_action(
-                            user=request.user,
-                            action='user_profile_updated',
-                            description=f'Updated profile for user {user_obj.username}',
-                            target_user=user_obj,
-                            request=request,
-                            additional_data={
-                                'old_data': old_data,
-                                'new_data': new_data,
-                                'changes': 'Profile groups updated'
-                            }
+                        old_groups = list(
+                            GroupRole.objects.filter(user=user_obj).values_list('group__name', flat=True)
                         )
+                        profile_form.save()
+                        new_groups = list(
+                            GroupRole.objects.filter(user=user_obj).values_list('group__name', flat=True)
+                        )
+                        if old_groups != new_groups:
+                            AuditLog.log_action(
+                                user=request.user,
+                                action='user_profile_updated',
+                                description=f'Updated group assignments for user {user_obj.username}',
+                                target_user=user_obj,
+                                request=request,
+                                additional_data={
+                                    'old_data': {'admin_groups': old_groups},
+                                    'new_data': {'admin_groups': new_groups},
+                                    'changes': 'Profile groups updated',
+                                },
+                            )
                         success_count += 1
                     else:
                         error_count += 1
@@ -697,7 +697,13 @@ def administration(request):
                     messages.error(request, f'Error updating profile for {user_obj.username}: {str(e)}', extra_tags='admin_notification')
 
             if success_count > 0:
-                messages.success(request, f'Successfully updated {success_count} user profiles.', extra_tags='admin_notification')
+                messages.success(
+                    request,
+                    f'Successfully updated group assignments for {success_count} user{"s" if success_count != 1 else ""}.',
+                    extra_tags='admin_notification',
+                )
+            elif error_count == 0 and skipped_count == len(users_to_promote):
+                messages.info(request, 'No group assignment changes were submitted.', extra_tags='admin_notification')
             if error_count > 0:
                 messages.error(request, f'Failed to update {error_count} user profiles.', extra_tags='admin_notification')
 

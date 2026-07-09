@@ -1,6 +1,7 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
+from datetime import datetime
 from events.models import Event, Group, RSVP
 from users.models import Profile, GroupDelegation, GroupRole
 from tinymce.widgets import TinyMCE
@@ -189,6 +190,15 @@ class EventForm(forms.ModelForm):
 
         if start_date and end_date and end_date == start_date:
             cleaned_data['end_date'] = None
+
+        start_time = cleaned_data.get('start_time')
+        end_time = cleaned_data.get('end_time')
+        if start_date and start_time and end_time:
+            effective_end_date = end_date or start_date
+            start_dt = datetime.combine(start_date, start_time)
+            end_dt = datetime.combine(effective_end_date, end_time)
+            if end_dt <= start_dt:
+                self.add_error('end_time', 'End time must be after start time.')
 
         return cleaned_data
 
