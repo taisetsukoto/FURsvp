@@ -15,10 +15,7 @@ class Command(BaseCommand):
         # fields within the ORM query might be more efficient, but this is broadly compatible.
         events_to_delete_pks = []
         for event in Event.objects.all():
-            event_end_datetime = datetime.combine(event.date, event.end_time)
-            # Make event_end_datetime timezone-aware if USE_TZ is True in settings
-            if timezone.is_aware(threshold_datetime):
-                event_end_datetime = timezone.make_aware(event_end_datetime, timezone.get_current_timezone())
+            event_end_datetime = event.ends_at or event.get_end_datetime()
 
             if event_end_datetime < threshold_datetime:
                 events_to_delete_pks.append(event.pk)

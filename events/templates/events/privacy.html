@@ -16,7 +16,7 @@
                         <section class="mb-5">
                             <h2 class="h4 fw-bold mb-4">1. Data Storage and Security</h2>
                             <ul>
-                                <li>FURsvp uses SQLite3 as its database system for secure and efficient data storage.</li>
+                                <li>FURsvp uses PostgreSQL as its database system for secure and efficient data storage.</li>
                                 <li>All data is encrypted and access is strictly controlled.</li>
                                 <li>Regular backups and security audits are performed to protect your information.</li>
                             </ul>
@@ -70,7 +70,7 @@
                         <section class="mb-5">
                             <h2 class="h4 fw-bold mb-4">7. Open Source and Technology</h2>
                             <ul>
-                                <li>FURsvp is open source and available on <a href="https://github.com/furconnect/fursvp" target="_blank">GitHub</a> under the MIT License.</li>
+                                <li>FURsvp is open source and available on <a href="https://github.com/FURsvp/fursvp" target="_blank">GitHub</a> under the MIT License.</li>
                                 <li>Built with Django, a secure and reliable web framework.</li>
                                 <li>Open source code does not grant access to user data; each instance's data remains private and isolated.</li>
                                 <li>All privacy practices described here apply to both official and self-hosted instances.</li>
@@ -95,41 +95,4 @@
         </div>
     </div>
 </div>
-
-<style>
-.privacy-content {
-    font-size: 1.1rem;
-    line-height: 1.6;
-}
-.privacy-content ul {
-    list-style-type: none;
-    padding-left: 0;
-}
-.privacy-content ul li {
-    position: relative;
-    padding-left: 1.5rem;
-    margin-bottom: 0.5rem;
-}
-.privacy-content ul li:before {
-    content: "•";
-    position: absolute;
-    left: 0;
-    color: var(--primary-color);
-}
-.privacy-content h2 {
-    color: var(--primary-color);
-    border-bottom: 2px solid var(--secondary-color);
-    padding-bottom: 0.5rem;
-}
-.privacy-content h3 {
-    color: #2c3e50;
-}
-.privacy-content a {
-    color: var(--primary-color);
-    text-decoration: none;
-}
-.privacy-content a:hover {
-    text-decoration: underline;
-}
-</style>
 {% endblock %} 

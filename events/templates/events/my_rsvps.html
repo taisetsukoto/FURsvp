@@ -1,0 +1,46 @@
+{% extends 'events/base.html' %}
+{% block title %}My RSVPs - FURsvp{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+        <div>
+            <h1 class="mb-1 fw-bold text-primary">My RSVPs</h1>
+            <p class="text-muted mb-0">All events you've responded to, in one place.</p>
+        </div>
+        <a href="{% url 'event_calendar' %}" class="btn btn-outline-primary d-inline-flex align-items-center">
+            <i class="material-icons me-1">calendar_month</i> Browse events
+        </a>
+    </div>
+
+    <div class="group-section-card profile-page-card mb-4">
+        <div class="group-section-header">
+            <div class="group-section-icon group-section-icon--events">
+                <i class="material-icons">upcoming</i>
+            </div>
+            <div class="group-section-heading">
+                <h2 class="group-section-title">Upcoming</h2>
+                <span class="group-section-meta">{{ upcoming_rsvps|length }} event{{ upcoming_rsvps|length|pluralize }}</span>
+            </div>
+        </div>
+        <div class="group-section-body">
+            {% include 'events/my_rsvps_cards.html' with rsvps=upcoming_rsvps empty_message="You don't have any upcoming RSVPs." %}
+        </div>
+    </div>
+
+    <div class="group-section-card profile-page-card mb-4">
+        <div class="group-section-header">
+            <div class="group-section-icon group-section-icon--past">
+                <i class="material-icons">history</i>
+            </div>
+            <div class="group-section-heading">
+                <h2 class="group-section-title">Past</h2>
+                <span class="group-section-meta">{{ past_rsvps|length }} event{{ past_rsvps|length|pluralize }}</span>
+            </div>
+        </div>
+        <div class="group-section-body">
+            {% include 'events/my_rsvps_cards.html' with rsvps=past_rsvps empty_message="No past RSVPs yet." %}
+        </div>
+    </div>
+</div>
+{% endblock %}

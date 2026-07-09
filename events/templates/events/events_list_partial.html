@@ -1,520 +1,168 @@
 {% load dict_extras %}
-<style>
-.event-card-modern {
-    border-radius: 1.25rem;
-    box-shadow: 0 4px 24px 0 rgba(31, 38, 135, 0.10);
-    background: #fff;
-    transition: box-shadow 0.18s, transform 0.12s;
-    border: none;
-}
-.event-card-modern:hover {
-    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.16);
-    transform: translateY(-2px) scale(1.02);
-}
-.event-title {
-    font-size: 1.25rem;
-    font-weight: 700;
-    color: #2563eb;
-    margin-bottom: 0.3rem;
-}
-.event-meta, .event-details {
-    color: #6b7280;
-    font-size: 1.05rem;
-}
-.rsvp-badge-modern {
-    background: linear-gradient(90deg, #3b82f6 0%, #06b6d4 100%);
-    color: #fff;
-    border-radius: 1.2rem;
-    font-size: 1.05rem;
-    font-weight: 600;
-    padding: 0.5rem 1.2rem;
-    display: flex;
-    align-items: center;
-    box-shadow: 0 2px 8px rgba(59,130,246,0.10);
-}
-.event-list-chevron {
-    color: #2563eb;
-    font-size: 2rem;
-    margin-left: 1.5rem;
-    opacity: 0.7;
-    transition: opacity 0.15s;
-}
-.event-list-item-modern:hover .event-list-chevron {
-    opacity: 1;
-}
-.gradient-badge-18 {
-        background: linear-gradient(90deg, #f59e42 0%, #fbbf24 100%);
-        color: #92400e;
-        border-radius: 1.2rem;
-        font-size: 1.05rem;
-        font-weight: 600;
-        padding: 0.5rem 1.2rem;
-        display: inline-flex;
-        align-items: center;
-        box-shadow: 0 2px 8px rgba(251,191,36,0.10);
-        margin-left: 0.5rem;
-        vertical-align: middle;
-    }
-    .gradient-badge-21 {
-        background: linear-gradient(90deg, #ef4444 0%, #dc2626 100%);
-        color: #fff;
-        border-radius: 1.2rem;
-        font-size: 1.05rem;
-        font-weight: 600;
-        padding: 0.5rem 1.2rem;
-        display: inline-flex;
-        align-items: center;
-        box-shadow: 0 2px 8px rgba(239,68,68,0.10);
-        margin-left: 0.5rem;
-        vertical-align: middle;
-    }
-
-    /* Event Status Badge Styles */
-    .event-status-badge {
-        position: absolute;
-        top: 1rem;
-        right: 1rem;
-        z-index: 10;
-    }
-
-    .event-status-badge-list {
-        position: absolute;
-        top: 1rem;
-        right: 1rem;
-        z-index: 10;
-    }
-
-    .status-badge {
-        display: flex;
-        align-items: center;
-        gap: 0.3rem;
-        padding: 0.4rem 0.8rem;
-        border-radius: 1.5rem;
-        font-size: 0.85rem;
-        font-weight: 600;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-        backdrop-filter: blur(10px);
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        transition: all 0.2s ease;
-    }
-
-    .status-badge:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-    }
-
-    .status-badge .material-icons {
-        font-size: 1rem;
-    }
-
-    .status-badge .status-text {
-        font-size: 0.8rem;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-
-    .status-active {
-        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-        color: #ffffff;
-    }
-
-    .status-cancelled {
-        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-        color: #ffffff;
-    }
-
-    .status-past {
-        background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
-        color: #ffffff;
-    }
-
-    /* RSVP Status Badge Styles */
-    .status-going {
-        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-        color: #ffffff;
-    }
-
-    .status-maybe {
-        background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
-        color: #ffffff;
-    }
-
-    .status-waitlist {
-        background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
-        color: #ffffff;
-    }
-
-    .status-not-going {
-        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-        color: #ffffff;
-    }
-
-    /* Dark mode styles for status badges */
-    .dark-mode .status-badge {
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-    }
-
-    .dark-mode .status-active {
-        background: linear-gradient(135deg, #059669 0%, #047857 100%);
-        color: #ffffff;
-    }
-
-    .dark-mode .status-cancelled {
-        background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
-        color: #ffffff;
-    }
-
-    .dark-mode .status-past {
-        background: linear-gradient(135deg, #4b5563 0%, #374151 100%);
-        color: #ffffff;
-    }
-
-    /* Dark mode styles for RSVP status badges */
-    .dark-mode .status-going {
-        background: linear-gradient(135deg, #059669 0%, #047857 100%);
-        color: #ffffff;
-    }
-
-    .dark-mode .status-maybe {
-        background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
-        color: #ffffff;
-    }
-
-    .dark-mode .status-waitlist {
-        background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%);
-        color: #ffffff;
-    }
-
-    .dark-mode .status-not-going {
-        background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
-        color: #ffffff;
-    }
-
-    /* Mobile responsive adjustments */
-    @media (max-width: 768px) {
-        .event-status-badge,
-        .event-status-badge-list {
-            top: 0.75rem;
-            right: 0.75rem;
-        }
-
-        .status-badge {
-            padding: 0.3rem 0.6rem;
-            font-size: 0.75rem;
-        }
-
-        .status-badge .material-icons {
-            font-size: 0.9rem;
-        }
-
-        .status-badge .status-text {
-            font-size: 0.7rem;
-        }
-    }
-
-    .rsvp-status-icon-badge {
-        position: absolute;
-        top: 1rem;
-        right: 1rem;
-        z-index: 10;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-    .icon-badge {
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        width: 44px;
-        height: 32px;
-        border-radius: 2rem;
-        box-shadow: 0 2px 8px rgba(59,130,246,0.10);
-        font-size: 1.25rem;
-        font-weight: 700;
-        color: #fff;
-        background: #ccc;
-        transition: background 0.18s, box-shadow 0.18s, transform 0.12s;
-    }
-    .icon-badge.going {
-        background: linear-gradient(90deg, #10b981 0%, #059669 100%);
-        color: #fff;
-    }
-    .icon-badge.maybe {
-        background: linear-gradient(90deg, #fbbf24 0%, #f59e42 100%);
-        color: #92400e;
-    }
-    .icon-badge.waitlist {
-        background: linear-gradient(90deg, #8b5cf6 0%, #7c3aed 100%);
-        color: #fff;
-    }
-    .icon-badge.notgoing {
-        background: linear-gradient(90deg, #ef4444 0%, #dc2626 100%);
-        color: #fff;
-    }
-    .icon-badge .material-icons {
-        font-size: 1.3rem;
-        margin: 0;
-    }
-    @media (max-width: 768px) {
-        .rsvp-status-icon-badge {
-            top: 0.5rem;
-            right: 0.5rem;
-        }
-        .icon-badge {
-            width: 36px;
-            height: 26px;
-            font-size: 1rem;
-        }
-    }
-    .rsvp-status-pill {
-        font-size: 0.92rem;
-        font-weight: 800;
-        letter-spacing: 1px;
-        text-transform: uppercase;
-        margin-left: 0.5rem;
-        color: #fff;
-        /* Optionally add background, padding, or other styles for distinction */
-        /* background: rgba(0,0,0,0.08); border-radius: 0.7rem; padding: 0.1rem 0.7rem; */
-        display: inline-block;
-    }
-    .long-badge {
-        font-size: 1.02rem;
-        font-weight: 800;
-        letter-spacing: 1px;
-        text-transform: uppercase;
-        margin-left: 0.7rem;
-        color: #fff;
-        border-radius: 1.2rem;
-        padding: 0.18rem 1.1rem;
-        display: inline-flex;
-        align-items: center;
-        gap: 0.5rem;
-    }
-    .long-badge.going {
-        background: linear-gradient(90deg, #10b981 0%, #059669 100%);
-    }
-    .long-badge.maybe {
-        background: linear-gradient(90deg, #fbbf24 0%, #f59e42 100%);
-        color: #92400e;
-    }
-    .long-badge.waitlist {
-        background: linear-gradient(90deg, #8b5cf6 0%, #7c3aed 100%);
-    }
-    .long-badge.notgoing {
-        background: linear-gradient(90deg, #ef4444 0%, #dc2626 100%);
-    }
-    .long-badge .material-icons {
-        font-size: 1.2rem;
-        margin-right: 0.3rem;
-    }
-
-/* Dark mode improvements for event list partial */
-.dark-mode .event-card-modern {
-    background: #23272f !important;
-    color: #f3f4f6 !important;
-    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.18);
-    border: 1.5px solid #374151 !important;
-}
-
-.dark-mode .event-title {
-    color: #60a5fa !important;
-}
-.dark-mode .event-meta, .dark-mode .event-details {
-    color: #a1a1aa !important;
-}
-.dark-mode .rsvp-badge-modern {
-    background: linear-gradient(90deg, #2563eb 0%, #06b6d4 100%) !important;
-    color: #fff !important;
-}
-.dark-mode .gradient-badge-18 {
-    background: linear-gradient(90deg, #fbbf24 0%, #f59e42 100%) !important;
-    color: #92400e !important;
-}
-.dark-mode .gradient-badge-21 {
-    background: linear-gradient(90deg, #ef4444 0%, #dc2626 100%) !important;
-    color: #fff !important;
-}
-.dark-mode .event-list-chevron {
-    color: #60a5fa !important;
-}
-</style>
-<div class="row" id="eventsGrid" style="display: flex;">
+<div class="home-events-grid" id="eventsGrid">
     {% for event in events %}
-    <div class="col-md-6 col-lg-4 mb-4">
-        <a href="{% url 'event_detail' event.id %}" class="card event-card-modern shadow-sm h-100 text-decoration-none position-relative">
-            <!-- RSVP Status Icon Badge -->
-            {% if event.user_rsvp_list %}
-                {% with user_rsvp=event.user_rsvp_list.0 %}
-                    <div class="rsvp-status-icon-badge">
-                        {% if user_rsvp.status == 'confirmed' %}
-                            <span class="d-flex align-items-center">
-                                <span class="icon-badge going"><i class="material-icons">check_circle</i></span>
-                            </span>
-                        {% elif user_rsvp.status == 'maybe' %}
-                            <span class="d-flex align-items-center">
-                                <span class="icon-badge maybe"><i class="material-icons">help</i></span>
-                            </span>
-                        {% elif user_rsvp.status == 'waitlisted' %}
-                            <span class="d-flex align-items-center">
-                                <span class="icon-badge waitlist"><i class="material-icons">queue</i></span>
-                            </span>
-                        {% elif user_rsvp.status == 'not_attending' %}
-                            <span class="d-flex align-items-center">
-                                <span class="icon-badge notgoing"><i class="material-icons">cancel</i></span>
-                            </span>
-                        {% endif %}
-                    </div>
-                {% endwith %}
-            {% endif %}
-            
-            <div class="card-body d-flex flex-column">
-                <h5 class="event-title mb-2">
-                    {{ event.title }}
-                </h5>
-                <div class="event-meta mb-2">
-                    <span class="event-date">
-                        <i class="material-icons align-middle me-1" style="font-size: 18px; color: #a0aec0;">calendar_today</i>
-                        {{ event.date }}{% if event.start_time %} at {{ event.start_time|time:"P" }}{% endif %}{% if event.end_time %} - {{ event.end_time|time:"P" }}{% endif %}
-                    </span>
-                </div>
-                <div class="event-details mb-3">
-                    <span class="me-3">
-                        <i class="material-icons align-middle me-1" style="font-size: 18px; color: #a0aec0;">group</i>
-                        {{ event.group.name }}
-                    </span>
-                    <div>
-                        <i class="material-icons align-middle me-1" style="font-size: 18px; color: #a0aec0;">location_on</i>
-                        {{ event.city }}{% if event.state %}, <abbr title="{{ event.state }}">{{ event.state|state_abbr }}</abbr>{% endif %}
-                    </div>
-                </div>
-                <div class="mt-auto d-flex align-items-center">
-                    <span class="badge rsvp-badge-modern">
-                        <i class="material-icons align-middle me-1" style="font-size: 18px;">people</i>
-                        {% if event.capacity %}
-                            {{ event.confirmed_count }} / {{ event.capacity }} RSVPs
-                        {% else %}
-                            {{ event.confirmed_count }} RSVPs
-                        {% endif %}
-                    </span>
-                    {% if event.age_restriction == 'mature' %}
-                        <span class="badge gradient-badge-21 ms-2">
-                            <i class="material-icons me-1 align-middle" style="font-size: 16px;">warning</i> 21+
-                        </span>
-                    {% elif event.age_restriction == 'adult' %}
-                        <span class="badge gradient-badge-18 ms-2">
-                            <i class="material-icons me-1 align-middle" style="font-size: 16px;">warning</i> 18+
-                        </span>
-                    {% endif %}
-                </div>
-            </div>
-        </a>
-    </div>
-    {% empty %}
-    <div class="col-12">
-        <div class="alert alert-info text-center" role="alert">
-            <i class="material-icons align-middle me-2">event_busy</i> No upcoming events found.
+    <a href="{% url 'event_detail' event.id %}" class="home-event-card">
+        <div class="home-event-card-date">
+            <span class="home-event-card-day">{{ event.date|date:"j" }}</span>
+            <span class="home-event-card-month">{{ event.date|date:"M" }}</span>
         </div>
-    </div>
-    {% endfor %}
-</div>
-
-<div class="list-group shadow-sm" id="eventsList" style="display: none;">
-    {% for event in events %}
-    <a href="{% url 'event_detail' event.id %}" class="list-group-item event-card-modern event-list-item-modern list-group-item-action p-0 mb-3 text-decoration-none position-relative">
-        <!-- RSVP Status Icon Badge -->
-        {% if event.user_rsvp_list %}
-            {% with user_rsvp=event.user_rsvp_list.0 %}
-                <div class="rsvp-status-icon-badge"
-                    {% if user_rsvp.status == 'confirmed' %}title="Going"{% elif user_rsvp.status == 'maybe' %}title="Maybe"{% elif user_rsvp.status == 'waitlisted' %}title="Waitlist"{% elif user_rsvp.status == 'not_attending' %}title="Not Going"{% endif %}>
-                    {% if user_rsvp.status == 'confirmed' %}
-                        <span class="d-flex align-items-center">
-                            <span class="long-badge going"><i class="material-icons">check_circle</i>GOING</span>
-                        </span>
-                    {% elif user_rsvp.status == 'maybe' %}
-                        <span class="d-flex align-items-center">
-                            <span class="long-badge maybe"><i class="material-icons">help</i>MAYBE</span>
-                        </span>
-                    {% elif user_rsvp.status == 'waitlisted' %}
-                        <span class="d-flex align-items-center">
-                            <span class="long-badge waitlist"><i class="material-icons">queue</i>WAITLIST</span>
-                        </span>
-                    {% elif user_rsvp.status == 'not_attending' %}
-                        <span class="d-flex align-items-center">
-                            <span class="long-badge notgoing"><i class="material-icons">cancel</i>NOT GOING</span>
-                        </span>
-                    {% endif %}
-                </div>
-            {% endwith %}
-        {% endif %}
-        
-        
-        <div class="d-flex w-100 p-4 align-items-center">
-            <div class="flex-grow-1">
-                <h5 class="event-title mb-2">{{ event.title }}</h5>
-                <div class="event-meta mb-2">
-                    <span class="event-date">
-                        <i class="material-icons align-middle me-1" style="font-size: 18px; color: #a0aec0;">calendar_today</i>
-                        {{ event.date }}{% if event.start_time %} at {{ event.start_time|time:"P" }}{% endif %}{% if event.end_time %} - {{ event.end_time|time:"P" }}{% endif %}
-                    </span>
-                </div>
-                <div class="event-details mb-3">
-                    <span class="me-3">
-                        <i class="material-icons align-middle me-1" style="font-size: 18px; color: #a0aec0;">group</i>
-                        {{ event.group.name }}
-                    </span>
-                    <div>
-                        <i class="material-icons align-middle me-1" style="font-size: 18px; color: #a0aec0;">location_on</i>
-                        {{ event.city }}{% if event.state %}, <abbr title="{{ event.state }}">{{ event.state|state_abbr }}</abbr>{% endif %}
-                    </div>
-                </div>
-                <div class="d-flex align-items-center">
-                    <span class="badge rsvp-badge-modern">
-                        <i class="material-icons align-middle me-1" style="font-size: 18px;">people</i>
-                        {% if event.capacity %}
-                            {{ event.confirmed_count }} / {{ event.capacity }} RSVPs
-                        {% else %}
-                            {{ event.confirmed_count }} RSVPs
+        <div class="home-event-card-body">
+            <div class="home-event-card-header">
+                <span class="home-event-card-group">
+                    <i class="material-icons">groups</i>
+                    <span class="home-event-card-group-name">{{ event.group.name }}</span>
+                </span>
+                {% if event.user_rsvp_list %}
+                    {% with user_rsvp=event.user_rsvp_list.0 %}
+                    <span class="home-event-rsvp-pill home-event-rsvp-pill--{{ user_rsvp.status }}">
+                        {% if user_rsvp.status == 'confirmed' %}
+                        <i class="material-icons">check_circle</i> Going
+                        {% elif user_rsvp.status == 'maybe' %}
+                        <i class="material-icons">help</i> Maybe
+                        {% elif user_rsvp.status == 'waitlisted' %}
+                        <i class="material-icons">queue</i> Waitlist
+                        {% elif user_rsvp.status == 'not_attending' %}
+                        <i class="material-icons">cancel</i> No
                         {% endif %}
                     </span>
-                    {% if event.age_restriction == 'mature' %}
-                        <span class="badge gradient-badge-21 ms-2">
-                            <i class="material-icons me-1 align-middle" style="font-size: 16px;">warning</i> 21+
-                        </span>
-                    {% elif event.age_restriction == 'adult' %}
-                        <span class="badge gradient-badge-18 ms-2">
-                            <i class="material-icons me-1 align-middle" style="font-size: 16px;">warning</i> 18+
-                        </span>
-                    {% endif %}
-                </div>
+                    {% endwith %}
+                {% endif %}
             </div>
-            <div class="ms-3 d-flex align-items-center">
-                <i class="material-icons event-list-chevron">chevron_right</i>
+            <h3 class="home-event-card-title">{{ event.title }}</h3>
+            <div class="home-event-card-meta">
+                <span>
+                    <i class="material-icons">schedule</i>
+                    {{ event|event_date_label }}{% if event.start_time %} · {{ event.start_time|time:"g:i A" }}{% if event.timezone %} {{ event|event_timezone_abbr }}{% endif %}{% endif %}
+                </span>
+                {% if event.city %}
+                <span>
+                    <i class="material-icons">location_on</i>
+                    {{ event.city }}{% if event.state %}, <abbr title="{{ event.state }}">{{ event.state|state_abbr }}</abbr>{% endif %}
+                </span>
+                {% endif %}
+            </div>
+            <div class="home-event-card-badges">
+                <span class="home-event-badge home-event-badge--rsvp">
+                    <i class="material-icons">people</i>
+                    {% if event.capacity %}
+                        {{ event.confirmed_count|default:0 }}/{{ event.capacity }}
+                    {% else %}
+                        {{ event.confirmed_count|default:0 }}
+                    {% endif %}
+                </span>
+                {% if event.age_restriction == 'mature' %}
+                <span class="home-event-badge home-event-badge--21">
+                    <i class="material-icons">warning</i> 21+
+                </span>
+                {% elif event.age_restriction == 'adult' %}
+                <span class="home-event-badge home-event-badge--18">
+                    <i class="material-icons">warning</i> 18+
+                </span>
+                {% endif %}
             </div>
         </div>
     </a>
     {% empty %}
-    <div class="alert alert-info text-center" role="alert">
-        <i class="material-icons align-middle me-2">event_busy</i> No upcoming events found.
+    <div class="home-events-empty home-events-empty--full">
+        <div class="home-events-empty-icon">
+            <i class="material-icons">event_busy</i>
+        </div>
+        <h3 class="home-events-empty-title">No upcoming events</h3>
+        <p class="home-events-empty-text">Check back soon, or browse groups to find events near you.</p>
+        <a href="{% url 'groups_list' %}" class="home-events-empty-link">
+            <i class="material-icons">groups</i> Browse Groups
+        </a>
     </div>
     {% endfor %}
 </div>
 
-<!-- Loading Spinner -->
-<div id="loadingSpinner" class="text-center py-5" style="display: none;">
+<div id="eventsList" style="display: none;">
+    <div class="home-event-list">
+        {% for event in events %}
+        <a href="{% url 'event_detail' event.id %}" class="home-event-list-item">
+            <div class="home-event-list-date">
+                <span class="home-event-card-day">{{ event.date|date:"j" }}</span>
+                <span class="home-event-card-month">{{ event.date|date:"M" }}</span>
+            </div>
+            <div class="home-event-list-body">
+                <div class="home-event-card-header">
+                    <span class="home-event-card-group">
+                        <i class="material-icons">groups</i>
+                        <span class="home-event-card-group-name">{{ event.group.name }}</span>
+                    </span>
+                    {% if event.user_rsvp_list %}
+                        {% with user_rsvp=event.user_rsvp_list.0 %}
+                        <span class="home-event-rsvp-pill home-event-rsvp-pill--{{ user_rsvp.status }}">
+                            {% if user_rsvp.status == 'confirmed' %}
+                            <i class="material-icons">check_circle</i> Going
+                            {% elif user_rsvp.status == 'maybe' %}
+                            <i class="material-icons">help</i> Maybe
+                            {% elif user_rsvp.status == 'waitlisted' %}
+                            <i class="material-icons">queue</i> Waitlist
+                            {% elif user_rsvp.status == 'not_attending' %}
+                            <i class="material-icons">cancel</i> No
+                            {% endif %}
+                        </span>
+                        {% endwith %}
+                    {% endif %}
+                </div>
+                <h3 class="home-event-card-title">{{ event.title }}</h3>
+                <div class="home-event-card-meta">
+                    <span>
+                        <i class="material-icons">schedule</i>
+                        {{ event|event_date_label }}{% if event.start_time %} · {{ event.start_time|time:"g:i A" }}{% if event.timezone %} {{ event|event_timezone_abbr }}{% endif %}{% endif %}
+                    </span>
+                    {% if event.city %}
+                    <span>
+                        <i class="material-icons">location_on</i>
+                        {{ event.city }}{% if event.state %}, <abbr title="{{ event.state }}">{{ event.state|state_abbr }}</abbr>{% endif %}
+                    </span>
+                    {% endif %}
+                </div>
+                <div class="home-event-card-badges">
+                    <span class="home-event-badge home-event-badge--rsvp">
+                        <i class="material-icons">people</i>
+                        {% if event.capacity %}
+                            {{ event.confirmed_count|default:0 }}/{{ event.capacity }}
+                        {% else %}
+                            {{ event.confirmed_count|default:0 }}
+                        {% endif %}
+                    </span>
+                    {% if event.age_restriction == 'mature' %}
+                    <span class="home-event-badge home-event-badge--21"><i class="material-icons">warning</i> 21+</span>
+                    {% elif event.age_restriction == 'adult' %}
+                    <span class="home-event-badge home-event-badge--18"><i class="material-icons">warning</i> 18+</span>
+                    {% endif %}
+                </div>
+            </div>
+            <i class="material-icons home-event-list-arrow">chevron_right</i>
+        </a>
+        {% empty %}
+        <div class="home-events-empty">
+            <div class="home-events-empty-icon">
+                <i class="material-icons">event_busy</i>
+            </div>
+            <h3 class="home-events-empty-title">No upcoming events</h3>
+            <p class="home-events-empty-text">Check back soon, or browse groups to find events near you.</p>
+            <a href="{% url 'groups_list' %}" class="home-events-empty-link">
+                <i class="material-icons">groups</i> Browse Groups
+            </a>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<div id="loadingSpinner" class="home-events-loading" style="display: none;">
     <div class="spinner-border text-primary" role="status">
         <span class="visually-hidden">Loading...</span>
     </div>
-    <p class="mt-2 text-muted">Loading events...</p>
+    <p>Loading events…</p>
 </div>
 
-<!-- Modern Pagination -->
 {% if paginator.num_pages > 1 %}
-<div class="modern-pagination-container mt-5">
+<div class="modern-pagination-container mt-4">
     <nav aria-label="Events pagination">
-        <ul class="pagination modern-pagination justify-content-center">
-            <!-- Previous Page -->
+        <ul class="pagination modern-pagination justify-content-center mb-0">
             {% if page_obj.has_previous %}
             <li class="page-item">
                 <a class="page-link modern-page-link" href="?page={{ page_obj.previous_page_number }}{% if current_sort %}&sort={{ current_sort|escapejs }}{% endif %}{% if current_order %}&order={{ current_order|escapejs }}{% endif %}{% if filter_adult %}&adult={{ filter_adult|escapejs }}{% endif %}{% if view_type %}&view={{ view_type|escapejs }}{% endif %}" aria-label="Previous">
@@ -531,25 +179,19 @@
             </li>
             {% endif %}
 
-            <!-- First Page -->
             {% if page_obj.number > 3 %}
             <li class="page-item">
                 <a class="page-link modern-page-link" href="?page=1{% if current_sort %}&sort={{ current_sort|escapejs }}{% endif %}{% if current_order %}&order={{ current_order|escapejs }}{% endif %}{% if filter_adult %}&adult={{ filter_adult|escapejs }}{% endif %}{% if view_type %}&view={{ view_type|escapejs }}{% endif %}">1</a>
             </li>
             {% if page_obj.number > 4 %}
-            <li class="page-item disabled">
-                <span class="page-link modern-page-link disabled">...</span>
-            </li>
+            <li class="page-item disabled"><span class="page-link modern-page-link disabled">...</span></li>
             {% endif %}
             {% endif %}
 
-            <!-- Page Numbers -->
             {% for num in page_obj.paginator.page_range %}
                 {% if num >= page_obj.number|add:'-2' and num <= page_obj.number|add:'2' %}
                     {% if num == page_obj.number %}
-                    <li class="page-item active">
-                        <span class="page-link modern-page-link active">{{ num }}</span>
-                    </li>
+                    <li class="page-item active"><span class="page-link modern-page-link active">{{ num }}</span></li>
                     {% else %}
                     <li class="page-item">
                         <a class="page-link modern-page-link" href="?page={{ num }}{% if current_sort %}&sort={{ current_sort|escapejs }}{% endif %}{% if current_order %}&order={{ current_order|escapejs }}{% endif %}{% if filter_adult %}&adult={{ filter_adult|escapejs }}{% endif %}{% if view_type %}&view={{ view_type|escapejs }}{% endif %}">{{ num }}</a>
@@ -558,19 +200,15 @@
                 {% endif %}
             {% endfor %}
 
-            <!-- Last Page -->
             {% if page_obj.number < paginator.num_pages|add:'-2' %}
             {% if page_obj.number < paginator.num_pages|add:'-3' %}
-            <li class="page-item disabled">
-                <span class="page-link modern-page-link disabled">...</span>
-            </li>
+            <li class="page-item disabled"><span class="page-link modern-page-link disabled">...</span></li>
             {% endif %}
             <li class="page-item">
                 <a class="page-link modern-page-link" href="?page={{ paginator.num_pages }}{% if current_sort %}&sort={{ current_sort|escapejs }}{% endif %}{% if current_order %}&order={{ current_order|escapejs }}{% endif %}{% if filter_adult %}&adult={{ filter_adult|escapejs }}{% endif %}{% if view_type %}&view={{ view_type|escapejs }}{% endif %}">{{ paginator.num_pages }}</a>
             </li>
             {% endif %}
 
-            <!-- Next Page -->
             {% if page_obj.has_next %}
             <li class="page-item">
                 <a class="page-link modern-page-link" href="?page={{ page_obj.next_page_number }}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if current_order %}&order={{ current_order }}{% endif %}{% if filter_adult %}&adult={{ filter_adult }}{% endif %}{% if view_type %}&view={{ view_type }}{% endif %}" aria-label="Next">
@@ -588,146 +226,10 @@
             {% endif %}
         </ul>
     </nav>
-    
-    <!-- Page Info -->
     <div class="text-center mt-3">
-        <span class="text-muted modern-page-info">
-            <i class="material-icons align-middle me-1" style="font-size: 18px;">info</i>
-            Page {{ page_obj.number }} of {{ paginator.num_pages }} 
-            ({{ paginator.count }} total events)
+        <span class="modern-page-info">
+            Page {{ page_obj.number }} of {{ paginator.num_pages }} · {{ paginator.count }} events
         </span>
     </div>
 </div>
-
-<style>
-.modern-pagination-container {
-    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
-    border-radius: 2rem;
-    padding: 2rem;
-    box-shadow: 0 4px 20px rgba(59, 130, 246, 0.08);
-    border: 1px solid rgba(59, 130, 246, 0.1);
-}
-
-.modern-pagination {
-    margin: 0;
-    gap: 0.5rem;
-}
-
-.modern-page-link {
-    border: none;
-    border-radius: 1.5rem;
-    padding: 0.75rem 1.25rem;
-    font-size: 1.1rem;
-    font-weight: 600;
-    color: #64748b;
-    background: linear-gradient(135deg, #ffffff 0%, #f1f5f9 100%);
-    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.08);
-    transition: all 0.2s ease;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    min-width: 44px;
-    justify-content: center;
-}
-
-.modern-page-link:hover {
-    background: linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%);
-    color: #ffffff;
-    transform: translateY(-2px);
-    box-shadow: 0 4px 16px rgba(59, 130, 246, 0.2);
-}
-
-.modern-page-link.active {
-    background: linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%);
-    color: #ffffff;
-    box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);
-    transform: translateY(-1px);
-}
-
-.modern-page-link.disabled {
-    background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
-    color: #94a3b8;
-    cursor: not-allowed;
-    transform: none;
-    box-shadow: 0 1px 4px rgba(59, 130, 246, 0.05);
-}
-
-.modern-page-link.disabled:hover {
-    background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
-    color: #94a3b8;
-    transform: none;
-    box-shadow: 0 1px 4px rgba(59, 130, 246, 0.05);
-}
-
-.modern-page-info {
-    font-size: 1rem;
-    font-weight: 500;
-    color: #64748b;
-    background: rgba(255, 255, 255, 0.8);
-    padding: 0.75rem 1.5rem;
-    border-radius: 1.5rem;
-    display: inline-block;
-    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.05);
-}
-
-/* Dark mode styles */
-.dark-mode .modern-pagination-container {
-    background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
-    border: 1px solid rgba(59, 130, 246, 0.2);
-    box-shadow: 0 4px 20px rgba(59, 130, 246, 0.15);
-}
-
-.dark-mode .modern-page-link {
-    background: linear-gradient(135deg, #334155 0%, #475569 100%);
-    color: #cbd5e1;
-    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.1);
-}
-
-.dark-mode .modern-page-link:hover {
-    background: linear-gradient(135deg, #3b82f6 0%, #06b6d4 100%);
-    color: #ffffff;
-    box-shadow: 0 4px 16px rgba(59, 130, 246, 0.25);
-}
-
-.dark-mode .modern-page-link.active {
-    background: linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%);
-    color: #ffffff;
-    box-shadow: 0 4px 16px rgba(59, 130, 246, 0.35);
-}
-
-.dark-mode .modern-page-link.disabled {
-    background: linear-gradient(135deg, #475569 0%, #64748b 100%);
-    color: #64748b;
-}
-
-.dark-mode .modern-page-link.disabled:hover {
-    background: linear-gradient(135deg, #475569 0%, #64748b 100%);
-    color: #64748b;
-}
-
-.dark-mode .modern-page-info {
-    background: rgba(30, 41, 59, 0.8);
-    color: #cbd5e1;
-    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.1);
-}
-
-/* Mobile responsive */
-@media (max-width: 768px) {
-    .modern-pagination-container {
-        padding: 1.5rem;
-        border-radius: 1.5rem;
-    }
-    
-    .modern-page-link {
-        padding: 0.6rem 1rem;
-        font-size: 1rem;
-        min-width: 40px;
-    }
-    
-    .modern-page-info {
-        font-size: 0.9rem;
-        padding: 0.6rem 1.2rem;
-    }
-}
-</style>
-{% endif %} 
+{% endif %}

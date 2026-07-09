@@ -1,6 +1,7 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
+from datetime import datetime
 from events.models import Event, Group, RSVP
 from users.models import Profile, GroupDelegation, GroupRole
 from tinymce.widgets import TinyMCE
@@ -84,7 +85,7 @@ class EventForm(forms.ModelForm):
     class Meta:
         model = Event
         fields = [
-            'title', 'group', 'date', 'start_time', 'end_time',
+            'title', 'group', 'date', 'end_date', 'start_time', 'end_time',
             'address', 'city', 'state', 'age_restriction', 'description',
             'capacity', 'waitlist_enabled', 'attendee_list_public', 'enable_rsvp_questions',
             'question1_text', 'question2_text', 'question3_text',
@@ -94,6 +95,7 @@ class EventForm(forms.ModelForm):
             'title': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Event Title'}),
             'group': forms.Select(attrs={'class': 'form-select', 'placeholder': 'Select Group'}),
             'date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'end_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
             'start_time': forms.TimeInput(attrs={'type': 'time', 'class': 'form-control'}),
             'end_time': forms.TimeInput(attrs={'type': 'time', 'class': 'form-control'}),
             'address': forms.TextInput(attrs={'class': 'form-control'}),
@@ -119,6 +121,8 @@ class EventForm(forms.ModelForm):
             if instance.date:
                 # Format for Flatpickr: m/d/Y (no leading zeros)
                 self.initial['date'] = f"{instance.date.month}/{instance.date.day}/{instance.date.year}"
+            if instance.end_date and instance.end_date != instance.date:
+                self.initial['end_date'] = f"{instance.end_date.month}/{instance.end_date.day}/{instance.end_date.year}"
             if instance.start_time:
                 self.initial['start_time'] = instance.start_time.strftime('%I:%M %p')
             if instance.end_time:
@@ -174,15 +178,38 @@ class EventForm(forms.ModelForm):
         cleaned_data = super().clean()
         waitlist_enabled = cleaned_data.get('waitlist_enabled')
         capacity = cleaned_data.get('capacity')
+        start_date = cleaned_data.get('date')
+        end_date = cleaned_data.get('end_date')
 
         if waitlist_enabled and not capacity:
             self.add_error('waitlist_enabled', 'Capacity must be set when waitlist is enabled.')
             self.add_error('capacity', 'Capacity must be set when waitlist is enabled.')
-        
+
+        if start_date and end_date and end_date < start_date:
+            self.add_error('end_date', 'End date cannot be before the start date.')
+
+        if start_date and end_date and end_date == start_date:
+            cleaned_data['end_date'] = None
+
+        start_time = cleaned_data.get('start_time')
+        end_time = cleaned_data.get('end_time')
+        if start_date and start_time and end_time:
+            effective_end_date = end_date or start_date
+            start_dt = datetime.combine(start_date, start_time)
+            end_dt = datetime.combine(effective_end_date, end_time)
+            if end_dt <= start_dt:
+                self.add_error('end_time', 'End time must be after start time.')
+
         return cleaned_data
 
     def save(self, commit=True):
         instance = super().save(commit=False)
+        if instance.end_date == instance.date:
+            instance.end_date = None
+        instance.enable_rsvp_questions = any(
+            (getattr(instance, f'question{i}_text') or '').strip()
+            for i in range(1, 4)
+        )
         instance.clean()  # Call the model's clean method
         if commit:
             instance.save()
@@ -250,6 +277,26 @@ class RSVPForm(forms.ModelForm):
             if not getattr(self.event, 'question3_text', '').strip():
                 self.fields.pop('question3', None)
 
+    def clean(self):
+        cleaned_data = super().clean()
+        status = cleaned_data.get('status')
+        if self.event and self.event.rsvps_locked:
+            raise forms.ValidationError('RSVPs are locked because this event has started.')
+        # Enforce capacity: prevent selecting 'confirmed' when capacity is reached
+        if self.event and status == 'confirmed' and self.event.capacity is not None:
+            # Count confirmed RSVPs excluding the current instance (if updating)
+            from events.models import RSVP
+            exclude_pk = getattr(self.instance, 'pk', None)
+            confirmed_count_qs = RSVP.objects.filter(event=self.event, status='confirmed')
+            if exclude_pk:
+                confirmed_count_qs = confirmed_count_qs.exclude(pk=exclude_pk)
+            confirmed_count = confirmed_count_qs.count()
+            if confirmed_count >= self.event.capacity and self.event.waitlist_enabled:
+                self.add_error('status', 'This event is currently full. If you’d like to be notified if a spot opens up, please join the waitlist`.')
+            elif self.event.capacity is not None and confirmed_count >= self.event.capacity:
+                self.add_error('status', 'This event is currently full. Please check back later to see if a spot opens up.')
+        return cleaned_data
+
     class Meta:
         model = RSVP
         fields = ['status', 'question1', 'question2', 'question3']
@@ -260,21 +307,51 @@ class RSVPForm(forms.ModelForm):
             })
         }
 
+class LeaderUserChoiceField(forms.ModelChoiceField):
+    """Accept any valid user id; options are loaded client-side via autocomplete."""
+
+    def valid_value(self, value):
+        if value in self.empty_values:
+            return False
+        try:
+            return User.objects.filter(pk=value).exists()
+        except (ValueError, TypeError):
+            return False
+
+
 class GroupRoleForm(forms.ModelForm):
+    user = LeaderUserChoiceField(
+        queryset=User.objects.none(),
+        empty_label='Search for a user…',
+        widget=forms.Select(attrs={'class': 'form-select leadership-user-select'}),
+    )
+
     class Meta:
         model = GroupRole
         fields = ['user', 'custom_label', 'can_post', 'can_manage_leadership']
         widgets = {
-            'user': forms.Select(attrs={'class': 'form-select tomselect-user'}),
-            'custom_label': forms.TextInput(attrs={'class': 'form-control'}),
+            'custom_label': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'e.g. Organizer, Co-chair',
+            }),
             'can_post': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'can_manage_leadership': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
-    
+
     def __init__(self, *args, **kwargs):
         group = kwargs.pop('group', None)
         super().__init__(*args, **kwargs)
+        self.group = group
         self.fields['custom_label'].required = True
         if group:
-            existing_users = GroupRole.objects.filter(group=group).values_list('user_id', flat=True)
-            self.fields['user'].queryset = User.objects.exclude(id__in=existing_users)
+            self.existing_user_ids = set(
+                GroupRole.objects.filter(group=group).values_list('user_id', flat=True)
+            )
+        else:
+            self.existing_user_ids = set()
+
+    def clean_user(self):
+        user = self.cleaned_data.get('user')
+        if user and user.id in self.existing_user_ids:
+            raise forms.ValidationError('This user is already a leader for this group.')
+        return user

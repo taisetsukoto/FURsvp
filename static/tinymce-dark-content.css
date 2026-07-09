@@ -1,8 +1,8 @@
 body {
-    background: #23272b !important;
-    color: #e0e0e0 !important;
+    background: #1a1d24 !important;
+    color: #e8eaed !important;
 }
 p, h1, h2, h3, h4, h5, h6, ul, ol, li, table, th, td, blockquote, pre, code {
-    color: #e0e0e0 !important;
+    color: #e8eaed !important;
 }
-a { color: #b3d1f7 !important; } 
+a { color: #93c5fd !important; }

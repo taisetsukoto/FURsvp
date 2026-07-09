@@ -2,9 +2,28 @@
 {% block title %}Registration Success - FURsvp{% endblock %}
 
 {% block content %}
-<div class="container">
-    <h1>Registration Successful!</h1>
-    <p>Your account has been created.</p>
-    <p><a href="{% url 'home' %}">Back to Homepage</a></p>
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-5">
+            <div class="auth-glass-card">
+                <div class="auth-page-header">
+                    <div class="auth-page-icon">
+                        <i class="material-icons">celebration</i>
+                    </div>
+                    <h1 class="auth-page-title">You're all set!</h1>
+                    <p class="auth-page-subtitle">Your FURsvp account has been created</p>
+                </div>
+                <div class="auth-status-box auth-status-box--success">
+                    Check your email to verify your account before signing in.
+                </div>
+                <a href="{% url 'login' %}" class="profile-btn-primary text-decoration-none">
+                    <i class="material-icons">login</i> Sign in
+                </a>
+                <a href="{% url 'home' %}" class="auth-btn-secondary">
+                    <i class="material-icons">home</i> Back to homepage
+                </a>
+            </div>
+        </div>
+    </div>
 </div>
-{% endblock %} 
+{% endblock %}

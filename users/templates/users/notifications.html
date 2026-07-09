@@ -1,234 +1,122 @@
 {% extends 'events/base.html' %}
+{% load users_extras %}
 
-{% block title %}Your Notifications{% endblock %}
+{% block title %}Notifications - FURsvp{% endblock %}
 
 {% block content %}
-<nav aria-label="breadcrumb" class="mb-4">
-    <div class="modern-breadcrumbs">
-        <a href="/" class="d-flex align-items-center">
-            <i class="material-icons me-1">home</i> Home
-        </a>
-        <span class="breadcrumb-chevron">›</span>
-        <span class="breadcrumb-current">Notifications</span>
-    </div>
-</nav>
-<style>
-    .notifications-header {
-        background: linear-gradient(90deg, #3b82f6 0%, #06b6d4 100%);
-        color: #fff;
-        border-radius: 1.5rem 1.5rem 0 0;
-        padding: 1.7rem 2.2rem 1.2rem 2.2rem;
-        font-size: 2rem;
-        font-weight: 800;
-        display: flex;
-        align-items: center;
-        gap: 0.7rem;
-        box-shadow: 0 4px 24px 0 rgba(31, 38, 135, 0.10);
-    }
+<div class="profile-gradient-bg">
+    <div class="row justify-content-center">
+        <div class="col-lg-8 col-xl-7">
+            <div class="profile-page-card">
+                <div class="auth-page-header">
+                    <div class="auth-page-icon">
+                        <i class="material-icons">notifications</i>
+                    </div>
+                    <h1 class="auth-page-title">Notifications</h1>
+                    <p class="auth-page-subtitle" id="notifications-subtitle">
+                        {% if total_count %}
+                        {% if unread_count %}
+                        {{ unread_count }} unread · {{ total_count }} total
+                        {% else %}
+                        All caught up · {{ total_count }} notification{{ total_count|pluralize }}
+                        {% endif %}
+                        {% else %}
+                        You're all caught up
+                        {% endif %}
+                    </p>
+                </div>
 
-    .notifications-header .material-icons {
-        font-size: 2.2rem;
-        margin-right: 0.7rem;
-    }
+                {% if total_count %}
+                <div class="notifications-toolbar">
+                    <div class="profile-tabs-shell notifications-filter-tabs">
+                        <ul class="nav profile-tabs" id="notificationsFilterTabs" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active" type="button" data-filter="all" aria-pressed="true">
+                                    <span>All</span>
+                                    <span class="filter-count">{{ total_count }}</span>
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link" type="button" data-filter="unread" aria-pressed="false">
+                                    <span>Unread</span>
+                                    <span class="filter-count" id="unread-filter-count">{{ unread_count }}</span>
+                                </button>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="notifications-toolbar-actions">
+                        <button type="button" class="notifications-mark-all-btn" id="mark-all-read-page-btn"
+                            {% if not unread_count %}disabled{% endif %}>
+                            <i class="material-icons" style="font-size: 1rem;">done_all</i>
+                            Mark all read
+                        </button>
+                        <button type="button" class="profile-btn-outline-danger" id="clear-all-notifications-page-btn">
+                            <i class="material-icons" style="font-size: 1rem;">delete_sweep</i>
+                            Clear all
+                        </button>
+                    </div>
+                </div>
 
-    .notifications-list {
-        padding: 2.2rem 2.2rem 2.2rem 2.2rem;
-        background: #f8fafc;
-        border-radius: 0 0 1.5rem 1.5rem;
-    }
+                <div id="notifications-page-content">
+                    {% for group in notification_groups %}
+                    <section class="notifications-date-group">
+                        <h2 class="notifications-date-label">
+                            {% if group.date == today %}Today
+                            {% elif group.date == yesterday %}Yesterday
+                            {% else %}{{ group.date|date:"F j, Y" }}
+                            {% endif %}
+                        </h2>
+                        <div class="notifications-list">
+                            {% for notification in group.items %}
+                            <div class="notifications-item{% if not notification.is_read %} unread{% endif %}"
+                                role="button"
+                                tabindex="0"
+                                data-notification-id="{{ notification.id }}"
+                                {% if notification.link %}data-link="{{ notification.link|notification_link }}"{% endif %}
+                                {% if notification.timestamp %}data-timestamp="{{ notification.timestamp.isoformat }}"{% endif %}>
+                                <div class="notifications-item-icon">
+                                    <i class="material-icons">{% if notification.link %}event{% else %}notifications{% endif %}</i>
+                                </div>
+                                <div class="notifications-item-body">
+                                    {% if notification.event_name %}
+                                    <div class="notifications-item-event">{{ notification.event_name }}</div>
+                                    {% endif %}
+                                    <p class="notifications-item-text">{{ notification.message }}</p>
+                                    <div class="notifications-item-meta">
+                                        {% if notification.timestamp %}
+                                        <span data-relative-time></span>
+                                        {% endif %}
+                                        {% if not notification.is_read %}
+                                        <span class="notifications-item-status">
+                                            <i class="material-icons">fiber_manual_record</i>
+                                            Unread
+                                        </span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <i class="material-icons notifications-item-chevron">chevron_right</i>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </section>
+                    {% endfor %}
+                </div>
 
-    .notification-card {
-        background: #fff;
-        border-radius: 1.1rem;
-        box-shadow: 0 2px 12px rgba(59, 130, 246, 0.07);
-        padding: 1.2rem 1.7rem;
-        margin-bottom: 1.2rem;
-        display: flex;
-        align-items: flex-start;
-        gap: 1.1rem;
-        transition: box-shadow 0.18s, transform 0.18s;
-        position: relative;
-        cursor: pointer;
-    }
-    .notification-card:hover {
-        box-shadow: 0 6px 24px rgba(59, 130, 246, 0.13);
-        transform: translateY(-2px) scale(1.01);
-    }
-
-    .notification-card:last-child {
-        margin-bottom: 0;
-    }
-
-    .notification-card .material-icons {
-        color: #3b82f6;
-        font-size: 1.6rem;
-        margin-right: 0.7rem;
-        flex-shrink: 0;
-    }
-
-    .notification-message {
-        font-size: 1.13rem;
-        color: #222;
-        font-weight: 500;
-        line-height: 1.5;
-    }
-
-    .notification-timestamp {
-        font-size: 0.98rem;
-        color: #6b7280;
-        margin-top: 0.2rem;
-        font-weight: 400;
-    }
-
-    .notification-unread-dot {
-        width: 0.8rem;
-        height: 0.8rem;
-        background: #3b82f6;
-        border: 2px solid #fff;
-        border-radius: 50%;
-        position: absolute;
-        left: -1.5rem;
-        top: 1.5rem;
-        box-shadow: 0 0 0 2px #e0e7ef;
-        z-index: 2;
-        animation: pulse 1.2s infinite;
-    }
-    @keyframes pulse {
-        0% { box-shadow: 0 0 0 0 #3b82f644; }
-        70% { box-shadow: 0 0 0 6px #3b82f600; }
-        100% { box-shadow: 0 0 0 0 #3b82f600; }
-    }
-
-    .notification-card.empty {
-        background: #f1f5f9;
-        color: #64748b;
-        justify-content: center;
-        padding: 2rem 1.7rem;
-        font-size: 1.15rem;
-        border: 1px dashed #cbd5e1;
-    }
-
-    .card-footer .pretty-action-btn {
-        background: linear-gradient(90deg, #3b82f6 0%, #06b6d4 100%);
-        color: #fff;
-        font-weight: 600;
-        border: none;
-        box-shadow: 0 2px 8px rgba(59, 130, 246, 0.10);
-        transition: background 0.18s, box-shadow 0.18s;
-    }
-    .card-footer .pretty-action-btn:hover {
-        background: linear-gradient(90deg, #2563eb 0%, #0e7490 100%);
-        box-shadow: 0 4px 16px rgba(59, 130, 246, 0.18);
-        color: #fff;
-    }
-
-    @media (max-width: 600px) {
-        .notifications-header,
-        .notifications-list {
-            padding: 1.1rem 0.7rem;
-        }
-        .notification-card {
-            padding: 1rem 0.7rem;
-        }
-    }
-
-    .dark-mode .notifications-header {
-        background: linear-gradient(90deg, #223a5f 0%, #0ea5e9 100%) !important;
-        color: #fff !important;
-        box-shadow: 0 4px 24px 0 rgba(20, 30, 50, 0.18);
-    }
-    .dark-mode .notifications-list {
-        background: #181a1b !important;
-    }
-    .dark-mode .notification-card {
-        background: #23272b !important;
-        color: #e0e0e0 !important;
-        box-shadow: 0 2px 12px rgba(30, 58, 138, 0.13);
-        border: 1px solid #232b3a !important;
-    }
-    .dark-mode .notification-card:hover {
-        box-shadow: 0 6px 24px rgba(30, 58, 138, 0.22);
-        background: #232b3a !important;
-    }
-    .dark-mode .notification-card .material-icons {
-        color: #38bdf8 !important;
-    }
-    .dark-mode .notification-message {
-        color: #e0e0e0 !important;
-    }
-    .dark-mode .notification-timestamp {
-        color: #b0b8c1 !important;
-    }
-    .dark-mode .notification-unread-dot {
-        background: #38bdf8 !important;
-        border: 2px solid #23272b !important;
-        box-shadow: 0 0 0 2px #223a5f;
-    }
-    .dark-mode .notification-card.empty {
-        background: #23272b !important;
-        color: #b0b8c1 !important;
-        border: 1px dashed #334155 !important;
-    }
-    .dark-mode .card-footer {
-        background: #181a1b !important;
-    }
-    .dark-mode .card-footer .pretty-action-btn {
-        background: linear-gradient(90deg, #223a5f 0%, #0ea5e9 100%) !important;
-        color: #fff !important;
-        box-shadow: 0 2px 8px rgba(30, 58, 138, 0.18);
-    }
-    .dark-mode .card-footer .pretty-action-btn:hover {
-        background: linear-gradient(90deg, #1e293b 0%, #0284c7 100%) !important;
-        color: #fff !important;
-        box-shadow: 0 4px 16px rgba(30, 58, 138, 0.22);
-    }
-    .dark-mode .modern-breadcrumbs {
-        background: #23272b !important;
-        color: #b3d1f7 !important;
-        border: 1px solid #223a5f !important;
-    }
-    .dark-mode .modern-breadcrumbs .breadcrumb-current,
-    .dark-mode .modern-breadcrumbs .material-icons {
-        color: #38bdf8 !important;
-    }
-    .dark-mode .modern-breadcrumbs a {
-        color: #b3d1f7 !important;
-    }
-</style>
-
-<div class="notifications-header">
-    <i class="material-icons">notifications</i>
-    Your Notifications
-</div>
-<div class="notifications-list">
-    {% for notification in notifications %}
-    <div class="notification-card">
-        {% if not notification.read %}
-        <span class="notification-unread-dot"></span>
-        {% endif %}
-        <i class="material-icons">notifications_active</i>
-        <div>
-            <div class="notification-message">{{ notification.message }}</div>
-            {% if notification.timestamp %}
-            <div class="notification-timestamp">{{ notification.timestamp|date:'M d, Y H:i' }}</div>
-            {% endif %}
+                <div class="notifications-filter-empty" id="notifications-filter-empty">
+                    No unread notifications.
+                </div>
+                {% else %}
+                <div class="notifications-empty">
+                    <div class="notifications-empty-icon">
+                        <i class="material-icons">notifications_none</i>
+                    </div>
+                    <h2>Nothing here yet</h2>
+                    <p>When you get updates about events or your account, they'll show up here.</p>
+                </div>
+                {% endif %}
+            </div>
         </div>
     </div>
-
-    {% empty %}
-    <div class="notification-card empty">
-        <i class="material-icons">info</i>
-        <div class="notification-message">You have no notifications yet.</div>
-    </div>
-    {% endfor %}
-</div>
-
-<div class="card-footer bg-white border-0 d-flex justify-content-center align-items-center py-4"
-    style="border-radius: 0 0 1.2rem 1.2rem;">
-    <button id="clear-all-notifications-page-btn" type="button"
-        class="btn btn-lg rounded-pill pretty-action-btn d-flex align-items-center gap-2 px-4 py-2">
-        <i class="material-icons align-middle">delete</i> Clear All Notifications
-    </button>
 </div>
 {% endblock %}
 
@@ -236,100 +124,54 @@
 {{ block.super }}
 <script>
     document.addEventListener('DOMContentLoaded', function () {
-        const clearAllBtn = document.getElementById('clear-all-notifications-page-btn');
-
-        if (clearAllBtn) {
-            clearAllBtn.addEventListener('click', async () => {
-                const modalHtml = `
-                    <div class="modal fade" id="clearNotificationsModalPage" tabindex="-1" aria-hidden="true">
-                        <div class="modal-dialog modal-dialog-centered">
-                            <div class="modal-content">
-                                <div class="modal-header">
-                                    <h5 class="modal-title">
-                                        <i class="material-icons me-2">delete</i>
-                                        Clear Notifications
-                                    </h5>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                </div>
-                                <div class="modal-body">
-                                    <p>Are you sure you want to clear all notifications? This action cannot be undone.</p>
-                                </div>
-                                <div class="modal-footer">
-                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                    <button type="button" class="btn btn-danger" id="confirmClearNotificationsPage">
-                                        <i class="material-icons me-1">delete</i>
-                                        Clear All Notifications
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-
-                document.body.insertAdjacentHTML('beforeend', modalHtml);
-                const modal = new bootstrap.Modal(document.getElementById(
-                    'clearNotificationsModalPage'));
-                modal.show();
-
-                document.getElementById('confirmClearNotificationsPage').addEventListener('click',
-                    async () => {
-                        try {
-                            const response = await fetch(
-                            '/users/notifications/purge_read/', {
-                                method: 'POST',
-                                headers: {
-                                    'X-CSRFToken': getCookie('csrftoken'),
-                                    'Content-Type': 'application/json'
-                                }
-                            });
-                            if (!response.ok) {
-                                throw new Error(`HTTP error! status: ${response.status}`);
-                            }
-                            window.location
-                        .reload(); // Reload the page to show updated notifications
-                        } catch (error) {
-                            console.error('Error clearing notifications:', error);
-                            alert('Failed to clear notifications. Please try again.');
-                        }
-                    });
-
-                document.getElementById('clearNotificationsModalPage').addEventListener(
-                    'hidden.bs.modal',
-                    function () {
-                        this.remove();
-                    });
-            });
+        function normalizeNotificationLink(link) {
+            if (!link) return null;
+            try {
+                const path = (link.includes('://') ? new URL(link).pathname : link.split('?')[0].split('#')[0])
+                    .replace(/\/$/, '') || '/';
+                if (path === '/users/notifications') {
+                    return '/users/notifications/all/';
+                }
+            } catch (error) {
+                const stripped = link.replace(/\/$/, '');
+                if (stripped === '/users/notifications') {
+                    return '/users/notifications/all/';
+                }
+            }
+            return link;
         }
 
-        // Mark notification as read when clicked on the full page
-        document.querySelectorAll('.list-group-item[data-notification-id]').forEach(item => {
-            item.addEventListener('click', async function (event) {
-                const notificationId = this.getAttribute('data-notification-id');
-                if (!this.classList.contains(
-                    'fw-bold')) { // Only mark as read if it's unread
-                    try {
-                        const response = await fetch('/users/notifications/mark_as_read/', {
-                            method: 'POST',
-                            headers: {
-                                'X-CSRFToken': getCookie('csrftoken'),
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({
-                                notification_ids: [notificationId]
-                            })
-                        });
-                        if (!response.ok) {
-                            throw new Error(`HTTP error! status: ${response.status}`);
-                        }
-                        this.classList.remove('fw-bold');
-                        this.classList.remove('bg-light');
-                        // No need to update badge here, as it's a full page view and badge is on base.html
-                    } catch (error) {
-                        console.error('Error marking notification as read:', error);
-                    }
-                }
-                // If there's a link, let the default anchor tag behavior handle the redirection
-            });
+        function navigateToNotificationLink(link) {
+            const destination = normalizeNotificationLink(link);
+            if (!destination || destination === '#') {
+                return;
+            }
+            if (destination === window.location.pathname) {
+                return;
+            }
+            window.location.assign(destination);
+        }
+
+        function formatRelativeTime(dateString) {
+            const date = new Date(dateString);
+            const now = new Date();
+            const diffSec = Math.floor((now - date) / 1000);
+            const diffMin = Math.floor(diffSec / 60);
+            const diffHour = Math.floor(diffMin / 60);
+            const diffDay = Math.floor(diffHour / 24);
+
+            if (diffSec < 60) return 'Just now';
+            if (diffMin < 60) return `${diffMin}m ago`;
+            if (diffHour < 24) return `${diffHour}h ago`;
+            if (diffDay < 7) return `${diffDay}d ago`;
+            return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+        }
+
+        document.querySelectorAll('[data-relative-time]').forEach(el => {
+            const item = el.closest('[data-timestamp]');
+            if (item) {
+                el.textContent = formatRelativeTime(item.dataset.timestamp);
+            }
         });
 
         function getCookie(name) {
@@ -345,6 +187,198 @@
                 }
             }
             return cookieValue;
+        }
+
+        function updateUnreadUI(unreadCount) {
+            const subtitle = document.getElementById('notifications-subtitle');
+            const unreadFilterCount = document.getElementById('unread-filter-count');
+            const markAllBtn = document.getElementById('mark-all-read-page-btn');
+            const totalCount = document.querySelectorAll('.notifications-item').length;
+
+            if (unreadFilterCount) {
+                unreadFilterCount.textContent = unreadCount;
+            }
+            if (markAllBtn) {
+                markAllBtn.disabled = unreadCount === 0;
+            }
+            if (subtitle) {
+                if (totalCount === 0) {
+                    subtitle.textContent = "You're all caught up";
+                } else if (unreadCount > 0) {
+                    subtitle.textContent = `${unreadCount} unread · ${totalCount} total`;
+                } else {
+                    subtitle.textContent = `All caught up · ${totalCount} notification${totalCount === 1 ? '' : 's'}`;
+                }
+            }
+        }
+
+        function applyFilter(filter) {
+            const items = document.querySelectorAll('.notifications-item');
+            const emptyState = document.getElementById('notifications-filter-empty');
+            let visibleCount = 0;
+
+            items.forEach(item => {
+                const show = filter === 'all' || item.classList.contains('unread');
+                item.classList.toggle('is-hidden', !show);
+                if (show) visibleCount += 1;
+            });
+
+            document.querySelectorAll('#notificationsFilterTabs [data-filter]').forEach(btn => {
+                const isActive = btn.dataset.filter === filter;
+                btn.classList.toggle('active', isActive);
+                btn.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+            });
+
+            document.querySelectorAll('.notifications-date-group').forEach(group => {
+                const hasVisible = group.querySelector('.notifications-item:not(.is-hidden)');
+                group.style.display = hasVisible ? '' : 'none';
+            });
+
+            if (emptyState) {
+                emptyState.classList.toggle('is-visible', filter === 'unread' && visibleCount === 0);
+            }
+        }
+
+        document.querySelectorAll('#notificationsFilterTabs [data-filter]').forEach(btn => {
+            btn.addEventListener('click', () => applyFilter(btn.dataset.filter));
+        });
+
+        async function markNotificationRead(item) {
+            const notificationId = item.getAttribute('data-notification-id');
+            if (!item.classList.contains('unread')) return;
+
+            const response = await fetch('/users/notifications/mark_as_read/', {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken'),
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ notification_ids: [notificationId] })
+            });
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            item.classList.remove('unread');
+            const status = item.querySelector('.notifications-item-status');
+            if (status) status.remove();
+
+            const unreadCount = document.querySelectorAll('.notifications-item.unread').length;
+            updateUnreadUI(unreadCount);
+
+            const activeFilter = document.querySelector('#notificationsFilterTabs .nav-link.active');
+            if (activeFilter && activeFilter.dataset.filter === 'unread') {
+                applyFilter('unread');
+            }
+        }
+
+        async function handleNotificationClick(item, event) {
+            if (event) {
+                event.preventDefault();
+            }
+            const link = item.dataset.link;
+            try {
+                await markNotificationRead(item);
+            } catch (error) {
+                console.error('Error marking notification as read:', error);
+            }
+            navigateToNotificationLink(link);
+        }
+
+        document.querySelectorAll('.notifications-item[data-notification-id]').forEach(item => {
+            item.addEventListener('click', (event) => handleNotificationClick(item, event));
+            item.addEventListener('keydown', (event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    handleNotificationClick(item, event);
+                }
+            });
+        });
+
+        const markAllBtn = document.getElementById('mark-all-read-page-btn');
+        if (markAllBtn) {
+            markAllBtn.addEventListener('click', async () => {
+                try {
+                    const response = await fetch('/users/notifications/mark_as_read/', {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': getCookie('csrftoken'),
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ notification_ids: [] })
+                    });
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    document.querySelectorAll('.notifications-item.unread').forEach(item => {
+                        item.classList.remove('unread');
+                        const status = item.querySelector('.notifications-item-status');
+                        if (status) status.remove();
+                    });
+                    updateUnreadUI(0);
+                    applyFilter(document.querySelector('#notificationsFilterTabs .nav-link.active')?.dataset.filter || 'all');
+                } catch (error) {
+                    console.error('Error marking all notifications as read:', error);
+                }
+            });
+        }
+
+        const clearAllBtn = document.getElementById('clear-all-notifications-page-btn');
+        if (clearAllBtn) {
+            clearAllBtn.addEventListener('click', () => {
+                const modalHtml = `
+                    <div class="modal fade" id="clearNotificationsModalPage" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">
+                                        <i class="material-icons me-2">delete_sweep</i>
+                                        Clear Notifications
+                                    </h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <p>Are you sure you want to clear all notifications? This action cannot be undone.</p>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                    <button type="button" class="btn btn-danger" id="confirmClearNotificationsPage">
+                                        <i class="material-icons me-1">delete</i>
+                                        Clear All
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                document.body.insertAdjacentHTML('beforeend', modalHtml);
+                const modal = new bootstrap.Modal(document.getElementById('clearNotificationsModalPage'));
+                modal.show();
+
+                document.getElementById('confirmClearNotificationsPage').addEventListener('click', async () => {
+                    try {
+                        const response = await fetch('/users/notifications/purge_read/', {
+                            method: 'POST',
+                            headers: {
+                                'X-CSRFToken': getCookie('csrftoken'),
+                                'Content-Type': 'application/json'
+                            }
+                        });
+                        if (!response.ok) {
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                        window.location.reload();
+                    } catch (error) {
+                        console.error('Error clearing notifications:', error);
+                        alert('Failed to clear notifications. Please try again.');
+                    }
+                });
+
+                document.getElementById('clearNotificationsModalPage').addEventListener('hidden.bs.modal', function () {
+                    this.remove();
+                });
+            });
         }
     });
 </script>
