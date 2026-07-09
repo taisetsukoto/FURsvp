@@ -3,21 +3,9 @@ Custom middleware for serving static files in production
 """
 import os
 from django.conf import settings
-from fursvp.ip_utils import get_client_ip
 from django.http import Http404, HttpResponse
 from django.contrib.staticfiles.handlers import StaticFilesHandler
 from django.contrib.staticfiles.finders import find
-
-
-class RemoteAddrMiddleware:
-    """Set REMOTE_ADDR from X-Forwarded-For/X-Real-IP when behind Docker/nginx."""
-
-    def __init__(self, get_response):
-        self.get_response = get_response
-
-    def __call__(self, request):
-        request.META['REMOTE_ADDR'] = get_client_ip(request)
-        return self.get_response(request)
 
 
 class StaticFilesMiddleware:

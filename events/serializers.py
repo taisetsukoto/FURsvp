@@ -65,7 +65,7 @@ class EventSerializer(serializers.ModelSerializer):
     class Meta:
         model = Event
         fields = [
-            'id', 'title', 'group', 'date', 'end_date', 'start_time', 'end_time', 'timezone',
+            'id', 'title', 'group', 'date', 'start_time', 'end_time',
             'start_timestamp', 'end_timestamp', 'description', 'address', 'city', 'state',
             'status', 'age_restriction', 'capacity', 'waitlist_enabled',
             'attendee_list_public', 'enable_rsvp_questions'
@@ -73,11 +73,23 @@ class EventSerializer(serializers.ModelSerializer):
     
     def get_start_timestamp(self, obj):
         """Get ISO-8601 timestamp for start time"""
-        return obj.get_start_datetime().isoformat()
+        if obj.date and obj.start_time:
+            dt = datetime.combine(obj.date, obj.start_time)
+            # Make timezone-aware if Django is configured for timezones
+            if timezone.is_aware(timezone.now()):
+                dt = timezone.make_aware(dt, timezone.get_current_timezone())
+            return dt.isoformat()
+        return None
     
     def get_end_timestamp(self, obj):
         """Get ISO-8601 timestamp for end time"""
-        return obj.get_end_datetime().isoformat()
+        if obj.date and obj.end_time:
+            dt = datetime.combine(obj.date, obj.end_time)
+            # Make timezone-aware if Django is configured for timezones
+            if timezone.is_aware(timezone.now()):
+                dt = timezone.make_aware(dt, timezone.get_current_timezone())
+            return dt.isoformat()
+        return None
 
     def get_description(self, obj):
         text = strip_tags(obj.description) if obj.description else ""
@@ -96,7 +108,7 @@ class EventDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Event
         fields = [
-            'id', 'title', 'group', 'date', 'end_date', 'start_time', 'end_time', 'timezone',
+            'id', 'title', 'group', 'date', 'start_time', 'end_time',
             'start_timestamp', 'end_timestamp', 'description', 'address', 'city', 'state',
             'status', 'age_restriction', 'capacity', 'waitlist_enabled',
             'attendee_list_public', 'enable_rsvp_questions',
@@ -113,11 +125,23 @@ class EventDetailSerializer(serializers.ModelSerializer):
     
     def get_start_timestamp(self, obj):
         """Get ISO-8601 timestamp for start time"""
-        return obj.get_start_datetime().isoformat()
+        if obj.date and obj.start_time:
+            dt = datetime.combine(obj.date, obj.start_time)
+            # Make timezone-aware if Django is configured for timezones
+            if timezone.is_aware(timezone.now()):
+                dt = timezone.make_aware(dt, timezone.get_current_timezone())
+            return dt.isoformat()
+        return None
     
     def get_end_timestamp(self, obj):
         """Get ISO-8601 timestamp for end time"""
-        return obj.get_end_datetime().isoformat()
+        if obj.date and obj.end_time:
+            dt = datetime.combine(obj.date, obj.end_time)
+            # Make timezone-aware if Django is configured for timezones
+            if timezone.is_aware(timezone.now()):
+                dt = timezone.make_aware(dt, timezone.get_current_timezone())
+            return dt.isoformat()
+        return None
 
     def get_description(self, obj):
         text = strip_tags(obj.description) if obj.description else ""
@@ -130,5 +154,8 @@ class RSVPSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = RSVP
-        fields = ['id', 'user', 'name', 'timestamp', 'status']
-        read_only_fields = ['timestamp']
+        fields = [
+            'id', 'user', 'name', 'timestamp', 'status',
+            'question1', 'question2', 'question3'
+        ]
+        read_only_fields = ['timestamp'] 

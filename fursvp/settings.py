@@ -28,7 +28,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'D71CFE3703158C6A495D119ED73820B99ACAC6E07BA1A910BC4F66B971466AC3')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True if os.environ.get('DEBUG') == "True" else False
+DEBUG = os.environ.get('DEBUG')
+
 ALLOWED_HOSTS = [os.environ.get('ALLOWED_HOSTS'), "fursvp.org", "127.0.0.1", "localhost"]
 
 
@@ -54,14 +55,12 @@ INSTALLED_APPS = [
     'two_factor',
     'qrcode',
     'sslserver',
-    'turnstile',
 ]
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'fursvp.middleware.RemoteAddrMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -251,16 +250,6 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 TELEGRAM_LOGIN_ENABLED = os.environ.get('TELEGRAM_LOGIN_ENABLED', 'false').lower() == 'true'
-
-# Cloudflare Turnstile (omit keys to use Cloudflare's dummy test keys in dev)
-if os.environ.get('TURNSTILE_SITEKEY'):
-    TURNSTILE_SITEKEY = os.environ['TURNSTILE_SITEKEY']
-if os.environ.get('TURNSTILE_SECRET'):
-    TURNSTILE_SECRET = os.environ['TURNSTILE_SECRET']
-TURNSTILE_DEFAULT_CONFIG = {
-    'theme': 'light',
-    'size': 'flexible',
-}
 
 # Django REST Framework Configuration
 REST_FRAMEWORK = {
