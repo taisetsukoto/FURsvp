@@ -97,15 +97,20 @@ class UserProfileForm(ModeratedProfileFieldsMixin, forms.ModelForm):
         if not (self.instance and self.instance.user and self.instance.user.is_superuser):
             self.fields.pop('can_post_blog', None)
 
+    def _should_update_groups(self):
+        prefix = f'{self.prefix}-' if self.prefix else ''
+        return self.data.get(f'{prefix}update_groups') == '1'
+
     def save(self, commit=True):
         instance = super().save(commit=commit)
-        if self.instance and self.instance.user:
-            selected_groups = self.cleaned_data.get('admin_groups', Group.objects.none())
-            # Add new GroupRoles
-            for group in selected_groups:
-                GroupRole.objects.get_or_create(user=self.instance.user, group=group)
-            # Remove GroupRoles for groups not selected
-            GroupRole.objects.filter(user=self.instance.user).exclude(group__in=selected_groups).delete()
+        user = instance.user
+        if not user or not self._should_update_groups():
+            return instance
+
+        selected_groups = self.cleaned_data.get('admin_groups', Group.objects.none())
+        for group in selected_groups:
+            GroupRole.objects.get_or_create(user=user, group=group)
+        GroupRole.objects.filter(user=user).exclude(group__in=selected_groups).delete()
         return instance
 
 class UserPublicProfileForm(ModeratedProfileFieldsMixin, forms.ModelForm):
