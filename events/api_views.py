@@ -18,10 +18,8 @@ from .serializers import (
 )
 
 
-class UserViewSet(viewsets.ReadOnlyModelViewSet):
-    """API viewset for User model - read-only"""
-    queryset = User.objects.all()
-    serializer_class = UserLookupSerializer
+class UserViewSet(viewsets.ViewSet):
+    """API viewset for user lookup actions (no list/retrieve by ID)"""
     permission_classes = [IsAuthenticatedOrReadOnly]
     
     @swagger_auto_schema(
@@ -62,6 +60,76 @@ class UserViewSet(viewsets.ReadOnlyModelViewSet):
                 'found': False,
                 'message': f'No user found with Telegram username: {telegram_username}'
             }, status=status.HTTP_404_NOT_FOUND)
+
+    @swagger_auto_schema(
+        operation_description="Get events registered by a specific user (respecting privacy settings)",
+        manual_parameters=[
+            openapi.Parameter('user_id', openapi.IN_QUERY, description="User ID to look up events for", type=openapi.TYPE_INTEGER, required=True),
+        ],
+        responses={
+            200: openapi.Response('Success - User events retrieved'),
+            400: 'Bad Request - Missing user_id parameter',
+            404: 'Not Found - User not found'
+        }
+    )
+    @action(detail=False, methods=['get'])
+    def events(self, request):
+        """Get events registered by a specific user (respecting privacy settings)"""
+        user_id = request.query_params.get('user_id', '').strip()
+        
+        if not user_id:
+            return Response(
+                {'error': 'Query parameter "user_id" is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            user = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response({
+                'error': f'User with ID {user_id} not found'
+            }, status=status.HTTP_404_NOT_FOUND)
+        
+        user_rsvps = RSVP.objects.filter(user=user).select_related('event', 'event__group')
+        
+        visible_events = []
+        for rsvp in user_rsvps:
+            event = rsvp.event
+            
+            if event.status == 'cancelled':
+                continue
+            
+            is_visible = False
+            
+            if (request.user.is_authenticated and 
+                (request.user == user or 
+                 request.user == event.organizer or 
+                 request.user.is_staff)):
+                is_visible = True
+            elif event.attendee_list_public:
+                is_visible = True
+            
+            if is_visible:
+                event_data = {
+                    'event_id': event.id,
+                    'event_title': event.title,
+                    'group_name': event.group.name,
+                    'event_date': event.date,
+                    'rsvp_status': rsvp.status,
+                    'rsvp_timestamp': rsvp.timestamp,
+                    'attendee_list_public': event.attendee_list_public
+                }
+                visible_events.append(event_data)
+        
+        visible_events.sort(key=lambda x: x['event_date'], reverse=True)
+        
+        return Response({
+            'user_id': user_id,
+            'username': user.username,
+            'display_name': user.profile.get_display_name() if hasattr(user, 'profile') else user.username,
+            'events': visible_events,
+            'count': len(visible_events)
+        })
 
 
 class GroupViewSet(viewsets.ReadOnlyModelViewSet):
