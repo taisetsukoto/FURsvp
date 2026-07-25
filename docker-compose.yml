@@ -2,6 +2,7 @@ version: '3.8'
 
 services:
   db:
+    restart: unless-stopped
     image: postgres:15
     volumes:
       - postgres_data:/var/lib/postgresql/data/
@@ -33,7 +34,7 @@ services:
     ports:
       - "8004:8000"
     environment:
-      - DEBUG=True
+      - DEBUG=False
       - DB_NAME=fursvp
       - DB_USER=fursvp
       - DB_PASSWORD=fursvp
