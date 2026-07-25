@@ -171,35 +171,50 @@ class Event(models.Model):
         return f'{prefix}{name}' if prefix else name
 
     @classmethod
-    def active_not_ended_q(cls, now=None, prefix=''):
-        """Events still in progress or not yet started (by event-local end time)."""
-        now = now or timezone.now()
-        starts_at = cls._field(prefix, 'starts_at')
-        ends_at = cls._field(prefix, 'ends_at')
+    def _effective_end_date_q(cls, lookup, value, prefix=''):
+        """Match Coalesce(end_date, date) — empty end_date inherits start date."""
+        end_date = cls._field(prefix, 'end_date')
+        date = cls._field(prefix, 'date')
         return (
-            models.Q(**{f'{ends_at}__gt': now}) |
-            models.Q(**{f'{ends_at}__isnull': True, f'{starts_at}__gt': now})
+            models.Q(**{f'{end_date}__{lookup}': value}) |
+            models.Q(**{f'{end_date}__isnull': True, f'{date}__{lookup}': value})
         )
 
     @classmethod
-    def active_ended_q(cls, now=None, prefix=''):
-        """Events whose event-local end time has passed."""
+    def active_not_ended_q(cls, now=None, prefix=''):
+        """Events still in progress or not yet started.
+
+        Uses Coalesce(end_date, date): if end_date is empty, the start date is used.
+        On the effective end day, ``ends_at`` (when set) decides whether it is still going.
+        """
         now = now or timezone.now()
+        today = timezone.localdate(now)
         ends_at = cls._field(prefix, 'ends_at')
-        starts_at = cls._field(prefix, 'starts_at')
-        return (
-            models.Q(**{f'{ends_at}__lte': now}) |
-            models.Q(**{f'{ends_at}__isnull': True, f'{starts_at}__lte': now})
+        future_days = cls._effective_end_date_q('gt', today, prefix=prefix)
+        ends_today = cls._effective_end_date_q('exact', today, prefix=prefix)
+        still_going_today = ends_today & (
+            models.Q(**{f'{ends_at}__gt': now}) |
+            models.Q(**{f'{ends_at}__isnull': True})
         )
+        return future_days | still_going_today
+
+    @classmethod
+    def active_ended_q(cls, now=None, prefix=''):
+        """Events whose effective end (end_date or start date) has passed."""
+        now = now or timezone.now()
+        today = timezone.localdate(now)
+        ends_at = cls._field(prefix, 'ends_at')
+        past_days = cls._effective_end_date_q('lt', today, prefix=prefix)
+        ends_today = cls._effective_end_date_q('exact', today, prefix=prefix)
+        ended_today = ends_today & models.Q(**{f'{ends_at}__isnull': False, f'{ends_at}__lte': now})
+        return past_days | ended_today
 
     @classmethod
     def overlaps_date_range_q(cls, range_start, range_end, prefix=''):
         """Events overlapping [range_start, range_end) — for calendar views."""
-        end_date = cls._field(prefix, 'end_date')
         date = cls._field(prefix, 'date')
         return models.Q(**{f'{date}__lt': range_end}) & (
-            models.Q(**{f'{end_date}__gte': range_start}) |
-            models.Q(**{f'{end_date}__isnull': True, f'{date}__gte': range_start})
+            cls._effective_end_date_q('gte', range_start, prefix=prefix)
         )
 
     def sync_event_time(self):
