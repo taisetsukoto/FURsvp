@@ -1,0 +1,55 @@
+{% load dict_extras %}
+<div class="row g-3">
+    {% for rsvp in rsvps %}
+    {% with event=rsvp.event %}
+    <div class="col-md-6 col-lg-4">
+        <a href="{% url 'event_detail' event.id %}" class="home-event-card">
+            <div class="home-event-card-header">
+                <span class="home-event-card-group">
+                    <i class="material-icons">groups</i>
+                    <span class="home-event-card-group-name">{{ event.group.name }}</span>
+                </span>
+                <span class="home-event-rsvp-pill home-event-rsvp-pill--{{ rsvp.status }}">
+                    {% if rsvp.status == 'confirmed' %}
+                    <i class="material-icons">check_circle</i> Going
+                    {% elif rsvp.status == 'maybe' %}
+                    <i class="material-icons">help</i> Maybe
+                    {% elif rsvp.status == 'waitlisted' %}
+                    <i class="material-icons">queue</i> Waitlist
+                    {% elif rsvp.status == 'not_attending' %}
+                    <i class="material-icons">cancel</i> No
+                    {% endif %}
+                </span>
+            </div>
+            <h3 class="home-event-card-title">{{ event.title }}</h3>
+            <div class="home-event-card-meta">
+                <span>
+                    <i class="material-icons">calendar_today</i>
+                    {{ event.date|date:"M j, Y" }}{% if event.start_time %} · {{ event.start_time|time:"g:i A" }}{% endif %}
+                </span>
+                {% if event.city %}
+                <span>
+                    <i class="material-icons">location_on</i>
+                    {{ event.city }}{% if event.state %}, <abbr title="{{ event.state }}">{{ event.state|state_abbr }}</abbr>{% endif %}
+                </span>
+                {% endif %}
+            </div>
+            {% if event.status == 'cancelled' %}
+            <div class="home-event-card-badges">
+                <span class="home-event-badge home-event-badge--21">
+                    <i class="material-icons">event_busy</i> Cancelled
+                </span>
+            </div>
+            {% endif %}
+        </a>
+    </div>
+    {% endwith %}
+    {% empty %}
+    <div class="col-12">
+        <div class="home-events-empty">
+            <i class="material-icons">event_busy</i>
+            <p>{{ empty_message }}</p>
+        </div>
+    </div>
+    {% endfor %}
+</div>

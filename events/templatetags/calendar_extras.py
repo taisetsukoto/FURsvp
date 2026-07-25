@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django import template
 import re
 
@@ -11,6 +13,21 @@ def get_item(dictionary, key):
 @register.simple_tag
 def make_date_key(year, month, day):
     return f"{int(year):04d}-{int(month):02d}-{int(day):02d}"
+
+
+@register.filter
+def relative_date_label(value, today):
+    """Short label for timeline headers: Today, Tomorrow, weekday, or month/day."""
+    if not value or not today:
+        return ''
+    if value == today:
+        return 'Today'
+    if value == today + timedelta(days=1):
+        return 'Tomorrow'
+    delta = (value - today).days
+    if 0 < delta <= 6:
+        return value.strftime('%A')
+    return f"{value.strftime('%b')} {value.day}"
 
 @register.filter
 def urlize(text):

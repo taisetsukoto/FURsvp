@@ -7,7 +7,7 @@ router = DefaultRouter()
 router.APIRootView = CustomAPIRootView
 router.register(r'groups', GroupViewSet)
 router.register(r'events', EventViewSet)
-router.register(r'users', UserViewSet)
+router.register(r'users', UserViewSet, basename='user')
 
 # The API URLs are now determined automatically by the router
 urlpatterns = [

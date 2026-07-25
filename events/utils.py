@@ -2,6 +2,8 @@ import os
 import requests
 import subprocess
 
+RSVP_LOCK_MESSAGE = 'RSVPs are locked because this event has started.'
+
 def post_to_telegram_channel(channel, message, parse_mode=None):
     """
     Post a message to a Telegram channel using the Telegram Bot API.

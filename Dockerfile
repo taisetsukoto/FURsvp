@@ -15,6 +15,8 @@ RUN apt-get update \
         build-essential \
         libpq-dev \
         git \
+        pkg-config \
+        libcairo2-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies

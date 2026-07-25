@@ -3,8 +3,106 @@ from django.contrib.auth.models import User
 from django.db.models.signals import post_save, m2m_changed
 from django.dispatch import receiver
 from events.models import Group
+from django.utils import timezone
 
 # Create your models here.
+
+User._meta.get_field('email')._unique = True
+User._meta.get_field('email').blank = False
+User._meta.get_field('email').null = False
+
+class AuditLog(models.Model):
+    """Audit log for tracking administrative actions and group event activities"""
+    ACTION_CHOICES = [
+        # User management actions
+        ('user_promoted', 'User Promoted'),
+        ('user_demoted', 'User Demoted'),
+        ('user_banned', 'User Banned'),
+        ('user_unbanned', 'User Unbanned'),
+        ('user_profile_updated', 'User Profile Updated'),
+        
+        # Group management actions
+        ('group_created', 'Group Created'),
+        ('group_updated', 'Group Updated'),
+        ('group_deleted', 'Group Deleted'),
+        ('group_renamed', 'Group Renamed'),
+        
+        # Event management actions
+        ('event_created', 'Event Created'),
+        ('event_updated', 'Event Updated'),
+        ('event_deleted', 'Event Deleted'),
+        ('event_cancelled', 'Event Cancelled'),
+        ('event_activated', 'Event Activated'),
+        
+        # RSVP actions
+        ('rsvp_created', 'RSVP Created'),
+        ('rsvp_updated', 'RSVP Updated'),
+        ('rsvp_deleted', 'RSVP Deleted'),
+        ('rsvp_status_changed', 'RSVP Status Changed'),
+        
+        # Notification actions
+        ('notification_sent', 'Notification Sent'),
+        ('bulk_notification_sent', 'Bulk Notification Sent'),
+        
+        # Site management actions
+        ('banner_updated', 'Site Banner Updated'),
+        ('banner_disabled', 'Site Banner Disabled'),
+        
+        # Blog actions
+        ('blog_post_created', 'Blog Post Created'),
+        ('blog_post_deleted', 'Blog Post Deleted'),
+        
+        # Other actions
+        ('admin_login', 'Admin Login'),
+        ('admin_logout', 'Admin Logout'),
+        ('other', 'Other'),
+    ]
+    
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='audit_logs', help_text="User who performed the action")
+    target_user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='targeted_audit_logs', help_text="User who was affected by the action")
+    action = models.CharField(max_length=50, choices=ACTION_CHOICES)
+    description = models.TextField(help_text="Detailed description of the action")
+    group = models.ForeignKey(Group, on_delete=models.SET_NULL, null=True, blank=True, help_text="Group involved in the action")
+    event = models.ForeignKey('events.Event', on_delete=models.SET_NULL, null=True, blank=True, help_text="Event involved in the action")
+    ip_address = models.GenericIPAddressField(null=True, blank=True, help_text="IP address of the user who performed the action")
+    user_agent = models.TextField(blank=True, help_text="User agent string")
+    timestamp = models.DateTimeField(auto_now_add=True, help_text="When the action occurred")
+    additional_data = models.JSONField(default=dict, blank=True, help_text="Additional data related to the action")
+    
+    class Meta:
+        ordering = ['-timestamp']
+        verbose_name = 'Audit Log Entry'
+        verbose_name_plural = 'Audit Log Entries'
+        indexes = [
+            models.Index(fields=['user', 'timestamp']),
+            models.Index(fields=['action', 'timestamp']),
+            models.Index(fields=['group', 'timestamp']),
+            models.Index(fields=['target_user', 'timestamp']),
+        ]
+    
+    def __str__(self):
+        return f"{self.user.username if self.user else 'System'} - {self.get_action_display()} - {self.timestamp.strftime('%Y-%m-%d %H:%M:%S')}"
+    
+    @classmethod
+    def log_action(cls, user, action, description, request=None, target_user=None, group=None, event=None, ip_address=None, user_agent=None, additional_data=None):
+        """Convenience method to create an audit log entry."""
+        if request is not None:
+            from fursvp.ip_utils import get_client_ip
+            if ip_address is None:
+                ip_address = get_client_ip(request)
+            if not user_agent:
+                user_agent = request.META.get('HTTP_USER_AGENT', '')
+        return cls.objects.create(
+            user=user,
+            action=action,
+            description=description,
+            target_user=target_user,
+            group=group,
+            event=event,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            additional_data=additional_data or {}
+        )
 
 class GroupRole(models.Model):
     """Custom hierarchy system for group leadership roles"""
@@ -86,6 +184,59 @@ class GroupDelegation(models.Model):
     def __str__(self):
         return f'{self.organizer.username} assigned {self.delegated_user.username} as an assistant for {self.group.name}'
 
+class BlockedTerm(models.Model):
+    """Offensive or trolling terms blocked in usernames and display names."""
+
+    MATCH_EXACT = 'exact'
+    MATCH_CONTAINS = 'contains'
+    MATCH_MODE_CHOICES = [
+        (MATCH_EXACT, 'Exact match'),
+        (MATCH_CONTAINS, 'Contains (substring)'),
+    ]
+
+    SOURCE_CMU = 'cmu'
+    SOURCE_MANUAL = 'manual'
+    SOURCE_CHOICES = [
+        (SOURCE_CMU, 'CMU bad-words list'),
+        (SOURCE_MANUAL, 'Added manually'),
+    ]
+
+    term = models.CharField(max_length=100)
+    match_mode = models.CharField(
+        max_length=10,
+        choices=MATCH_MODE_CHOICES,
+        default=MATCH_CONTAINS,
+        help_text='Exact: block only when the whole normalized value matches. Contains: block when the term appears within the value.',
+    )
+    source = models.CharField(
+        max_length=10,
+        choices=SOURCE_CHOICES,
+        default=SOURCE_MANUAL,
+    )
+    is_active = models.BooleanField(default=True)
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['term']
+        verbose_name = 'Blocked term'
+        verbose_name_plural = 'Blocked terms'
+        constraints = [
+            models.UniqueConstraint(
+                models.functions.Lower('term'),
+                name='users_blockedterm_term_unique_ci',
+            ),
+        ]
+
+    def __str__(self):
+        return self.term
+
+    def save(self, *args, **kwargs):
+        self.term = self.term.strip().lower()
+        super().save(*args, **kwargs)
+
+
 class BannedUser(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='banned_entries')
     group = models.ForeignKey('events.Group', on_delete=models.CASCADE, null=True, blank=True)
@@ -122,7 +273,3 @@ class Notification(models.Model):
 def create_profile(sender, instance, created, **kwargs):
     if created:
         Profile.objects.create(user=instance)
-
-@receiver(post_save, sender=User)
-def save_profile(sender, instance, **kwargs):
-    instance.profile.save()

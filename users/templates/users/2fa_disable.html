@@ -1,10 +1,35 @@
-{% extends "events/base.html" %}
+{% extends 'events/base.html' %}
+{% block title %}Disable 2FA - FURsvp{% endblock %}
 {% block content %}
-<h2>Disable Two-Factor Authentication</h2>
-<p>Are you sure you want to disable 2FA? This will remove the extra layer of security from your account.</p>
-<form method="post">
-  {% csrf_token %}
-  <button type="submit" class="btn btn-danger">Yes, Disable 2FA</button>
-  <a href="{% url 'profile' %}" class="btn btn-secondary ms-2">Cancel</a>
-</form>
-{% endblock %} 
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-5">
+            <div class="auth-glass-card">
+                <div class="auth-page-header">
+                    <div class="auth-page-icon auth-page-icon--danger">
+                        <i class="material-icons">no_encryption</i>
+                    </div>
+                    <h1 class="auth-page-title">Disable 2FA</h1>
+                    <p class="auth-page-subtitle">This removes the extra security layer from your account</p>
+                </div>
+
+                <div class="auth-warning-box">
+                    <i class="material-icons align-middle me-1">warning</i>
+                    Are you sure you want to disable two-factor authentication?
+                </div>
+
+                <form method="post">
+                    {% csrf_token %}
+                    <button type="submit" class="profile-btn-danger">
+                        <i class="material-icons">delete_forever</i> Yes, disable 2FA
+                    </button>
+                </form>
+
+                <a href="{% url 'profile' %}" class="auth-btn-secondary">
+                    <i class="material-icons">arrow_back</i> Cancel
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

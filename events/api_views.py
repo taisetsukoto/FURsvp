@@ -18,10 +18,8 @@ from .serializers import (
 )
 
 
-class UserViewSet(viewsets.ReadOnlyModelViewSet):
-    """API viewset for User model - read-only"""
-    queryset = User.objects.all()
-    serializer_class = UserLookupSerializer
+class UserViewSet(viewsets.ViewSet):
+    """API viewset for user lookup actions (no list/retrieve by ID)"""
     permission_classes = [IsAuthenticatedOrReadOnly]
     
     @swagger_auto_schema(
@@ -92,25 +90,17 @@ class UserViewSet(viewsets.ReadOnlyModelViewSet):
                 'error': f'User with ID {user_id} not found'
             }, status=status.HTTP_404_NOT_FOUND)
         
-        # Get user's RSVPs
         user_rsvps = RSVP.objects.filter(user=user).select_related('event', 'event__group')
         
-        # Filter events based on privacy settings
         visible_events = []
         for rsvp in user_rsvps:
             event = rsvp.event
             
-            # Skip cancelled events
             if event.status == 'cancelled':
                 continue
             
-            # Check if event is visible based on privacy settings
             is_visible = False
             
-            # Event is visible if:
-            # 1. User is requesting their own events
-            # 2. Event has public attendee list
-            # 3. User is authenticated and is an organizer/admin
             if (request.user.is_authenticated and 
                 (request.user == user or 
                  request.user == event.organizer or 
@@ -131,7 +121,6 @@ class UserViewSet(viewsets.ReadOnlyModelViewSet):
                 }
                 visible_events.append(event_data)
         
-        # Sort by event date (most recent first)
         visible_events.sort(key=lambda x: x['event_date'], reverse=True)
         
         return Response({
@@ -161,13 +150,11 @@ class GroupViewSet(viewsets.ReadOnlyModelViewSet):
         
         if event_type == 'upcoming':
             events = events.filter(
-                Q(date__gt=now.date()) | 
-                (Q(date=now.date()) & Q(end_time__gt=now.time()))
+                Event.active_not_ended_q(now)
             ).order_by('date', 'start_time')
         elif event_type == 'past':
             events = events.filter(
-                Q(date__lt=now.date()) | 
-                (Q(date=now.date()) & Q(end_time__lt=now.time()))
+                Event.active_ended_q(now)
             ).order_by('-date', '-start_time')
         else:
             events = events.order_by('date', 'start_time')
@@ -212,13 +199,11 @@ class EventViewSet(viewsets.ReadOnlyModelViewSet):
             
             if event_type == 'upcoming':
                 queryset = queryset.filter(
-                    Q(date__gt=now.date()) | 
-                    (Q(date=now.date()) & Q(end_time__gt=now.time()))
+                    Event.active_not_ended_q(now)
                 )
             elif event_type == 'past':
                 queryset = queryset.filter(
-                    Q(date__lt=now.date()) | 
-                    (Q(date=now.date()) & Q(end_time__lt=now.time()))
+                    Event.active_ended_q(now)
                 )
         
         # Filter by location
@@ -243,7 +228,7 @@ class EventViewSet(viewsets.ReadOnlyModelViewSet):
         event = self.get_object()
         
         # Check if attendee list is public
-        if not event.attendee_list_public and not request.user.is_authenticated:
+        if not event.attendee_list_public and not request.user.is_staff:
             return Response(
                 {'error': 'Attendee list is not public for this event'},
                 status=status.HTTP_403_FORBIDDEN
@@ -259,7 +244,7 @@ class EventViewSet(viewsets.ReadOnlyModelViewSet):
         event = self.get_object()
         
         # Check if attendee list is public
-        if not event.attendee_list_public and not request.user.is_authenticated:
+        if not event.attendee_list_public and not request.user.is_staff:
             return Response(
                 {'error': 'Attendee list is not public for this event'},
                 status=status.HTTP_403_FORBIDDEN
@@ -274,8 +259,7 @@ class EventViewSet(viewsets.ReadOnlyModelViewSet):
         """Get upcoming events"""
         now = timezone.now()
         events = self.get_queryset().filter(
-            Q(date__gt=now.date()) | 
-            (Q(date=now.date()) & Q(end_time__gt=now.time()))
+            Event.active_not_ended_q(now)
         ).order_by('date', 'start_time')
         
         serializer = self.get_serializer(events, many=True)
@@ -289,7 +273,6 @@ class EventViewSet(viewsets.ReadOnlyModelViewSet):
         
         serializer = self.get_serializer(events, many=True)
         return Response(serializer.data)
-
 
 class CustomAPIRootView(APIView):
     api_root_dict = None

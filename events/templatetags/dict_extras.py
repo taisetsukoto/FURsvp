@@ -22,3 +22,28 @@ def state_abbr(state_name):
         "Virginia": "VA", "Washington": "WA", "West Virginia": "WV", "Wisconsin": "WI", "Wyoming": "WY"
     }
     return abbrs.get(state_name, state_name)
+
+@register.filter
+def event_date_label(event):
+    """Human-readable start/end date for an event."""
+    start = event.date
+    end = event.effective_end_date
+    if end > start:
+        if start.year == end.year and start.month == end.month:
+            return f"{start.strftime('%b %d')}–{end.strftime('%d, %Y')}"
+        if start.year == end.year:
+            return f"{start.strftime('%b %d')} – {end.strftime('%b %d, %Y')}"
+        return f"{start.strftime('%b %d, %Y')} – {end.strftime('%b %d, %Y')}"
+    return start.strftime('%b %d, %Y')
+
+@register.filter
+def event_timezone_abbr(event):
+    if hasattr(event, 'get_timezone_abbreviation'):
+        return event.get_timezone_abbreviation()
+    return ''
+
+@register.filter
+def event_timezone_name(event):
+    if hasattr(event, 'get_timezone_display_name'):
+        return event.get_timezone_display_name()
+    return ''

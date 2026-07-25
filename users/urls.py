@@ -5,6 +5,7 @@ from .views import CustomPasswordResetView, CustomPasswordResetDoneView, CustomP
 
 urlpatterns = [
     path('register/', views.register, name='register'),
+    path('client-ip/', views.store_client_ip, name='store_client_ip'),
     path('register/success/', views.registration_success, name='registration_success'),
     path('pending-approval/', views.pending_approval, name='pending_approval'),
     path('login/', views.custom_login, name='login'),
@@ -12,6 +13,7 @@ urlpatterns = [
     path('profile/', views.profile, name='profile'),
     path('administration/', views.administration, name='administration'),
     path('<int:user_id>/ban/', views.ban_user, name='ban_user'),
+    path('ban-group/', views.ban_group_user, name='ban_group_user'),
     path('user_search_autocomplete/', views.user_search_autocomplete, name='user_search_autocomplete'),
     path('notifications/', views.get_notifications, name='get_notifications'),
     path('notifications/mark_as_read/', views.mark_notifications_as_read, name='mark_notifications_as_read'),
