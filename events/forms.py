@@ -66,15 +66,27 @@ class EventForm(forms.ModelForm):
         label='I confirm that all event details are accurate and truthful.',
         widget=forms.CheckboxInput(attrs={'class': 'form-check-input'})
     )
+    date = forms.DateField(
+        required=True,
+        widget=forms.DateInput(attrs={'type': 'text', 'class': 'form-control'}),
+        # Flatpickr submits Y-m-d; keep m/d/Y as a fallback for older clients.
+        input_formats=['%Y-%m-%d', '%m/%d/%Y', '%m/%d/%y'],
+    )
+    end_date = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={'type': 'text', 'class': 'form-control'}),
+        input_formats=['%Y-%m-%d', '%m/%d/%Y', '%m/%d/%y'],
+    )
     start_time = forms.TimeField(
         required=True,
-        widget=forms.TimeInput(attrs={'type': 'time', 'class': 'form-control'}),
-        input_formats=['%H:%M', '%I:%M %p', '%I:%M%p']
+        widget=forms.TimeInput(attrs={'type': 'text', 'class': 'form-control'}),
+        # Flatpickr submits H:i; keep 12-hour formats as a fallback.
+        input_formats=['%H:%M', '%H:%M:%S', '%I:%M %p', '%I:%M%p'],
     )
     end_time = forms.TimeField(
         required=True,
-        widget=forms.TimeInput(attrs={'type': 'time', 'class': 'form-control'}),
-        input_formats=['%H:%M', '%I:%M %p', '%I:%M%p']
+        widget=forms.TimeInput(attrs={'type': 'text', 'class': 'form-control'}),
+        input_formats=['%H:%M', '%H:%M:%S', '%I:%M %p', '%I:%M%p'],
     )
     accessibility_details = forms.CharField(
         required=False,
@@ -94,10 +106,6 @@ class EventForm(forms.ModelForm):
         widgets = {
             'title': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Event Title'}),
             'group': forms.Select(attrs={'class': 'form-select', 'placeholder': 'Select Group'}),
-            'date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
-            'end_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
-            'start_time': forms.TimeInput(attrs={'type': 'time', 'class': 'form-control'}),
-            'end_time': forms.TimeInput(attrs={'type': 'time', 'class': 'form-control'}),
             'address': forms.TextInput(attrs={'class': 'form-control'}),
             'city': forms.TextInput(attrs={'class': 'form-control'}),
             'description': forms.Textarea(attrs={'class': 'form-control'}),
@@ -114,19 +122,16 @@ class EventForm(forms.ModelForm):
         instance = kwargs.get('instance') or getattr(self, 'instance', None)
         super().__init__(*args, **kwargs)
 
-        date_widget = self.fields['date'].widget
-        time_widget = self.fields['start_time'].widget
-
         if not self.is_bound and instance and instance.pk:
+            # Machine formats for Flatpickr (altInput shows the friendly versions).
             if instance.date:
-                # Format for Flatpickr: m/d/Y (no leading zeros)
-                self.initial['date'] = f"{instance.date.month}/{instance.date.day}/{instance.date.year}"
+                self.initial['date'] = instance.date.isoformat()
             if instance.end_date and instance.end_date != instance.date:
-                self.initial['end_date'] = f"{instance.end_date.month}/{instance.end_date.day}/{instance.end_date.year}"
+                self.initial['end_date'] = instance.end_date.isoformat()
             if instance.start_time:
-                self.initial['start_time'] = instance.start_time.strftime('%I:%M %p')
+                self.initial['start_time'] = instance.start_time.strftime('%H:%M')
             if instance.end_time:
-                self.initial['end_time'] = instance.end_time.strftime('%I:%M %p')
+                self.initial['end_time'] = instance.end_time.strftime('%H:%M')
 
         if instance:
             self.fields['eula_agreement'].required = False

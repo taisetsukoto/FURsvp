@@ -646,27 +646,45 @@
                 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
                 <script>
                     document.addEventListener('DOMContentLoaded', function () {
+                        // Match create-event Flatpickr: submit machine formats (Y-m-d / H:i),
+                        // show friendly altInput values so untouched fields still validate.
                         flatpickr('.flatpickr[name="date"]', {
-                            dateFormat: 'm/d/Y',
+                            dateFormat: 'Y-m-d',
+                            altInput: true,
+                            altFormat: 'F j, Y',
+                            altInputClass: 'form-control',
                             allowInput: true,
+                            disableMobile: true,
                         });
                         flatpickr('.flatpickr[name="end_date"]', {
-                            dateFormat: 'm/d/Y',
+                            dateFormat: 'Y-m-d',
+                            altInput: true,
+                            altFormat: 'F j, Y',
+                            altInputClass: 'form-control',
                             allowInput: true,
+                            disableMobile: true,
                         });
                         flatpickr('.flatpickr[name="start_time"]', {
                             enableTime: true,
                             noCalendar: true,
-                            dateFormat: 'h:i K',
+                            dateFormat: 'H:i',
                             time_24hr: false,
+                            altInput: true,
+                            altFormat: 'h:i K',
+                            altInputClass: 'form-control',
                             allowInput: true,
+                            disableMobile: true,
                         });
                         flatpickr('.flatpickr[name="end_time"]', {
                             enableTime: true,
                             noCalendar: true,
-                            dateFormat: 'h:i K',
+                            dateFormat: 'H:i',
                             time_24hr: false,
+                            altInput: true,
+                            altFormat: 'h:i K',
+                            altInputClass: 'form-control',
                             allowInput: true,
+                            disableMobile: true,
                         });
                     });
                 </script>
