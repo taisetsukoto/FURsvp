@@ -46,7 +46,7 @@
                                     {% make_date_key year month day as date_key %}
                                     {% with day_events=events_by_date|get_item:date_key %}
                                     <button type="button"
-                                        class="calendar-day{% if day_events|length > 0 %} has-events{% endif %}{% if date_key == today|date:'Y-m-d' %} today{% endif %}"
+                                        class="calendar-day{% if day_events|length > 0 %} has-events{% endif %}{% if date_key == today|date:'Y-m-d' %} today{% endif %}{% if selected_date and date_key == selected_date|date:'Y-m-d' %} is-selected{% endif %}"
                                         role="gridcell"
                                         data-date="{{ date_key }}"
                                         aria-label="{{ month_name }} {{ day }}{% if day_events|length > 0 %}, {{ day_events|length }} event{{ day_events|length|pluralize }}{% endif %}">
@@ -76,7 +76,7 @@
                     <div class="calendar-sidebar-filters">
                         <h2 class="calendar-sidebar-title">Filters</h2>
                         <div class="calendar-filter-actions">
-                            <a href="{% url 'event_calendar' %}?adult={{ filter_adult|default:'false' }}{% if filter_group %}&amp;group={{ filter_group|escapejs }}{% endif %}" class="calendar-filter-btn">
+                            <a href="{% url 'event_calendar' %}?year={{ today.year }}&amp;month={{ today.month }}&amp;day={{ today.day }}&amp;adult={{ filter_adult|default:'false' }}{% if filter_group %}&amp;group={{ filter_group|escapejs }}{% endif %}" class="calendar-filter-btn">
                                 <i class="material-icons">today</i>
                                 Today
                             </a>
@@ -99,16 +99,20 @@
                     <div class="calendar-agenda" aria-live="polite">
                         <div class="calendar-agenda-header">
                             <div>
-                                <h3 class="calendar-agenda-title" id="calendarAgendaTitle">{{ month_name }} {{ year }}</h3>
+                                <h3 class="calendar-agenda-title" id="calendarAgendaTitle">
+                                    {% if selected_date %}{{ selected_date|date:"l, F j" }}{% else %}{{ month_name }} {{ year }}{% endif %}
+                                </h3>
                                 <p class="calendar-agenda-subtitle" id="calendarAgendaSubtitle">
-                                    {% if month_event_count == 0 %}
+                                    {% if selected_date %}
+                                    Showing events for this day
+                                    {% elif month_event_count == 0 %}
                                     No events this month{% if filter_adult == 'false' %} — try showing 18+/21+{% endif %}
                                     {% else %}
                                     Select a date to filter, or browse all events below
                                     {% endif %}
                                 </p>
                             </div>
-                            <button type="button" class="calendar-agenda-reset" id="calendarAgendaReset" hidden>
+                            <button type="button" class="calendar-agenda-reset" id="calendarAgendaReset"{% if not selected_date %} hidden{% endif %}>
                                 Show all
                             </button>
                         </div>
@@ -122,7 +126,7 @@
                             {% else %}
                             {% regroup month_events by date as events_by_day %}
                             {% for day_group in events_by_day %}
-                            <div class="calendar-agenda-group" data-date="{{ day_group.grouper|date:'Y-m-d' }}">
+                            <div class="calendar-agenda-group" data-date="{{ day_group.grouper|date:'Y-m-d' }}"{% if selected_date and day_group.grouper != selected_date %} hidden{% endif %}>
                                 <h4 class="calendar-agenda-date">
                                     <span class="calendar-agenda-date-weekday">{{ day_group.grouper|date:"D" }}</span>
                                     {{ day_group.grouper|date:"M j" }}
@@ -187,11 +191,41 @@ document.addEventListener('DOMContentLoaded', function() {
     const filterGroup = '{{ filter_group|default:""|escapejs }}';
     const year = {{ year }};
     const month = {{ month }};
+    let selectedDate = '{% if selected_date %}{{ selected_date|date:"Y-m-d" }}{% endif %}' || null;
 
     const groupLogos = {};
     JSON.parse(document.getElementById('calendar-groups-data').textContent).forEach(function(group) {
         groupLogos[group.value] = group.logo || '';
     });
+
+    function calendarParams(overrides) {
+        const params = new URLSearchParams(window.location.search);
+        params.set('year', String(year));
+        params.set('month', String(month));
+        params.set('adult', filterAdult ? 'true' : 'false');
+        if (filterGroup) {
+            params.set('group', filterGroup);
+        } else {
+            params.delete('group');
+        }
+        Object.keys(overrides || {}).forEach(function(key) {
+            const value = overrides[key];
+            if (value === null || value === undefined || value === '') {
+                params.delete(key);
+            } else {
+                params.set(key, String(value));
+            }
+        });
+        return params;
+    }
+
+    function syncDayQuery(dateKey) {
+        const day = dateKey ? String(Number(dateKey.split('-')[2])) : null;
+        const params = calendarParams({ day: day });
+        const query = params.toString();
+        const nextUrl = query ? (window.location.pathname + '?' + query) : window.location.pathname;
+        window.history.replaceState({}, '', nextUrl);
+    }
 
     function renderCalendarGroupOption(data, escape) {
         if (!data.value) {
@@ -218,15 +252,11 @@ document.addEventListener('DOMContentLoaded', function() {
                 item: renderCalendarGroupOption,
             },
             onChange: function(value) {
-                const params = new URLSearchParams(window.location.search);
-                params.set('year', String(year));
-                params.set('month', String(month));
-                params.set('adult', filterAdult ? 'true' : 'false');
-                if (value) {
-                    params.set('group', value);
-                } else {
-                    params.delete('group');
-                }
+                const params = calendarParams({
+                    adult: filterAdult ? 'true' : 'false',
+                    group: value || null,
+                    day: selectedDate ? String(Number(selectedDate.split('-')[2])) : null,
+                });
                 window.location.search = params.toString();
             },
         });
@@ -235,13 +265,10 @@ document.addEventListener('DOMContentLoaded', function() {
     const toggleAdult = document.getElementById('calendarToggleAdult');
     if (toggleAdult) {
         toggleAdult.addEventListener('click', function() {
-            const params = new URLSearchParams(window.location.search);
-            params.set('year', String(year));
-            params.set('month', String(month));
-            params.set('adult', filterAdult ? 'false' : 'true');
-            if (filterGroup) {
-                params.set('group', filterGroup);
-            }
+            const params = calendarParams({
+                adult: filterAdult ? 'false' : 'true',
+                day: selectedDate ? String(Number(selectedDate.split('-')[2])) : null,
+            });
             window.location.search = params.toString();
         });
     }
@@ -252,7 +279,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const agendaSubtitle = document.getElementById('calendarAgendaSubtitle');
     const agendaReset = document.getElementById('calendarAgendaReset');
     const monthLabel = '{{ month_name|escapejs }} {{ year }}';
-    let selectedDate = null;
 
     function formatAgendaDate(dateKey) {
         const parts = dateKey.split('-');
@@ -260,7 +286,7 @@ document.addEventListener('DOMContentLoaded', function() {
         return date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
     }
 
-    function setSelectedDate(dateKey) {
+    function setSelectedDate(dateKey, updateUrl) {
         selectedDate = dateKey;
         dayButtons.forEach(function(button) {
             button.classList.toggle('is-selected', button.dataset.date === dateKey);
@@ -277,9 +303,12 @@ document.addEventListener('DOMContentLoaded', function() {
         if (agendaReset) {
             agendaReset.hidden = false;
         }
+        if (updateUrl !== false) {
+            syncDayQuery(dateKey);
+        }
     }
 
-    function clearSelectedDate() {
+    function clearSelectedDate(updateUrl) {
         selectedDate = null;
         dayButtons.forEach(function(button) {
             button.classList.remove('is-selected');
@@ -298,6 +327,9 @@ document.addEventListener('DOMContentLoaded', function() {
         if (agendaReset) {
             agendaReset.hidden = true;
         }
+        if (updateUrl !== false) {
+            syncDayQuery(null);
+        }
     }
 
     dayButtons.forEach(function(button) {
@@ -312,7 +344,9 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     if (agendaReset) {
-        agendaReset.addEventListener('click', clearSelectedDate);
+        agendaReset.addEventListener('click', function() {
+            clearSelectedDate();
+        });
     }
 });
 </script>

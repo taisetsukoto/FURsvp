@@ -1097,6 +1097,15 @@ def event_calendar(request):
     else:
         end_date = datetime(year, month + 1, 1).date()
 
+    selected_date = None
+    day_param = request.GET.get('day', '').strip()
+    if day_param:
+        try:
+            day = int(day_param)
+            selected_date = datetime(year, month, day).date()
+        except (TypeError, ValueError):
+            selected_date = None
+
     events_qs = Event.objects.filter(
         Event.overlaps_date_range_q(start_date, end_date),
         status='active',
@@ -1169,6 +1178,7 @@ def event_calendar(request):
         'next_month': next_month,
         'next_year': next_year,
         'today': today,
+        'selected_date': selected_date,
         'filter_adult': filter_adult,
         'filter_group': filter_group,
         'calendar_groups_options': calendar_groups_options,
