@@ -7,40 +7,47 @@
 
 {% block extra_css %}
 {% if location_display_string %}
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.19.0/dist/maplibre-gl.css"
+    integrity="sha384-MGCxhspF/+ufueUgol3FDkiAYQbpSNRhBT0VWHJt64U8qIy9qlnXWx8LAbj6niPH" crossorigin="">
 {% endif %}
 {% endblock %}
 
 {% block content %}
 <div class="container py-4 event-page">
+    {% if user_rsvp and event.status != 'cancelled' %}
+    {% if user_rsvp.status == 'confirmed' or user_rsvp.status == 'maybe' or user_rsvp.status == 'waitlisted' or user_rsvp.status == 'not_attending' %}
+    <div class="rsvp-status-banner rsvp-status-banner--{% if user_rsvp.status == 'confirmed' %}confirmed{% elif user_rsvp.status == 'maybe' %}maybe{% elif user_rsvp.status == 'waitlisted' %}waitlisted{% else %}declined{% endif %}" role="status">
+        <span class="rsvp-status-banner-mark" aria-hidden="true">
+            <i class="material-icons">{% if user_rsvp.status == 'confirmed' %}check_circle{% elif user_rsvp.status == 'maybe' %}help{% elif user_rsvp.status == 'waitlisted' %}hourglass_empty{% else %}cancel{% endif %}</i>
+        </span>
+        <p class="rsvp-status-banner-text">
+            {% if user_rsvp.status == 'confirmed' %}You are confirmed for this event.
+            {% elif user_rsvp.status == 'maybe' %}You marked yourself as maybe for this event.
+            {% elif user_rsvp.status == 'waitlisted' %}You are waitlisted. You will be notified if a spot opens up.
+            {% else %}You are not going to this event.{% endif %}
+        </p>
+        <span class="rsvp-status-banner-label">
+            {% if user_rsvp.status == 'confirmed' %}Confirmed
+            {% elif user_rsvp.status == 'maybe' %}Maybe
+            {% elif user_rsvp.status == 'waitlisted' %}Waitlist
+            {% else %}Not going{% endif %}
+        </span>
+    </div>
+    {% endif %}
+    {% endif %}
+
     {% if event.status == 'cancelled' %}
     <div class="event-status-banner event-status-banner--danger">
         <i class="material-icons">event_busy</i>
         This event has been cancelled.
     </div>
-    {% elif user_rsvp and event.status != 'cancelled' %}
-    {% if user_rsvp.status == 'confirmed' %}
-    <div class="event-status-banner event-status-banner--success">
-        <i class="material-icons">check_circle</i>
-        You are confirmed for this event.
-    </div>
-    {% elif user_rsvp.status == 'maybe' %}
-    <div class="event-status-banner event-status-banner--warning">
-        <i class="material-icons">help</i>
-        You marked yourself as maybe for this event.
-    </div>
-    {% elif user_rsvp.status == 'not_attending' %}
-    <div class="event-status-banner event-status-banner--danger">
-        <i class="material-icons">cancel</i>
-        You are not going to this event.
-    </div>
-    {% elif user_rsvp.status == 'waitlisted' %}
-    <div class="event-status-banner event-status-banner--warning">
-        <i class="material-icons">hourglass_empty</i>
-        You are waitlisted. You will be notified if a spot opens up.
-    </div>
     {% endif %}
+
+    {% if signups_closed and not event_has_started and event.status == 'active' %}
+    <div class="event-status-banner event-status-banner--muted">
+        <i class="material-icons">lock</i>
+        RSVPs closed on {{ event.rsvp_close_date|date:"M j, Y" }}.
+    </div>
     {% endif %}
 
     {% if event_has_started and not event_has_passed and event.status == 'active' %}
@@ -78,6 +85,12 @@
                     <a href="{% url 'group_detail' event.group.id %}" class="event-hero-chip">
                         <i class="material-icons">groups</i>{{ event.group.name }}
                     </a>
+                    {% if event.rsvp_close_date and event.status == 'active' and not event_has_started %}
+                    <span class="event-hero-chip">
+                        <i class="material-icons">{% if signups_closed %}lock{% else %}event_busy{% endif %}</i>
+                        {% if signups_closed %}RSVPs closed{% else %}RSVPs close {{ event.rsvp_close_date|date:"M j" }}{% endif %}
+                    </span>
+                    {% endif %}
                     {% if event.age_restriction == 'mature' %}
                     <span class="event-age-badge event-age-badge--21"><i class="material-icons">warning</i> 21+</span>
                     {% elif event.age_restriction == 'adult' %}
@@ -94,11 +107,19 @@
     <div class="row g-4 mb-4 align-items-start">
         <div class="col-lg-8">
             <div class="group-section-card profile-page-card mb-4">
-                <div class="group-section-header">
+                <div class="group-section-header event-info-header">
                     <div class="group-section-icon group-section-icon--info">
                         <i class="material-icons">info</i>
                     </div>
                     <h2 class="group-section-title">Event Information</h2>
+                    {% if event.group.contact_email %}
+                    <div class="group-section-header-action">
+                        <a href="mailto:{{ event.group.contact_email }}" class="group-toolbar-btn group-toolbar-btn--secondary group-toolbar-btn--compact event-contact-link" title="Email {{ event.group.contact_email }}">
+                            <i class="material-icons">email</i>
+                            <span>{{ event.group.contact_email }}</span>
+                        </a>
+                    </div>
+                    {% endif %}
                 </div>
                 <div class="group-section-body">
                     <div class="event-meta-grid">
@@ -123,6 +144,15 @@
                                 <span class="event-meta-value">{{ event.start_time|time:"g:i A" }}{% if event.end_time %} – {{ event.end_time|time:"g:i A" }}{% endif %}{% if event.timezone %} {{ event|event_timezone_abbr }}{% endif %}</span>
                             </div>
                         </div>
+                        {% if event.rsvp_close_date %}
+                        <div class="event-meta-item">
+                            <i class="material-icons">event_busy</i>
+                            <div>
+                                <span class="event-meta-label">RSVP close date</span>
+                                <span class="event-meta-value">{{ event.rsvp_close_date|date:"M j, Y" }}</span>
+                            </div>
+                        </div>
+                        {% endif %}
                         {% if event.capacity %}
                         <div class="event-meta-item">
                             <i class="material-icons">people</i>
@@ -355,27 +385,39 @@
                             <i class="material-icons">edit</i> Edit Event
                         </button>
                         {% if event.status == 'cancelled' %}
-                        <form method="post" action="{% url 'uncancel_event' event.id %}"
-                            onsubmit="return confirm('Are you sure you want to uncancel this event? This will notify all attendees.');">
+                        <form method="post" action="{% url 'uncancel_event' event.id %}">
                             {% csrf_token %}
-                            <button type="submit" class="group-toolbar-btn group-toolbar-btn--success">
+                            <button type="submit" class="group-toolbar-btn group-toolbar-btn--success"
+                                data-confirm-title="Uncancel event"
+                                data-confirm-body="Are you sure you want to uncancel this event? This will notify all attendees."
+                                data-confirm-label="Uncancel event"
+                                data-confirm-icon="restore"
+                                data-confirm-success="1">
                                 <i class="material-icons">restore</i> Uncancel Event
                             </button>
                         </form>
                         {% else %}
-                        <form method="post"
-                            onsubmit="return confirm('Are you sure you want to cancel this event? This will notify all attendees.');">
+                        <form method="post">
                             {% csrf_token %}
-                            <button type="submit" name="cancel_event" class="group-toolbar-btn group-toolbar-btn--danger">
+                            <button type="submit" name="cancel_event" class="group-toolbar-btn group-toolbar-btn--danger"
+                                data-confirm-title="Cancel event"
+                                data-confirm-body="Are you sure you want to cancel this event? This will notify all attendees."
+                                data-confirm-label="Cancel event"
+                                data-confirm-icon="cancel"
+                                data-confirm-danger="1">
                                 <i class="material-icons">cancel</i> Cancel Event
                             </button>
                         </form>
                         {% endif %}
-                        <form method="post"
-                            onsubmit="return confirm('Are you sure you want to delete this event? This action cannot be undone.');">
+                        <form method="post">
                             {% csrf_token %}
                             <input type="hidden" name="delete_event" value="1">
-                            <button type="submit" class="group-toolbar-btn group-toolbar-btn--danger">
+                            <button type="submit" class="group-toolbar-btn group-toolbar-btn--danger"
+                                data-confirm-title="Delete event"
+                                data-confirm-body="Are you sure you want to delete this event? This action cannot be undone."
+                                data-confirm-label="Delete event"
+                                data-confirm-icon="delete"
+                                data-confirm-danger="1">
                                 <i class="material-icons">delete</i> Delete Event
                             </button>
                         </form>
@@ -396,173 +438,253 @@
                                     </div>
                                     <div class="event-editor-modal-header-text">
                                         <h5 class="event-editor-modal-title" id="editEventModalLabel">Edit Event</h5>
-                                        <p class="event-editor-modal-subtitle">Update event details, location, and settings</p>
+                                        <p class="event-editor-modal-subtitle">Step <span id="editWizardCurrent">1</span> of 5 — <span id="editWizardTitle">Basics</span></p>
                                     </div>
                                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                 </div>
+                                <p class="event-edit-wizard-hint">Click a number to edit that section.</p>
+                                <nav class="event-wizard-progress" aria-label="Edit event sections">
+                                    <ol class="event-wizard-progress-list">
+                                        <li class="event-wizard-progress-item active" data-step="1">
+                                            <button type="button" class="event-wizard-progress-jump" data-step="1" aria-label="Edit basics">
+                                                <span class="event-wizard-progress-dot">1</span>
+                                                <span class="event-wizard-progress-label">Basics</span>
+                                            </button>
+                                        </li>
+                                        <li class="event-wizard-progress-item" data-step="2">
+                                            <button type="button" class="event-wizard-progress-jump" data-step="2" aria-label="Edit schedule">
+                                                <span class="event-wizard-progress-dot">2</span>
+                                                <span class="event-wizard-progress-label">Schedule</span>
+                                            </button>
+                                        </li>
+                                        <li class="event-wizard-progress-item" data-step="3">
+                                            <button type="button" class="event-wizard-progress-jump" data-step="3" aria-label="Edit location">
+                                                <span class="event-wizard-progress-dot">3</span>
+                                                <span class="event-wizard-progress-label">Location</span>
+                                            </button>
+                                        </li>
+                                        <li class="event-wizard-progress-item" data-step="4">
+                                            <button type="button" class="event-wizard-progress-jump" data-step="4" aria-label="Edit accessibility">
+                                                <span class="event-wizard-progress-dot">4</span>
+                                                <span class="event-wizard-progress-label">Accessibility</span>
+                                            </button>
+                                        </li>
+                                        <li class="event-wizard-progress-item" data-step="5">
+                                            <button type="button" class="event-wizard-progress-jump" data-step="5" aria-label="Edit questions">
+                                                <span class="event-wizard-progress-dot">5</span>
+                                                <span class="event-wizard-progress-label">Questions</span>
+                                            </button>
+                                        </li>
+                                    </ol>
+                                </nav>
                                 {% csrf_token %}
                                 <div class="modal-body event-editor-modal-body">
-                                    <div class="event-editor-panel">
-                                        <h6 class="event-editor-section-label">Basic info</h6>
-                                        <div class="auth-field">
-                                            <label for="{{ event_form.title.id_for_label }}" class="auth-form-label">Event title</label>
-                                            <div class="input-group auth-input-group">
-                                                <span class="input-group-text"><i class="material-icons">event_note</i></span>
-                                                {% render_field event_form.title class="form-control" %}
-                                            </div>
-                                            {% if event_form.title.errors %}<div class="invalid-feedback d-block">{{ event_form.title.errors }}</div>{% endif %}
-                                        </div>
-                                        <div class="auth-field mb-0">
-                                            <label for="{{ event_form.group.id_for_label }}" class="auth-form-label">Group</label>
-                                            <div class="input-group auth-input-group">
-                                                <span class="input-group-text"><i class="material-icons">groups</i></span>
-                                                {% render_field event_form.group class="form-select" %}
-                                            </div>
-                                            {% if event_form.group.errors %}<div class="invalid-feedback d-block">{{ event_form.group.errors }}</div>{% endif %}
-                                        </div>
+                                    {% if event_form.errors %}
+                                    <div class="event-wizard-alert" role="alert">
+                                        Please fix the highlighted fields before saving.
                                     </div>
+                                    {% endif %}
 
-                                    <div class="event-editor-panel">
-                                        <h6 class="event-editor-section-label">Date &amp; time</h6>
-                                        <div class="event-editor-grid event-editor-grid--4">
-                                            <div class="auth-field mb-0">
-                                                <label for="{{ event_form.date.id_for_label }}" class="auth-form-label">Start date</label>
+                                    <div class="event-wizard-step active" data-step="1" data-step-title="Basics">
+                                        <div class="event-wizard-step-header">
+                                            <h2 class="event-wizard-step-heading">Event basics</h2>
+                                            <p class="event-wizard-step-desc">Update the name, group, and description attendees see.</p>
+                                        </div>
+                                        <div class="event-editor-panel">
+                                            <div class="auth-field">
+                                                <label for="{{ event_form.title.id_for_label }}" class="auth-form-label">Event title</label>
                                                 <div class="input-group auth-input-group">
-                                                    <span class="input-group-text"><i class="material-icons">calendar_today</i></span>
-                                                    {% render_field event_form.date class="form-control flatpickr" placeholder="Start date" %}
+                                                    <span class="input-group-text"><i class="material-icons">event_note</i></span>
+                                                    {% render_field event_form.title class="form-control" %}
                                                 </div>
-                                                {% if event_form.date.errors %}<div class="invalid-feedback d-block">{{ event_form.date.errors }}</div>{% endif %}
+                                                {% if event_form.title.errors %}<div class="invalid-feedback d-block">{{ event_form.title.errors }}</div>{% endif %}
+                                            </div>
+                                            <div class="auth-field">
+                                                <label for="{{ event_form.group.id_for_label }}" class="auth-form-label">Group</label>
+                                                <div class="input-group auth-input-group">
+                                                    <span class="input-group-text"><i class="material-icons">groups</i></span>
+                                                    {% render_field event_form.group class="form-select" %}
+                                                </div>
+                                                {% if event_form.group.errors %}<div class="invalid-feedback d-block">{{ event_form.group.errors }}</div>{% endif %}
                                             </div>
                                             <div class="auth-field mb-0">
-                                                <label for="{{ event_form.end_date.id_for_label }}" class="auth-form-label">End date</label>
-                                                <div class="input-group auth-input-group">
-                                                    <span class="input-group-text"><i class="material-icons">event</i></span>
-                                                    {% render_field event_form.end_date class="form-control flatpickr" placeholder="Same as start" %}
-                                                </div>
-                                                {% if event_form.end_date.errors %}<div class="invalid-feedback d-block">{{ event_form.end_date.errors }}</div>{% endif %}
-                                            </div>
-                                            <div class="auth-field mb-0">
-                                                <label for="{{ event_form.start_time.id_for_label }}" class="auth-form-label">Start time</label>
-                                                <div class="input-group auth-input-group">
-                                                    <span class="input-group-text"><i class="material-icons">schedule</i></span>
-                                                    {% render_field event_form.start_time class="form-control flatpickr" placeholder="Start time" required='required' %}
-                                                </div>
-                                                {% if event_form.start_time.errors %}<div class="invalid-feedback d-block">{{ event_form.start_time.errors }}</div>{% endif %}
-                                            </div>
-                                            <div class="auth-field mb-0">
-                                                <label for="{{ event_form.end_time.id_for_label }}" class="auth-form-label">End time</label>
-                                                <div class="input-group auth-input-group">
-                                                    <span class="input-group-text"><i class="material-icons">schedule</i></span>
-                                                    {% render_field event_form.end_time class="form-control flatpickr" placeholder="End time" required='required' %}
-                                                </div>
-                                                {% if event_form.end_time.errors %}<div class="invalid-feedback d-block">{{ event_form.end_time.errors }}</div>{% endif %}
+                                                <label for="{{ event_form.description.id_for_label }}" class="auth-form-label">Description</label>
+                                                {% render_field event_form.description class="form-control" %}
+                                                {% if event_form.description.errors %}<div class="invalid-feedback d-block">{{ event_form.description.errors }}</div>{% endif %}
                                             </div>
                                         </div>
                                     </div>
 
-                                    <div class="event-editor-panel">
-                                        <h6 class="event-editor-section-label">Location</h6>
-                                        <div class="auth-field">
-                                            <label for="{{ event_form.address.id_for_label }}" class="auth-form-label">Street address</label>
-                                            <div class="input-group auth-input-group">
-                                                <span class="input-group-text"><i class="material-icons">place</i></span>
-                                                {% render_field event_form.address class="form-control" placeholder="Enter street address" %}
-                                                <button type="button" class="input-group-text input-group-text--action" id="useLocationBtn" title="Use my location">
-                                                    <i class="material-icons">my_location</i>
-                                                </button>
-                                            </div>
-                                            {% if event_form.address.errors %}<div class="invalid-feedback d-block">{{ event_form.address.errors }}</div>{% endif %}
+                                    <div class="event-wizard-step" data-step="2" data-step-title="Schedule">
+                                        <div class="event-wizard-step-header">
+                                            <h2 class="event-wizard-step-heading">Date &amp; time</h2>
+                                            <p class="event-wizard-step-desc">When the event starts and ends, plus capacity, age settings, and an optional RSVP close date.</p>
                                         </div>
-                                        <div class="event-editor-grid">
-                                            <div class="auth-field mb-0">
-                                                <label for="{{ event_form.city.id_for_label }}" class="auth-form-label">City</label>
-                                                <div class="input-group auth-input-group">
-                                                    <span class="input-group-text"><i class="material-icons">location_city</i></span>
-                                                    {% render_field event_form.city class="form-control" placeholder="Enter city" %}
+                                        <div class="event-editor-panel">
+                                            <div class="event-editor-grid event-editor-grid--4">
+                                                <div class="auth-field mb-0">
+                                                    <label for="{{ event_form.date.id_for_label }}" class="auth-form-label">Start date</label>
+                                                    <div class="input-group auth-input-group">
+                                                        <span class="input-group-text"><i class="material-icons">calendar_today</i></span>
+                                                        {% render_field event_form.date class="form-control flatpickr" placeholder="Start date" %}
+                                                    </div>
+                                                    {% if event_form.date.errors %}<div class="invalid-feedback d-block">{{ event_form.date.errors }}</div>{% endif %}
                                                 </div>
-                                                {% if event_form.city.errors %}<div class="invalid-feedback d-block">{{ event_form.city.errors }}</div>{% endif %}
+                                                <div class="auth-field mb-0">
+                                                    <label for="{{ event_form.end_date.id_for_label }}" class="auth-form-label">End date</label>
+                                                    <div class="input-group auth-input-group">
+                                                        <span class="input-group-text"><i class="material-icons">event</i></span>
+                                                        {% render_field event_form.end_date class="form-control flatpickr" placeholder="Same as start" %}
+                                                    </div>
+                                                    {% if event_form.end_date.errors %}<div class="invalid-feedback d-block">{{ event_form.end_date.errors }}</div>{% endif %}
+                                                </div>
+                                                <div class="auth-field mb-0">
+                                                    <label for="{{ event_form.start_time.id_for_label }}" class="auth-form-label">Start time</label>
+                                                    <div class="input-group auth-input-group">
+                                                        <span class="input-group-text"><i class="material-icons">schedule</i></span>
+                                                        {% render_field event_form.start_time class="form-control flatpickr" placeholder="Start time" required='required' %}
+                                                    </div>
+                                                    {% if event_form.start_time.errors %}<div class="invalid-feedback d-block">{{ event_form.start_time.errors }}</div>{% endif %}
+                                                </div>
+                                                <div class="auth-field mb-0">
+                                                    <label for="{{ event_form.end_time.id_for_label }}" class="auth-form-label">End time</label>
+                                                    <div class="input-group auth-input-group">
+                                                        <span class="input-group-text"><i class="material-icons">schedule</i></span>
+                                                        {% render_field event_form.end_time class="form-control flatpickr" placeholder="End time" required='required' %}
+                                                    </div>
+                                                    {% if event_form.end_time.errors %}<div class="invalid-feedback d-block">{{ event_form.end_time.errors }}</div>{% endif %}
+                                                </div>
                                             </div>
-                                            <div class="auth-field mb-0">
-                                                <label for="{{ event_form.state.id_for_label }}" class="auth-form-label">State</label>
-                                                <div class="input-group auth-input-group">
-                                                    <span class="input-group-text"><i class="material-icons">map</i></span>
-                                                    {% render_field event_form.state class="form-select" %}
+                                            <div class="event-editor-grid mt-3">
+                                                <div class="auth-field mb-0">
+                                                    <label for="{{ event_form.rsvp_close_date.id_for_label }}" class="auth-form-label">RSVP close date <span class="text-muted">(optional)</span></label>
+                                                    <div class="input-group auth-input-group">
+                                                        <span class="input-group-text"><i class="material-icons">event_busy</i></span>
+                                                        {% render_field event_form.rsvp_close_date class="form-control flatpickr" placeholder="Open until event starts" %}
+                                                    </div>
+                                                    {% if event_form.rsvp_close_date.errors %}<div class="invalid-feedback d-block">{{ event_form.rsvp_close_date.errors }}</div>{% endif %}
+                                                    <div class="auth-field-help">Last day people can sign up. Leave blank to keep RSVPs open until the event starts.</div>
                                                 </div>
-                                                {% if event_form.state.errors %}<div class="invalid-feedback d-block">{{ event_form.state.errors }}</div>{% endif %}
+                                            </div>
+                                        </div>
+                                        <div class="event-editor-panel">
+                                            <h6 class="event-editor-section-label">Event settings</h6>
+                                            <div class="event-editor-grid">
+                                                <div class="auth-field mb-0">
+                                                    <label for="{{ event_form.age_restriction.id_for_label }}" class="auth-form-label">Age restriction</label>
+                                                    <div class="input-group auth-input-group">
+                                                        <span class="input-group-text"><i class="material-icons">block</i></span>
+                                                        {% render_field event_form.age_restriction class="form-select" %}
+                                                    </div>
+                                                    {% if event_form.age_restriction.errors %}<div class="invalid-feedback d-block">{{ event_form.age_restriction.errors }}</div>{% endif %}
+                                                </div>
+                                                <div class="auth-field mb-0">
+                                                    <label for="{{ event_form.capacity.id_for_label }}" class="auth-form-label">Capacity <span class="text-muted">(optional)</span></label>
+                                                    <div class="input-group auth-input-group">
+                                                        <span class="input-group-text"><i class="material-icons">people_alt</i></span>
+                                                        {% render_field event_form.capacity class="form-control" %}
+                                                    </div>
+                                                    {% if event_form.capacity.errors %}<div class="invalid-feedback d-block">{{ event_form.capacity.errors }}</div>{% endif %}
+                                                </div>
+                                            </div>
+                                            <div class="event-editor-perms mt-3">
+                                                <label class="event-editor-perm">
+                                                    {% render_field event_form.waitlist_enabled class="form-check-input" %}
+                                                    <span>Enable waitlist</span>
+                                                </label>
+                                                <label class="event-editor-perm">
+                                                    {% render_field event_form.attendee_list_public class="form-check-input" %}
+                                                    <span>Public attendee list</span>
+                                                </label>
                                             </div>
                                         </div>
                                     </div>
 
-                                    <div class="event-editor-panel">
-                                        <h6 class="event-editor-section-label">Event settings</h6>
-                                        <div class="event-editor-grid">
-                                            <div class="auth-field mb-0">
-                                                <label for="{{ event_form.age_restriction.id_for_label }}" class="auth-form-label">Age restriction</label>
+                                    <div class="event-wizard-step" data-step="3" data-step-title="Location">
+                                        <div class="event-wizard-step-header">
+                                            <h2 class="event-wizard-step-heading">Location</h2>
+                                            <p class="event-wizard-step-desc">Where the event takes place. Leave blank for online or TBA events.</p>
+                                        </div>
+                                        <div class="event-editor-panel">
+                                            <div class="auth-field">
+                                                <label for="{{ event_form.address.id_for_label }}" class="auth-form-label">Street address</label>
                                                 <div class="input-group auth-input-group">
-                                                    <span class="input-group-text"><i class="material-icons">block</i></span>
-                                                    {% render_field event_form.age_restriction class="form-select" %}
+                                                    <span class="input-group-text"><i class="material-icons">place</i></span>
+                                                    {% render_field event_form.address class="form-control" placeholder="Enter street address" %}
+                                                    <button type="button" class="input-group-text input-group-text--action" id="useLocationBtn" title="Use my location">
+                                                        <i class="material-icons">my_location</i>
+                                                    </button>
                                                 </div>
-                                                {% if event_form.age_restriction.errors %}<div class="invalid-feedback d-block">{{ event_form.age_restriction.errors }}</div>{% endif %}
+                                                {% if event_form.address.errors %}<div class="invalid-feedback d-block">{{ event_form.address.errors }}</div>{% endif %}
+                                            </div>
+                                            <div class="event-editor-grid">
+                                                <div class="auth-field mb-0">
+                                                    <label for="{{ event_form.city.id_for_label }}" class="auth-form-label">City</label>
+                                                    <div class="input-group auth-input-group">
+                                                        <span class="input-group-text"><i class="material-icons">location_city</i></span>
+                                                        {% render_field event_form.city class="form-control" placeholder="Enter city" %}
+                                                    </div>
+                                                    {% if event_form.city.errors %}<div class="invalid-feedback d-block">{{ event_form.city.errors }}</div>{% endif %}
+                                                </div>
+                                                <div class="auth-field mb-0">
+                                                    <label for="{{ event_form.state.id_for_label }}" class="auth-form-label">State</label>
+                                                    <div class="input-group auth-input-group">
+                                                        <span class="input-group-text"><i class="material-icons">map</i></span>
+                                                        {% render_field event_form.state class="form-select" %}
+                                                    </div>
+                                                    {% if event_form.state.errors %}<div class="invalid-feedback d-block">{{ event_form.state.errors }}</div>{% endif %}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="event-wizard-step" data-step="4" data-step-title="Accessibility">
+                                        <div class="event-wizard-step-header">
+                                            <h2 class="event-wizard-step-heading">Accessibility</h2>
+                                            <p class="event-wizard-step-desc">Help attendees know what to expect. Leave blank if not applicable.</p>
+                                        </div>
+                                        <div class="event-editor-panel">
+                                            <div class="auth-field mb-0">
+                                                <label for="{{ event_form.accessibility_details.id_for_label }}" class="auth-form-label">Accessibility details</label>
+                                                {% render_field event_form.accessibility_details class="form-control" %}
+                                                <div class="auth-field-help">Examples: wheelchair access, ASL interpreter, scent-free policy, quiet room.</div>
+                                                {% if event_form.accessibility_details.errors %}<div class="invalid-feedback d-block">{{ event_form.accessibility_details.errors }}</div>{% endif %}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="event-wizard-step" data-step="5" data-step-title="Questions">
+                                        <div class="event-wizard-step-header">
+                                            <h2 class="event-wizard-step-heading">RSVP questions</h2>
+                                            <p class="event-wizard-step-desc">Ask custom questions when people RSVP. Leave blank to skip.</p>
+                                        </div>
+                                        <div class="event-editor-panel">
+                                            <div class="auth-field">
+                                                <label for="{{ event_form.question1_text.id_for_label }}" class="auth-form-label">Question 1</label>
+                                                {% render_field event_form.question1_text class="form-control" placeholder="Leave blank to disable" %}
+                                                <div class="auth-field-help">Leave blank to disable.</div>
+                                            </div>
+                                            <div class="auth-field">
+                                                <label for="{{ event_form.question2_text.id_for_label }}" class="auth-form-label">Question 2</label>
+                                                {% render_field event_form.question2_text class="form-control" placeholder="Leave blank to disable" %}
+                                                <div class="auth-field-help">Leave blank to disable.</div>
                                             </div>
                                             <div class="auth-field mb-0">
-                                                <label for="{{ event_form.capacity.id_for_label }}" class="auth-form-label">Capacity <span class="text-muted">(optional)</span></label>
-                                                <div class="input-group auth-input-group">
-                                                    <span class="input-group-text"><i class="material-icons">people_alt</i></span>
-                                                    {% render_field event_form.capacity class="form-control" %}
-                                                </div>
-                                                {% if event_form.capacity.errors %}<div class="invalid-feedback d-block">{{ event_form.capacity.errors }}</div>{% endif %}
+                                                <label for="{{ event_form.question3_text.id_for_label }}" class="auth-form-label">Question 3</label>
+                                                {% render_field event_form.question3_text class="form-control" placeholder="Leave blank to disable" %}
+                                                <div class="auth-field-help">Leave blank to disable.</div>
                                             </div>
-                                        </div>
-                                        <div class="event-editor-perms mt-3">
-                                            <label class="event-editor-perm">
-                                                {% render_field event_form.waitlist_enabled class="form-check-input" %}
-                                                <span>Enable waitlist</span>
-                                            </label>
-                                            <label class="event-editor-perm">
-                                                {% render_field event_form.attendee_list_public class="form-check-input" %}
-                                                <span>Public attendee list</span>
-                                            </label>
-                                        </div>
-                                    </div>
-
-                                    <div class="event-editor-panel">
-                                        <h6 class="event-editor-section-label">Accessibility</h6>
-                                        <div class="auth-field mb-0">
-                                            <label for="{{ event_form.accessibility_details.id_for_label }}" class="auth-form-label">Accessibility details</label>
-                                            {% render_field event_form.accessibility_details class="form-control" %}
-                                            <div class="auth-field-help">Leave blank if not accessible.</div>
-                                            {% if event_form.accessibility_details.errors %}<div class="invalid-feedback d-block">{{ event_form.accessibility_details.errors }}</div>{% endif %}
-                                        </div>
-                                    </div>
-
-                                    <div class="event-editor-panel">
-                                        <h6 class="event-editor-section-label">RSVP questions</h6>
-                                        <div class="auth-field">
-                                            <label for="{{ event_form.question1_text.id_for_label }}" class="auth-form-label">Question 1</label>
-                                            {% render_field event_form.question1_text class="form-control" placeholder="Leave blank to disable" %}
-                                            <div class="auth-field-help">Leave blank to disable.</div>
-                                        </div>
-                                        <div class="auth-field">
-                                            <label for="{{ event_form.question2_text.id_for_label }}" class="auth-form-label">Question 2</label>
-                                            {% render_field event_form.question2_text class="form-control" placeholder="Leave blank to disable" %}
-                                            <div class="auth-field-help">Leave blank to disable.</div>
-                                        </div>
-                                        <div class="auth-field mb-0">
-                                            <label for="{{ event_form.question3_text.id_for_label }}" class="auth-form-label">Question 3</label>
-                                            {% render_field event_form.question3_text class="form-control" placeholder="Leave blank to disable" %}
-                                            <div class="auth-field-help">Leave blank to disable.</div>
-                                        </div>
-                                    </div>
-
-                                    <div class="event-editor-panel">
-                                        <h6 class="event-editor-section-label">Description</h6>
-                                        <div class="auth-field mb-0">
-                                            {% render_field event_form.description class="form-control" %}
-                                            {% if event_form.description.errors %}<div class="invalid-feedback d-block">{{ event_form.description.errors }}</div>{% endif %}
                                         </div>
                                     </div>
                                 </div>
-                                <div class="modal-footer group-modal-footer">
+                                <div class="modal-footer group-modal-footer event-edit-wizard-footer">
+                                    <button type="button" class="group-toolbar-btn group-toolbar-btn--secondary" id="editWizardBack" disabled>
+                                        <i class="material-icons">arrow_back</i> Back
+                                    </button>
+                                    <button type="button" class="group-toolbar-btn" id="editWizardNext">
+                                        Next <i class="material-icons">arrow_forward</i>
+                                    </button>
+                                    <div class="event-wizard-nav-spacer"></div>
                                     <button type="button" class="group-toolbar-btn group-toolbar-btn--secondary" data-bs-dismiss="modal">Cancel</button>
                                     <button type="submit" class="group-toolbar-btn">
                                         <i class="material-icons">save</i> Save changes
@@ -630,15 +752,130 @@
                     }
                     document.addEventListener('DOMContentLoaded', function () {
                         var editEventModal = document.getElementById('editEventModal');
-                        if (editEventModal) {
-                            editEventModal.addEventListener('shown.bs.modal', function () {
-                                var editor = tinymce.get('{{ event_form.description.id_for_label }}');
-                                if (editor) {
-                                    editor.destroy();
-                                }
-                                setTimeout(initTinyMCEEventModal, 750);
-                            });
+                        if (!editEventModal) return;
+
+                        var TOTAL_STEPS = 5;
+                        var STEP_FIELDS = {
+                            title: 1, group: 1, description: 1,
+                            date: 2, end_date: 2, rsvp_close_date: 2, start_time: 2, end_time: 2,
+                            age_restriction: 2, capacity: 2, waitlist_enabled: 2, attendee_list_public: 2,
+                            address: 3, city: 3, state: 3,
+                            accessibility_details: 4,
+                            question1_text: 5, question2_text: 5, question3_text: 5
+                        };
+                        var descId = '{{ event_form.description.id_for_label }}';
+                        var currentStep = 1;
+                        var modalVisible = false;
+                        var steps = Array.from(editEventModal.querySelectorAll('.event-wizard-step'));
+                        var progressItems = Array.from(editEventModal.querySelectorAll('.event-wizard-progress-item'));
+                        var backBtn = document.getElementById('editWizardBack');
+                        var nextBtn = document.getElementById('editWizardNext');
+                        var currentLabel = document.getElementById('editWizardCurrent');
+                        var titleEl = document.getElementById('editWizardTitle');
+                        var form = document.getElementById('editEventForm');
+
+                        function syncTinyMCE() {
+                            if (window.tinymce) tinymce.triggerSave();
                         }
+
+                        function ensureEditor() {
+                            if (!modalVisible || currentStep !== 1 || !window.tinymce) return;
+                            if (tinymce.get(descId)) {
+                                tinymce.get(descId).fire('ResizeEditor');
+                                return;
+                            }
+                            setTimeout(initTinyMCEEventModal, 50);
+                        }
+
+                        function goToStep(stepNum) {
+                            currentStep = Math.max(1, Math.min(TOTAL_STEPS, stepNum));
+                            steps.forEach(function (step) {
+                                step.classList.toggle('active', parseInt(step.dataset.step, 10) === currentStep);
+                            });
+                            progressItems.forEach(function (item) {
+                                var num = parseInt(item.dataset.step, 10);
+                                item.classList.toggle('active', num === currentStep);
+                                var jump = item.querySelector('.event-wizard-progress-jump');
+                                if (!jump) return;
+                                if (num === currentStep) jump.setAttribute('aria-current', 'step');
+                                else jump.removeAttribute('aria-current');
+                            });
+                            var active = steps.find(function (step) {
+                                return parseInt(step.dataset.step, 10) === currentStep;
+                            });
+                            currentLabel.textContent = String(currentStep);
+                            titleEl.textContent = active ? active.dataset.stepTitle : '';
+                            backBtn.disabled = currentStep === 1;
+                            nextBtn.hidden = currentStep === TOTAL_STEPS;
+                            var body = editEventModal.querySelector('.event-editor-modal-body');
+                            if (body) body.scrollTop = 0;
+                            ensureEditor();
+                        }
+
+                        backBtn.addEventListener('click', function () { goToStep(currentStep - 1); });
+                        nextBtn.addEventListener('click', function () { goToStep(currentStep + 1); });
+                        editEventModal.querySelectorAll('.event-wizard-progress-jump').forEach(function (btn) {
+                            btn.addEventListener('click', function () {
+                                goToStep(parseInt(btn.dataset.step, 10));
+                            });
+                        });
+
+                        function validateStep(stepNum) {
+                            var stepEl = steps.find(function (step) {
+                                return parseInt(step.dataset.step, 10) === stepNum;
+                            });
+                            if (!stepEl) return true;
+                            syncTinyMCE();
+                            var valid = true;
+                            stepEl.querySelectorAll('input, select, textarea').forEach(function (field) {
+                                if (field.type === 'hidden' || field.disabled || field.closest('.tox-tinymce')) return;
+                                field.classList.remove('is-invalid');
+                                if (typeof field.checkValidity === 'function' && !field.checkValidity()) {
+                                    field.classList.add('is-invalid');
+                                    valid = false;
+                                }
+                            });
+                            return valid;
+                        }
+
+                        form.addEventListener('submit', function (e) {
+                            syncTinyMCE();
+                            for (var s = 1; s <= TOTAL_STEPS; s++) {
+                                if (!validateStep(s)) {
+                                    e.preventDefault();
+                                    goToStep(s);
+                                    var stepEl = steps.find(function (step) {
+                                        return parseInt(step.dataset.step, 10) === s;
+                                    });
+                                    var firstInvalid = stepEl && stepEl.querySelector('.is-invalid, .invalid-feedback');
+                                    if (firstInvalid && firstInvalid.focus) firstInvalid.focus();
+                                    return;
+                                }
+                            }
+                        });
+
+                        var errorFields = [{% if event_form.errors %}{% for field in event_form.errors %}'{{ field|escapejs }}'{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}];
+                        var firstErrorStep = 1;
+                        var hasErrorStep = false;
+                        errorFields.forEach(function (name) {
+                            var step = STEP_FIELDS[name];
+                            if (step && (!hasErrorStep || step < firstErrorStep)) {
+                                firstErrorStep = step;
+                                hasErrorStep = true;
+                            }
+                        });
+                        goToStep(hasErrorStep ? firstErrorStep : 1);
+
+                        editEventModal.addEventListener('shown.bs.modal', function () {
+                            modalVisible = true;
+                            if (currentStep !== 1 || !window.tinymce) return;
+                            var editor = tinymce.get(descId);
+                            if (editor) editor.destroy();
+                            setTimeout(initTinyMCEEventModal, 50);
+                        });
+                        editEventModal.addEventListener('hidden.bs.modal', function () {
+                            modalVisible = false;
+                        });
                     });
                 </script>
                 <!-- Flatpickr CSS/JS -->
@@ -649,6 +886,14 @@
                         // Match create-event Flatpickr: submit machine formats (Y-m-d / H:i),
                         // show friendly altInput values so untouched fields still validate.
                         flatpickr('.flatpickr[name="date"]', {
+                            dateFormat: 'Y-m-d',
+                            altInput: true,
+                            altFormat: 'F j, Y',
+                            altInputClass: 'form-control',
+                            allowInput: true,
+                            disableMobile: true,
+                        });
+                        flatpickr('.flatpickr[name="rsvp_close_date"]', {
                             dateFormat: 'Y-m-d',
                             altInput: true,
                             altFormat: 'F j, Y',
@@ -698,9 +943,46 @@
                         <h2 class="group-section-title">RSVP</h2>
                     </div>
                     <div class="group-section-body">
-                        {% if user.is_authenticated %}
+                        {% if signups_closed %}
+                        <div class="event-attendee-notice">RSVPs closed on {{ event.rsvp_close_date|date:"M j, Y" }}.{% if user.is_authenticated and user_rsvp %} You can still remove yours.{% endif %}</div>
+                        {% if user.is_authenticated and user_rsvp %}
+                        <form method="post" class="event-rsvp-remove-form">
+                            {% csrf_token %}
+                            <button type="submit" name="remove_rsvp" class="group-toolbar-btn group-toolbar-btn--danger"
+                                data-confirm-title="Remove RSVP"
+                                data-confirm-body="Are you sure you want to remove your RSVP? Signups are closed, so you will not be able to RSVP again."
+                                data-confirm-label="Remove RSVP"
+                                data-confirm-icon="cancel"
+                                data-confirm-danger="1">
+                                <i class="material-icons">cancel</i> Remove RSVP
+                            </button>
+                        </form>
+                        {% endif %}
+                        {% elif user.is_authenticated %}
+                        {% if user_rsvp %}
+                        <div class="event-attendee-notice">You've already RSVPed to this event. Remove your RSVP if you want to change it.</div>
+                        <form method="post" class="event-rsvp-remove-form">
+                            {% csrf_token %}
+                            <button type="submit" name="remove_rsvp" class="group-toolbar-btn group-toolbar-btn--danger"
+                                data-confirm-title="Remove RSVP"
+                                data-confirm-body="Are you sure you want to remove your RSVP?"
+                                data-confirm-label="Remove RSVP"
+                                data-confirm-icon="cancel"
+                                data-confirm-danger="1">
+                                <i class="material-icons">cancel</i> Remove RSVP
+                            </button>
+                        </form>
+                        {% else %}
                         {% if is_event_full and can_join_waitlist %}
-                        <div class="event-attendee-notice">Event is full, but you can join the waitlist.</div>
+                        <div class="event-status-banner event-status-banner--warning" role="alert">
+                            <i class="material-icons">warning</i>
+                            <span>This event is full. You are not on the list until you join the waitlist.</span>
+                        </div>
+                        {% elif is_event_full %}
+                        <div class="event-status-banner event-status-banner--danger" role="alert">
+                            <i class="material-icons">error</i>
+                            <span>This event is full. A Going RSVP will not be saved.</span>
+                        </div>
                         {% endif %}
                         <form method="post" class="event-rsvp-form">
                             {% csrf_token %}
@@ -708,7 +990,7 @@
                                 <label for="{{ form.status.id_for_label }}" class="auth-form-label">Your status</label>
                                 <div class="input-group auth-input-group">
                                     <span class="input-group-text"><i class="material-icons">how_to_reg</i></span>
-                                    <select name="status" id="{{ form.status.id_for_label }}" class="form-select">
+                                    <select name="status" id="{{ form.status.id_for_label }}" class="form-select{% if form.status.errors %} is-invalid{% endif %}">
                                         <option value="" disabled {% if not form.status.value %}selected{% endif %}>Select RSVP status</option>
                                         {% with choices=form.status.field.choices %}
                                         {% for option in choices %}
@@ -729,6 +1011,9 @@
                                         {% endwith %}
                                     </select>
                                 </div>
+                                {% if form.status.errors %}
+                                <div class="event-rsvp-status-error" role="alert">{{ form.status.errors }}</div>
+                                {% endif %}
                             </div>
                             {% if event.question1_text %}
                             <div class="auth-field">
@@ -753,14 +1038,6 @@
                             {% endif %}
                             <button type="submit" class="group-toolbar-btn mt-3">
                                 <i class="material-icons">event</i> Submit RSVP
-                            </button>
-                        </form>
-                        {% if user_rsvp %}
-                        <form method="post" class="event-rsvp-remove-form mt-3"
-                            onsubmit="return confirm('Are you sure you want to remove your RSVP?');">
-                            {% csrf_token %}
-                            <button type="submit" name="remove_rsvp" class="group-toolbar-btn group-toolbar-btn--danger">
-                                <i class="material-icons">cancel</i> Remove RSVP
                             </button>
                         </form>
                         {% endif %}
@@ -860,10 +1137,11 @@
 {% block extra_js %}
 {{ block.super }}
 {% if location_display_string %}
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-<script src="{% static 'event-location-map.js' %}"></script>
+<script src="https://unpkg.com/maplibre-gl@5.19.0/dist/maplibre-gl.js"
+    integrity="sha384-pEfbADcwebVj4NNOvWFLUkm+FiGTICE5bChpV647czG7OpSqcHNgxM8QawfAkbRO" crossorigin=""></script>
+<script src="{% static 'event-location-map.js' %}?v=20261005k"></script>
 {% endif %}
+<script src="{% static 'event-location-fill.js' %}?v=20261005v"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function () {
         // Contact Info Modal
@@ -944,9 +1222,14 @@
                         banForm.onsubmit = async function (e) {
                             e.preventDefault();
                             if (!userId) return false;
-                            if (!confirm('Are you sure you want to ban ' + displayName + ' from this group?')) {
-                                return false;
-                            }
+                            const confirmed = await window.fursvpConfirm({
+                                title: 'Ban from group',
+                                body: 'Are you sure you want to ban ' + (displayName || 'this person') + ' from this group?',
+                                confirmLabel: 'Ban user',
+                                icon: 'gavel',
+                                danger: true
+                            });
+                            if (!confirmed) return false;
                             const formData = new FormData(banForm);
                             try {
                                 const response = await fetch('/users/' + userId + '/ban/', {
@@ -958,13 +1241,13 @@
                                 });
                                 const data = await response.json();
                                 if (data.status === 'success') {
-                                    alert(data.message);
+                                    if (window.fursvpShowToast) window.fursvpShowToast({ level: 'success', text: data.message });
                                     bootstrap.Modal.getInstance(contactInfoModal).hide();
-                                } else {
-                                    alert(data.message || 'Could not ban user.');
+                                } else if (window.fursvpShowToast) {
+                                    window.fursvpShowToast({ level: 'error', text: data.message || 'Could not ban user.' });
                                 }
                             } catch (error) {
-                                alert('Could not ban user.');
+                                if (window.fursvpShowToast) window.fursvpShowToast({ level: 'error', text: 'Could not ban user.' });
                             }
                             return false;
                         };
@@ -1000,133 +1283,6 @@
             setTimeout(function () {
                 editEventModal.show();
             }, 400);
-        }
-
-        // Geolocation and address autocomplete
-        var useLocationBtn = document.getElementById('useLocationBtn');
-        var cityField = document.getElementById('id_city');
-        var stateField = document.getElementById('id_state');
-        var addressField = document.getElementById('id_address');
-
-        if (addressField) {
-            var autocompleteContainer = document.createElement('div');
-            autocompleteContainer.className = 'autocomplete-container';
-            autocompleteContainer.style.cssText = `
-            position: absolute;
-            width: 100%;
-            max-height: 200px;
-            overflow-y: auto;
-            background: white;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            z-index: 1000;
-            display: none;
-            margin-top: 4px;
-            top: 100%;
-        `;
-            addressField.parentElement.style.position = 'relative';
-            addressField.parentElement.appendChild(autocompleteContainer);
-
-            function fetchAddressSuggestions(query, city, state) {
-                if (!query || !city || !state || query.length < 3) {
-                    autocompleteContainer.style.display = 'none';
-                    return;
-                }
-                fetch(
-                        `https://nominatim.openstreetmap.org/search?street=${encodeURIComponent(query)}&city=${encodeURIComponent(city)}&state=${encodeURIComponent(state)}&country=USA&format=json&addressdetails=1&limit=10`
-                    )
-                    .then(response => response.json())
-                    .then(data => {
-                        autocompleteContainer.innerHTML = '';
-                        if (!data || data.length === 0) {
-                            autocompleteContainer.style.display = 'none';
-                            return;
-                        }
-                        data.forEach(result => {
-                            let addressLine = '';
-                            if (result.address.house_number && result.address.road) {
-                                addressLine = result.address.house_number + ' ' + result.address
-                                    .road;
-                            } else if (result.address.road) {
-                                addressLine = result.address.road;
-                            } else {
-                                addressLine = result.display_name;
-                            }
-                            const suggestion = document.createElement('div');
-                            suggestion.className = 'autocomplete-suggestion';
-                            suggestion.style.cssText = `
-                            padding: 8px 12px;
-                            cursor: pointer;
-                            border-bottom: 1px solid #eee;
-                        `;
-                            suggestion.textContent = addressLine;
-                            suggestion.addEventListener('click', function () {
-                                addressField.value = addressLine;
-                                autocompleteContainer.style.display = 'none';
-                            });
-                            suggestion.addEventListener('mouseover', function () {
-                                suggestion.style.backgroundColor = '#f5f5f5';
-                            });
-                            suggestion.addEventListener('mouseout', function () {
-                                suggestion.style.backgroundColor = 'white';
-                            });
-                            autocompleteContainer.appendChild(suggestion);
-                        });
-                        autocompleteContainer.style.display = 'block';
-                    });
-            }
-
-            addressField.addEventListener('input', function () {
-                fetchAddressSuggestions(addressField.value, cityField.value, stateField.value);
-            });
-
-            // Hide suggestions when clicking outside
-            document.addEventListener('click', function (e) {
-                if (addressField && !addressField.contains(e.target) && !autocompleteContainer.contains(
-                        e.target)) {
-                    autocompleteContainer.style.display = 'none';
-                }
-            });
-        }
-
-        if (useLocationBtn) {
-            useLocationBtn.addEventListener('click', function () {
-                if (!navigator.geolocation) {
-                    alert('Geolocation is not supported by your browser.');
-                    return;
-                }
-                useLocationBtn.disabled = true;
-                useLocationBtn.innerHTML = '<i class="material-icons spin">my_location</i>';
-                navigator.geolocation.getCurrentPosition(function (position) {
-                    var lat = position.coords.latitude;
-                    var lon = position.coords.longitude;
-                    fetch(
-                            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`
-                        )
-                        .then(response => response.json())
-                        .then(data => {
-                            if (data.address) {
-                                if (cityField) cityField.value = data.address.city || data
-                                    .address.town || data.address.village || '';
-                                if (stateField) stateField.value = data.address.state || '';
-                            }
-                            useLocationBtn.disabled = false;
-                            useLocationBtn.innerHTML =
-                                '<i class="material-icons">my_location</i>';
-                        })
-                        .catch(function () {
-                            alert('Could not retrieve address from location.');
-                            useLocationBtn.disabled = false;
-                            useLocationBtn.innerHTML =
-                                '<i class="material-icons">my_location</i>';
-                        });
-                }, function (error) {
-                    alert('Unable to retrieve your location. Please allow location access.');
-                    useLocationBtn.disabled = false;
-                    useLocationBtn.innerHTML = '<i class="material-icons">my_location</i>';
-                });
-            });
         }
 
         // RSVP form: prevent Enter from submitting when in question fields

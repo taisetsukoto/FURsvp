@@ -325,59 +325,33 @@
 
         const clearAllBtn = document.getElementById('clear-all-notifications-page-btn');
         if (clearAllBtn) {
-            clearAllBtn.addEventListener('click', () => {
-                const modalHtml = `
-                    <div class="modal fade" id="clearNotificationsModalPage" tabindex="-1" aria-hidden="true">
-                        <div class="modal-dialog modal-dialog-centered">
-                            <div class="modal-content">
-                                <div class="modal-header">
-                                    <h5 class="modal-title">
-                                        <i class="material-icons me-2">delete_sweep</i>
-                                        Clear Notifications
-                                    </h5>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                </div>
-                                <div class="modal-body">
-                                    <p>Are you sure you want to clear all notifications? This action cannot be undone.</p>
-                                </div>
-                                <div class="modal-footer">
-                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                    <button type="button" class="btn btn-danger" id="confirmClearNotificationsPage">
-                                        <i class="material-icons me-1">delete</i>
-                                        Clear All
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-
-                document.body.insertAdjacentHTML('beforeend', modalHtml);
-                const modal = new bootstrap.Modal(document.getElementById('clearNotificationsModalPage'));
-                modal.show();
-
-                document.getElementById('confirmClearNotificationsPage').addEventListener('click', async () => {
-                    try {
-                        const response = await fetch('/users/notifications/purge_read/', {
-                            method: 'POST',
-                            headers: {
-                                'X-CSRFToken': getCookie('csrftoken'),
-                                'Content-Type': 'application/json'
-                            }
-                        });
-                        if (!response.ok) {
-                            throw new Error(`HTTP error! status: ${response.status}`);
+            clearAllBtn.addEventListener('click', async () => {
+                const ok = await window.fursvpConfirm({
+                    title: 'Clear notifications',
+                    body: 'Are you sure you want to clear all notifications? This action cannot be undone.',
+                    confirmLabel: 'Clear all',
+                    icon: 'delete',
+                    danger: true
+                });
+                if (!ok) return;
+                try {
+                    const response = await fetch('/users/notifications/purge_read/', {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': getCookie('csrftoken'),
+                            'Content-Type': 'application/json'
                         }
-                        window.location.reload();
-                    } catch (error) {
-                        console.error('Error clearing notifications:', error);
-                        alert('Failed to clear notifications. Please try again.');
+                    });
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
                     }
-                });
-
-                document.getElementById('clearNotificationsModalPage').addEventListener('hidden.bs.modal', function () {
-                    this.remove();
-                });
+                    window.location.reload();
+                } catch (error) {
+                    console.error('Error clearing notifications:', error);
+                    if (window.fursvpShowToast) {
+                        window.fursvpShowToast({ level: 'error', text: 'Failed to clear notifications. Please try again.' });
+                    }
+                }
             });
         }
     });

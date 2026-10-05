@@ -3,76 +3,129 @@
 
 {% block content %}
 <div class="container py-4">
-    <h1 class="mb-4 fw-bold text-primary">All Groups</h1>
-    <!-- Group Search Form -->
-    <form method="get" class="mb-4" id="groupSearchForm">
-        <div class="material-search-bar">
-            <span class="material-icons search-icon">search</span>
-            <input type="text" name="search" class="form-control material-search-input" placeholder="Search groups by name or description..." value="{{ search_query|default:''|escapejs }}" autocomplete="off">
-            <button type="submit" class="material-search-btn" aria-label="Search">
-                <span class="material-icons">search</span>
-            </button>
+    <header class="page-hero" aria-label="All Groups">
+        <div class="page-hero-main">
+            <div class="page-hero-icon" aria-hidden="true">
+                <i class="material-icons">groups</i>
+            </div>
+            <div class="page-hero-copy">
+                <p class="page-hero-kicker">Communities</p>
+                <h1>All Groups</h1>
+                <p class="page-hero-lead">Furry groups hosting events on FURsvp, in one place.</p>
+                <div class="page-hero-stats">
+                    <span class="page-hero-stat">
+                        <i class="material-icons">groups</i>
+                        {{ group_count }} group{{ group_count|pluralize }}
+                    </span>
+                    <span class="page-hero-stat">
+                        <i class="material-icons">event</i>
+                        {{ groups_with_upcoming }} with upcoming events
+                    </span>
+                </div>
+            </div>
         </div>
-    </form>
-    <!-- End Group Search Form -->
-    <div class="row">
-        {% for group in groups %}
-        <div class="col-md-6 col-lg-4 mb-4">
-            <a href="{{ group.get_absolute_url }}" class="card event-card-modern shadow-sm h-100 text-decoration-none d-flex flex-column align-items-center justify-content-center p-4">
-                {% if group.logo_base64 %}
-                    <img src="data:image/png;base64,{{ group.logo_base64 }}" alt="{{ group.name }} Logo" class="rounded-circle shadow mb-3" style="width: 90px; height: 90px; object-fit: cover; border: 3px solid #6366f1;">
-                {% else %}
-                    <div class="rounded-circle d-inline-flex align-items-center justify-content-center shadow mb-3" style="width: 90px; height: 90px; background: #6366f1; color: #fff; font-weight: bold; font-size: 2rem;">
-                        <i class="material-icons" style="font-size: 48px;">group</i>
-                    </div>
-                {% endif %}
-                <div class="fw-bold text-center mb-2" style="font-size: 1.25rem; color: #2563eb;">{{ group.name }}</div>
-                <div class="text-muted text-center mb-2" style="font-size: 1.05rem; min-height: 48px;">{{ group.description|truncatechars:240|striptags }}</div>
+        <div class="page-hero-actions">
+            <a href="{% url 'event_calendar' %}" class="page-hero-btn">
+                <i class="material-icons">calendar_month</i> Browse events
             </a>
         </div>
-        {% empty %}
-        <div class="col-12 text-muted text-center py-5">
-            <span class="material-icons" style="font-size: 2.5rem; color: #b3b3b3;">search_off</span>
-            <span style="font-size: 1.35rem; font-weight: 600; display: block; margin-top: 0.5rem;">No groups found.</span>
+    </header>
+
+    <div class="group-section-card profile-page-card mb-4">
+        <div class="group-section-header">
+            <div class="group-section-icon group-section-icon--events">
+                <i class="material-icons">groups</i>
+            </div>
+            <div class="group-section-heading">
+                <h2 class="group-section-title">{% if search_query %}Search results{% else %}Groups{% endif %}</h2>
+                <span class="group-section-meta">{{ groups.paginator.count }} group{{ groups.paginator.count|pluralize }}{% if search_query %} matching{% endif %}</span>
+            </div>
         </div>
-        {% endfor %}
+        <form method="get" class="groups-directory-search home-events-search" id="groupSearchForm">
+            <div class="home-search-bar">
+                <i class="material-icons">search</i>
+                <input type="text" name="search" class="home-search-input" placeholder="Search groups by name or description…" value="{{ search_query }}" autocomplete="off">
+                <button type="submit" class="home-search-btn">
+                    <span class="d-none d-sm-inline">Search</span>
+                    <i class="material-icons d-sm-none">arrow_forward</i>
+                </button>
+            </div>
+        </form>
+        <div class="group-section-body group-section-body--flush">
+            <div class="row g-3">
+                {% for group in groups %}
+                <div class="col-md-6 col-lg-4">
+                    <a href="{{ group.get_absolute_url }}" class="group-directory-card">
+                        {% if group.logo_base64 %}
+                        <img src="data:image/png;base64,{{ group.logo_base64 }}" alt="" class="group-directory-logo">
+                        {% else %}
+                        <span class="group-directory-logo group-directory-logo--placeholder" aria-hidden="true">
+                            <i class="material-icons">groups</i>
+                        </span>
+                        {% endif %}
+                        <span class="group-directory-body">
+                            <span class="group-directory-name">{{ group.name }}</span>
+                            {% if group.description %}
+                            <span class="group-directory-desc">{{ group.description|striptags|truncatechars:140 }}</span>
+                            {% endif %}
+                            <span class="group-directory-meta">
+                                <i class="material-icons">event</i>
+                                {% if group.upcoming_count %}
+                                {{ group.upcoming_count }} upcoming
+                                {% else %}
+                                No upcoming events
+                                {% endif %}
+                            </span>
+                        </span>
+                    </a>
+                </div>
+                {% empty %}
+                <div class="col-12">
+                    <div class="group-section-empty">
+                        <i class="material-icons">search_off</i>
+                        <p>{% if search_query %}No groups match that search.{% else %}No groups yet.{% endif %}</p>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% if groups.paginator.num_pages > 1 %}
+            <nav aria-label="Group list pagination" class="mt-4">
+                <ul class="pagination justify-content-center material-circular-pagination">
+                    {% if groups.has_previous %}
+                        <li class="page-item">
+                            <a class="page-link material-page-link" href="?page=1{% if search_query %}&search={{ search_query|urlencode }}{% endif %}" aria-label="First">
+                                <i class="material-icons" style="font-size: 24px;">first_page</i>
+                            </a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link material-page-link" href="?page={{ groups.previous_page_number }}{% if search_query %}&search={{ search_query|urlencode }}{% endif %}" aria-label="Previous">
+                                <i class="material-icons" style="font-size: 24px;">chevron_left</i>
+                            </a>
+                        </li>
+                    {% endif %}
+                    {% for num in groups.paginator.page_range %}
+                        {% if groups.number == num %}
+                            <li class="page-item active"><span class="page-link material-page-link active">{{ num }}</span></li>
+                        {% elif num > groups.number|add:'-3' and num < groups.number|add:'3' %}
+                            <li class="page-item"><a class="page-link material-page-link" href="?page={{ num }}{% if search_query %}&search={{ search_query|urlencode }}{% endif %}">{{ num }}</a></li>
+                        {% endif %}
+                    {% endfor %}
+                    {% if groups.has_next %}
+                        <li class="page-item">
+                            <a class="page-link material-page-link" href="?page={{ groups.next_page_number }}{% if search_query %}&search={{ search_query|urlencode }}{% endif %}" aria-label="Next">
+                                <i class="material-icons" style="font-size: 24px;">chevron_right</i>
+                            </a>
+                        </li>
+                        <li class="page-item">
+                            <a class="page-link material-page-link" href="?page={{ groups.paginator.num_pages }}{% if search_query %}&search={{ search_query|urlencode }}{% endif %}" aria-label="Last">
+                                <i class="material-icons" style="font-size: 24px;">last_page</i>
+                            </a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+        </div>
     </div>
-    {% if groups.paginator.num_pages > 1 %}
-    <nav aria-label="Group list pagination" class="mt-4">
-        <ul class="pagination justify-content-center material-circular-pagination">
-            {% if groups.has_previous %}
-                <li class="page-item">
-                    <a class="page-link material-page-link" href="?page=1{% if search_query %}&search={{ search_query|urlencode }}{% endif %}" aria-label="First">
-                        <i class="material-icons" style="font-size: 24px;">first_page</i>
-                    </a>
-                </li>
-                <li class="page-item">
-                    <a class="page-link material-page-link" href="?page={{ groups.previous_page_number }}{% if search_query %}&search={{ search_query|urlencode }}{% endif %}" aria-label="Previous">
-                        <i class="material-icons" style="font-size: 24px;">chevron_left</i>
-                    </a>
-                </li>
-            {% endif %}
-            {% for num in groups.paginator.page_range %}
-                {% if groups.number == num %}
-                    <li class="page-item active"><span class="page-link material-page-link active">{{ num }}</span></li>
-                {% elif num > groups.number|add:'-3' and num < groups.number|add:'3' %}
-                    <li class="page-item"><a class="page-link material-page-link" href="?page={{ num }}{% if search_query %}&search={{ search_query|urlencode }}{% endif %}">{{ num }}</a></li>
-                {% endif %}
-            {% endfor %}
-            {% if groups.has_next %}
-                <li class="page-item">
-                    <a class="page-link material-page-link" href="?page={{ groups.next_page_number }}{% if search_query %}&search={{ search_query|urlencode }}{% endif %}" aria-label="Next">
-                        <i class="material-icons" style="font-size: 24px;">chevron_right</i>
-                    </a>
-                </li>
-                <li class="page-item">
-                    <a class="page-link material-page-link" href="?page={{ groups.paginator.num_pages }}{% if search_query %}&search={{ search_query|urlencode }}{% endif %}" aria-label="Last">
-                        <i class="material-icons" style="font-size: 24px;">last_page</i>
-                    </a>
-                </li>
-            {% endif %}
-        </ul>
-    </nav>
-    {% endif %}
 </div>
-{% endblock %} 
+{% endblock %}

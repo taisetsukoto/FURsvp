@@ -221,15 +221,19 @@
 
 <!-- Profile Picture Modal -->
 <div class="modal fade" id="profilePictureModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">
-                    <i class="material-icons">photo_camera</i> Update Profile Picture
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content fursvp-modal">
+            <div class="fursvp-modal-header">
+                <div class="fursvp-modal-header-icon">
+                    <i class="material-icons">photo_camera</i>
+                </div>
+                <div class="fursvp-modal-header-text">
+                    <h5 class="fursvp-modal-title">Update profile picture</h5>
+                    <p class="fursvp-modal-subtitle">Choose an image, then crop it to a square</p>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body">
+            <div class="modal-body fursvp-modal-body">
                 <form method="post" id="profile-picture-form">
                     {% csrf_token %}
                     <input type="hidden" name="profile_picture_base64" id="profile-picture-base64">
@@ -245,16 +249,18 @@
                     <!-- Remove Profile Picture Button -->
                     {% if profile.profile_picture_base64 %}
                     <div class="mb-3" id="remove-pfp-button-container">
-                        <button type="button" class="btn btn-outline-danger w-100" id="remove-pfp-button">
-                            <i class="material-icons me-2">delete</i> Remove Current Profile Picture
+                        <button type="button" class="group-toolbar-btn group-toolbar-btn--danger" id="remove-pfp-button">
+                            <i class="material-icons">delete</i> Remove current picture
                         </button>
                     </div>
                     {% endif %}
                 </form>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" id="crop-and-save-button">Crop and Save</button>
+            <div class="fursvp-modal-footer">
+                <button type="button" class="group-toolbar-btn group-toolbar-btn--secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="group-toolbar-btn" id="crop-and-save-button">
+                    <i class="material-icons">crop</i> Crop and save
+                </button>
             </div>
         </div>
     </div>
@@ -263,22 +269,22 @@
 <!-- Math Equation Modal (Step 1) -->
 <div class="modal fade" id="deleteAccountModal" tabindex="-1" aria-labelledby="deleteAccountModalLabel"
     aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content profile-glass-card p-3"
-            style="box-shadow: 0 8px 32px rgba(239,68,68,0.18); border: 2px solid #fca5a5;">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content fursvp-modal">
             <form id="delete-account-form" onsubmit="return false;">
                 {% csrf_token %}
                 <input type="hidden" name="delete_account" value="1">
-                <div class="modal-header border-0 pb-0">
-                    <h5 class="modal-title fw-bold text-danger d-flex align-items-center gap-2"
-                        id="deleteAccountModalLabel">
-                        <i class="material-icons text-danger" style="font-size: 2rem;">warning</i>
-                        You're logging out fur-ever?
-                    </h5>
+                <div class="fursvp-modal-header">
+                    <div class="fursvp-modal-header-icon is-danger">
+                        <i class="material-icons">warning</i>
+                    </div>
+                    <div class="fursvp-modal-header-text">
+                        <h5 class="fursvp-modal-title" id="deleteAccountModalLabel">You're logging out fur-ever?</h5>
+                        <p class="fursvp-modal-subtitle">Don't forget to boop snoots on your way out.</p>
+                    </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <div class="modal-body pt-2 pb-0">
-                    <p class="mb-2">Don't forget to boop snoots on your way out! 🥲</p>
+                <div class="modal-body fursvp-modal-body">
                     <div class="alert alert-danger mb-3" style="background: #fef2f2; color: #b91c1c; border: none;">
                         <strong>This action cannot be undone.</strong> To confirm, please solve the following equation:
                     </div>
@@ -290,8 +296,9 @@
                         <div class="invalid-feedback" id="math-feedback">Incorrect answer. Please try again.</div>
                     </div>
                 </div>
-                <div class="modal-footer border-0 pt-0">
-                    <button type="button" class="profile-btn-danger"
+                <div class="fursvp-modal-footer">
+                    <button type="button" class="group-toolbar-btn group-toolbar-btn--secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="group-toolbar-btn group-toolbar-btn--danger"
                         id="open-final-delete-btn" disabled>
                         <i class="material-icons me-2">delete_forever</i> Delete My Account
                     </button>
@@ -303,30 +310,30 @@
 
 <!-- Final Confirmation Modal (Step 2) -->
 <div class="modal fade" id="finalDeleteModal" tabindex="-1" aria-labelledby="finalDeleteModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content profile-glass-card p-3"
-            style="box-shadow: 0 8px 32px rgba(239,68,68,0.18); border: 2px solid #fca5a5;">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content fursvp-modal">
             <form method="post" id="final-delete-form">
                 {% csrf_token %}
                 <input type="hidden" name="delete_account" value="1">
-                <div class="modal-header border-0 pb-0">
-                    <h5 class="modal-title fw-bold text-danger d-flex align-items-center gap-2"
-                        id="finalDeleteModalLabel">
-                        <i class="material-icons text-danger" style="font-size: 2rem;">delete_forever</i>
-                        Last chance! Really delete your account?
-                    </h5>
+                <div class="fursvp-modal-header">
+                    <div class="fursvp-modal-header-icon is-danger">
+                        <i class="material-icons">delete_forever</i>
+                    </div>
+                    <div class="fursvp-modal-header-text">
+                        <h5 class="fursvp-modal-title" id="finalDeleteModalLabel">Last chance</h5>
+                        <p class="fursvp-modal-subtitle">Really delete your account? This cannot be undone.</p>
+                    </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <div class="modal-body pt-2 pb-0">
+                <div class="modal-body fursvp-modal-body">
                     <div class="alert alert-danger mb-3" style="background: #fef2f2; color: #b91c1c; border: none;">
                         <strong>This is your last chance to back out.</strong> If you proceed, your account will be
                         deleted forever.
                     </div>
                 </div>
-                <div class="modal-footer border-0 pt-0">
-                    <button type="button" class="btn btn-secondary rounded-pill px-4" data-bs-dismiss="modal">I want my
-                        mommy...</button>
-                    <button type="submit" class="profile-btn-danger"
+                <div class="fursvp-modal-footer">
+                    <button type="button" class="group-toolbar-btn group-toolbar-btn--secondary" data-bs-dismiss="modal">Keep my account</button>
+                    <button type="submit" class="group-toolbar-btn group-toolbar-btn--danger"
                         id="final-delete-btn">
                         <i class="material-icons me-2">delete_forever</i> Delete for real
                     </button>
@@ -418,11 +425,17 @@
         });
 
         if (removePfpButton) {
-            removePfpButton.addEventListener('click', function () {
-                if (confirm('Are you sure you want to remove your profile picture?')) {
-                    profilePictureBase64Input.value = ''; // Clear the base64 value
-                    document.getElementById('profile-picture-form').submit();
-                }
+            removePfpButton.addEventListener('click', async function () {
+                const confirmed = await window.fursvpConfirm({
+                    title: 'Remove profile picture',
+                    body: 'Are you sure you want to remove your profile picture?',
+                    confirmLabel: 'Remove picture',
+                    icon: 'delete',
+                    danger: true
+                });
+                if (!confirmed) return;
+                profilePictureBase64Input.value = '';
+                document.getElementById('profile-picture-form').submit();
             });
         }
 
@@ -443,9 +456,14 @@
                 const userId = this.dataset.userId;
                 const groupId = this.dataset.groupId;
 
-                if (!confirm('Are you sure you want to unban this user from this group?')) {
-                    return;
-                }
+                const confirmed = await window.fursvpConfirm({
+                    title: 'Unban from group',
+                    body: 'Are you sure you want to unban this user from this group?',
+                    confirmLabel: 'Unban',
+                    icon: 'person_add',
+                    success: true
+                });
+                if (!confirmed) return;
 
                 const formData = new FormData();
                 formData.append('user_id', userId);

@@ -65,6 +65,11 @@ class Event(models.Model):
         blank=True,
         help_text='Last day of the event. Defaults to the start date when unset.',
     )
+    rsvp_close_date = models.DateField(
+        null=True,
+        blank=True,
+        help_text='Last day guests can RSVP. Leave blank to accept RSVPs until the event starts.',
+    )
     start_time = models.TimeField(null=True, blank=True, default=time(0, 0, 0))
     end_time = models.TimeField(null=True, blank=True, default=time(0, 0, 0))
     description = models.TextField(blank=True)
@@ -266,10 +271,27 @@ class Event(models.Model):
     def is_multi_day(self):
         return self.effective_end_date > self.date
 
+    def event_local_date(self, now=None):
+        now = now or timezone.now()
+        if timezone.is_naive(now):
+            now = timezone.make_aware(now, timezone.get_current_timezone())
+        return now.astimezone(self.get_event_tz()).date()
+
+    def rsvp_close_date_passed(self, now=None):
+        """True once the RSVP close date's calendar day has ended in the event timezone."""
+        if not self.rsvp_close_date:
+            return False
+        return self.event_local_date(now) > self.rsvp_close_date
+
     @property
     def rsvps_locked(self):
         """Prevent RSVP changes once the event starts or is cancelled."""
         return self.status != 'active' or self.has_started()
+
+    @property
+    def signups_closed(self):
+        """New RSVPs are closed. Existing RSVPs can still be removed until the event starts."""
+        return self.rsvps_locked or self.rsvp_close_date_passed()
 
 class RSVP(models.Model):
     event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='rsvps')

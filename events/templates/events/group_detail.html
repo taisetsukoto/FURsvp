@@ -7,68 +7,75 @@
 
 {% block content %}
 <div class="container py-4 group-page">
-    <div class="group-hero-card profile-page-card mb-4">
-        <div class="group-hero-inner">
-            <div class="group-hero-logo">
+    <header class="page-hero" aria-label="{{ group.name }}">
+        <div class="page-hero-main">
+            <div class="page-hero-logo">
                 {% if group.logo_base64 %}
-                <img src="data:image/png;base64,{{ group.logo_base64 }}" alt="{{ group.name }} logo">
+                <img src="data:image/png;base64,{{ group.logo_base64 }}" alt="">
                 {% else %}
-                <div class="group-hero-logo-placeholder">
+                <div class="page-hero-logo-placeholder" aria-hidden="true">
                     <i class="material-icons">groups</i>
                 </div>
                 {% endif %}
             </div>
-            <div class="group-hero-content">
-                <h1 class="group-hero-title">{{ group.name }}</h1>
+            <div class="page-hero-copy">
+                <p class="page-hero-kicker">Group</p>
+                <h1>{{ group.name }}</h1>
+                {% if group.description %}
+                <p class="page-hero-lead">{{ group.description|striptags|truncatechars:180 }}</p>
+                {% endif %}
+                <div class="page-hero-stats">
+                    <span class="page-hero-stat">
+                        <i class="material-icons">event</i>
+                        {{ upcoming_events|length }} upcoming
+                    </span>
+                    <span class="page-hero-stat">
+                        <i class="material-icons">people</i>
+                        {{ leadership_roles|length }} leader{{ leadership_roles|length|pluralize }}
+                    </span>
+                </div>
                 {% if group.website or group.telegram_channel or group.contact_email %}
-                <div class="group-hero-links">
+                <div class="page-hero-links">
                     {% if group.website %}
-                    <a href="{{ group.website }}" target="_blank" rel="noopener" class="group-link-chip">
+                    <a href="{{ group.website }}" target="_blank" rel="noopener" class="page-hero-chip">
                         <i class="material-icons">language</i> Website
                     </a>
                     {% endif %}
                     {% if group.telegram_channel %}
-                    <a href="https://t.me/{{ group.telegram_channel }}" target="_blank" rel="noopener" class="group-link-chip">
-                        <i class="material-icons">telegram</i> Telegram
+                    <a href="https://t.me/{{ group.telegram_channel }}" target="_blank" rel="noopener" class="page-hero-chip">
+                        <i class="material-icons">send</i> Telegram
                     </a>
                     {% endif %}
                     {% if group.contact_email %}
-                    <a href="mailto:{{ group.contact_email }}" class="group-link-chip">
+                    <a href="mailto:{{ group.contact_email }}" class="page-hero-chip">
                         <i class="material-icons">email</i> Contact
                     </a>
                     {% endif %}
                 </div>
                 {% endif %}
-                {% if can_edit_group %}
-                <div class="group-hero-actions">
-                    <button type="button" class="group-toolbar-btn" data-bs-toggle="modal" data-bs-target="#editGroupModal">
-                        <i class="material-icons">edit</i> Edit Group
-                    </button>
-                    <button type="button" class="group-toolbar-btn group-toolbar-btn--secondary" data-bs-toggle="modal" data-bs-target="#leadershipModal">
-                        <i class="material-icons">admin_panel_settings</i> Manage Leadership
-                    </button>
-                    {% if can_manage_bans %}
-                    <button type="button" class="group-toolbar-btn group-toolbar-btn--secondary" data-bs-toggle="modal" data-bs-target="#groupBansModal">
-                        <i class="material-icons">block</i> View Bans
-                        {% if group_banned_users %}
-                        <span class="group-hero-ban-count">{{ group_banned_users|length }}</span>
-                        {% endif %}
-                    </button>
-                    {% endif %}
-                </div>
-                {% elif can_manage_bans %}
-                <div class="group-hero-actions">
-                    <button type="button" class="group-toolbar-btn group-toolbar-btn--secondary" data-bs-toggle="modal" data-bs-target="#groupBansModal">
-                        <i class="material-icons">block</i> View Bans
-                        {% if group_banned_users %}
-                        <span class="group-hero-ban-count">{{ group_banned_users|length }}</span>
-                        {% endif %}
-                    </button>
-                </div>
-                {% endif %}
             </div>
         </div>
-    </div>
+        {% if can_edit_group or can_manage_bans %}
+        <div class="page-hero-actions">
+            {% if can_edit_group %}
+            <button type="button" class="page-hero-btn" data-bs-toggle="modal" data-bs-target="#editGroupModal">
+                <i class="material-icons">edit</i> Edit group
+            </button>
+            <button type="button" class="page-hero-btn page-hero-btn--ghost" data-bs-toggle="modal" data-bs-target="#leadershipModal">
+                <i class="material-icons">admin_panel_settings</i> Leadership
+            </button>
+            {% endif %}
+            {% if can_manage_bans %}
+            <button type="button" class="page-hero-btn page-hero-btn--ghost" data-bs-toggle="modal" data-bs-target="#groupBansModal">
+                <i class="material-icons">block</i> Bans
+                {% if group_banned_users %}
+                <span class="page-hero-count">{{ group_banned_users|length }}</span>
+                {% endif %}
+            </button>
+            {% endif %}
+        </div>
+        {% endif %}
+    </header>
 
     {% if is_banned_from_group %}
     <div class="event-status-banner event-status-banner--danger mb-4">
@@ -312,15 +319,19 @@
     {% if telegram_feed %}
     <!-- Modal for Full Article -->
     <div class="modal fade" id="fullArticleModal" tabindex="-1" aria-labelledby="fullArticleModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content modern-modal-content">
-                <div class="modal-header modern-modal-header">
-                    <h5 class="modal-title d-flex align-items-center" id="fullArticleModalLabel">
-                        <i class="material-icons me-2">description</i> <span id="fullArticleModalTitle">Full Article</span>
-                    </h5>
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content fursvp-modal">
+                <div class="fursvp-modal-header">
+                    <div class="fursvp-modal-header-icon">
+                        <i class="material-icons">description</i>
+                    </div>
+                    <div class="fursvp-modal-header-text">
+                        <h5 class="fursvp-modal-title" id="fullArticleModalLabel"><span id="fullArticleModalTitle">Full Article</span></h5>
+                        <p class="fursvp-modal-subtitle">Telegram post</p>
+                    </div>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <div class="modal-body modern-modal-body" id="fullArticleModalBody">
+                <div class="modal-body fursvp-modal-body" id="fullArticleModalBody">
                 </div>
             </div>
         </div>
@@ -431,18 +442,23 @@
                     new TomSelect(userSelect, {
                         valueField: 'id',
                         labelField: 'text',
-                        searchField: 'text',
+                        searchField: ['text', 'username'],
                         create: false,
                         maxItems: 1,
                         placeholder: 'Search for a user…',
                         dropdownParent: 'body',
-                        allowEmptyOption: true,
+                        allowEmptyOption: false,
+                        // Server already filtered; don't hide partial username matches.
+                        score: function() {
+                            return function() { return 1; };
+                        },
                         load: function(query, callback) {
-                            if (!query.length) {
+                            const term = query.trim().replace(/^@/, '');
+                            if (term.length < 2) {
                                 return callback();
                             }
                             const params = new URLSearchParams({
-                                q: query,
+                                q: term,
                                 group_id: String({{ group.id }}),
                                 exclude_group_leaders: String({{ group.id }}),
                             });
@@ -505,9 +521,14 @@
         }
 
         async function unbanGroupUser(userId, displayName) {
-            if (!confirm('Unban ' + displayName + ' from this group?')) {
-                return;
-            }
+            const confirmed = await window.fursvpConfirm({
+                title: 'Unban from group',
+                body: 'Unban ' + displayName + ' from this group?',
+                confirmLabel: 'Unban',
+                icon: 'person_add',
+                success: true
+            });
+            if (!confirmed) return;
             const formData = new FormData();
             formData.append('action', 'unban');
             formData.append('ban_type', 'group');
@@ -555,9 +576,14 @@
                     showGroupBanToast('Enter the user\'s full username.', 'error');
                     return;
                 }
-                if (!confirm('Ban @' + username + ' from this group? They will not be able to RSVP to group events.')) {
-                    return;
-                }
+                const confirmed = await window.fursvpConfirm({
+                    title: 'Ban from group',
+                    body: 'Ban @' + username + ' from this group? They will not be able to RSVP to group events.',
+                    confirmLabel: 'Ban user',
+                    icon: 'gavel',
+                    danger: true
+                });
+                if (!confirmed) return;
                 const formData = new FormData();
                 formData.append('username', username);
                 formData.append('group_id', groupId);
@@ -612,14 +638,9 @@
         });
         // Handle remove leader form submissions
         document.querySelectorAll('.remove-leader-form').forEach(function(form) {
-            form.addEventListener('submit', function(e) {
-                // Ensure the form has the correct action URL
+            form.addEventListener('submit', function() {
                 if (!this.action) {
                     this.action = window.location.href;
-                }
-                // Add confirmation
-                if (!confirm('Are you sure you want to remove this leader?')) {
-                    e.preventDefault();
                 }
             });
         });
@@ -918,7 +939,12 @@
                                             <i class="material-icons">save</i>
                                             <span class="d-none d-sm-inline">Save</span>
                                         </button>
-                                        <button type="submit" name="remove_leader" class="group-toolbar-btn group-toolbar-btn--danger group-toolbar-btn--compact" title="Remove leader" onclick="return confirm('Remove this leader?');">
+                                        <button type="submit" name="remove_leader" class="group-toolbar-btn group-toolbar-btn--danger group-toolbar-btn--compact" title="Remove leader"
+                                            data-confirm-title="Remove leader"
+                                            data-confirm-body="Are you sure you want to remove this leader?"
+                                            data-confirm-label="Remove leader"
+                                            data-confirm-icon="person_remove"
+                                            data-confirm-danger="1">
                                             <i class="material-icons">person_remove</i>
                                             <span class="d-none d-sm-inline">Remove</span>
                                         </button>
@@ -1049,14 +1075,18 @@
 <!-- Discord Username Modal -->
 <div class="modal fade" id="discordModal" tabindex="-1" aria-labelledby="discordModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content modern-modal-content" id="discordModalContent">
-      <div class="modal-header modern-modal-header" style="background: linear-gradient(90deg, #5865F2 0%, #404eed 100%); color: #fff; border-bottom: none; padding-top: 1rem; padding-bottom: 1rem; align-items: center; min-height: 0.5rem;">
-        <h5 class="modal-title d-flex align-items-center" id="discordModalLabel" style="font-size: 1.1rem; font-weight: 600; gap: 0.5rem;">
-          <span class="material-icons me-2" style="font-size: 1.5rem; color: #fff; background: #5865F2; border-radius: 50%; padding: 0.2em; box-shadow: 0 2px 8px rgba(88,101,242,0.15);">chat</span> Discord Username
-        </h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" style="filter: invert(1); opacity: 0.8;"></button>
+    <div class="modal-content fursvp-modal" id="discordModalContent">
+      <div class="fursvp-modal-header">
+        <div class="fursvp-modal-header-icon">
+          <i class="material-icons">chat</i>
+        </div>
+        <div class="fursvp-modal-header-text">
+          <h5 class="fursvp-modal-title" id="discordModalLabel">Discord username</h5>
+          <p class="fursvp-modal-subtitle">Copy and add this person on Discord</p>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
-      <div class="modal-body modern-modal-body text-center" style="background: #f4f6fb; border-radius: 0 0 1.25rem 1.25rem; padding: 2rem 2.5rem 1.5rem 2.5rem;">
+      <div class="modal-body fursvp-modal-body text-center">
         <p class="mb-2" style="font-size: 1.2rem;"><strong id="discordDisplayName"></strong></p>
         <div class="mb-3 d-flex justify-content-center align-items-center gap-2">
           <span class="discord-badge" id="discordUsernameBadge">
@@ -1069,8 +1099,8 @@
         <div class="text-muted small">Copy and add this user on Discord.</div>
         <div id="copyDiscordMsg" class="text-success mt-2" style="display:none; font-size: 1.05em;">Copied!</div>
       </div>
-      <div class="modal-footer" style="background: #f3f4f6; border-top: none; padding: 1.5rem 2.5rem; border-radius: 0 0 1.25rem 1.25rem;">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      <div class="fursvp-modal-footer">
+        <button type="button" class="group-toolbar-btn group-toolbar-btn--secondary" data-bs-dismiss="modal">Close</button>
       </div>
     </div>
   </div>

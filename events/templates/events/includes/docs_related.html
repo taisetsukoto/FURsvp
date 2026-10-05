@@ -1,0 +1,14 @@
+<nav class="docs-related" aria-label="Related policies">
+    <a href="{% url 'faq' %}" class="{% if request.resolver_match.url_name == 'faq' %}is-current{% endif %}">
+        <i class="material-icons">help</i> FAQ
+    </a>
+    <a href="{% url 'terms' %}" class="{% if request.resolver_match.url_name == 'terms' %}is-current{% endif %}">
+        <i class="material-icons">gavel</i> Terms
+    </a>
+    <a href="{% url 'eula' %}" class="{% if request.resolver_match.url_name == 'eula' %}is-current{% endif %}">
+        <i class="material-icons">description</i> EULA
+    </a>
+    <a href="{% url 'privacy' %}" class="{% if request.resolver_match.url_name == 'privacy' %}is-current{% endif %}">
+        <i class="material-icons">privacy_tip</i> Privacy
+    </a>
+</nav>

@@ -4,7 +4,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <script>
         (function () {
             var stored = localStorage.getItem('fursvpDarkMode');
@@ -23,8 +23,8 @@
     <!-- Material Design Icons -->
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <!-- Custom CSS -->
-    <link href="{% static 'fursvp.css' %}" rel="stylesheet">
-    <link href="{% static 'fursvp-pages.css' %}" rel="stylesheet">
+    <link href="{% static 'fursvp.css' %}?v=20261005e" rel="stylesheet">
+    <link href="{% static 'fursvp-pages.css' %}?v=20261005v" rel="stylesheet">
     {% block extra_css %}{% endblock %}
     <!-- TomSelect CSS -->
     <link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.css" rel="stylesheet">
@@ -229,17 +229,18 @@
     <!-- Group Selector Modal -->
     <div class="modal fade" id="groupSelectorModal" tabindex="-1" aria-labelledby="groupSelectorModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered modern-modal-dialog">
-            <div class="modal-content modern-modal-content">
-                <div class="modal-header modern-modal-header">
-                    <h5 class="modal-title modern-modal-title" id="groupSelectorModalLabel">
-                        <i class="material-icons me-2">groups</i>
-                        My Groups
-                    </h5>
-                    <button type="button" class="btn-close modern-btn-close" data-bs-dismiss="modal" aria-label="Close">
-                        <i class="material-icons">close</i>
-                    </button>
+            <div class="modal-content fursvp-modal">
+                <div class="fursvp-modal-header">
+                    <div class="fursvp-modal-header-icon">
+                        <i class="material-icons">groups</i>
+                    </div>
+                    <div class="fursvp-modal-header-text">
+                        <h5 class="fursvp-modal-title" id="groupSelectorModalLabel">My Groups</h5>
+                        <p class="fursvp-modal-subtitle">Groups you lead or assist</p>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <div class="modal-body modern-modal-body">
+                <div class="modal-body fursvp-modal-body">
                     <div class="group-list">
                         {% if user.group_roles.all %}
                         <div class="group-section mb-4">
@@ -296,71 +297,48 @@
         </div>
     </div>
 
-    <div class="main-content">
-        <div class="container">
-            {% if messages %}
-            <div class="message-container">
-                {% for message in messages %}
-                {% if not "admin_notification" in message.tags %}
-                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-                    <i class="material-icons me-2">info</i>
-                    {{ message }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    <div class="modal fade" id="fursvpConfirmModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content fursvp-modal">
+                <div class="fursvp-modal-header">
+                    <div class="fursvp-modal-header-icon" id="fursvpConfirmIconWrap">
+                        <i class="material-icons" id="fursvpConfirmIcon">help</i>
+                    </div>
+                    <div class="fursvp-modal-header-text">
+                        <h5 class="fursvp-modal-title" id="fursvpConfirmTitle">Are you sure?</h5>
+                        <p class="fursvp-modal-subtitle" id="fursvpConfirmBody"></p>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                {% endif %}
-                {% endfor %}
+                <div class="fursvp-modal-footer">
+                    <button type="button" class="group-toolbar-btn group-toolbar-btn--secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="group-toolbar-btn" id="fursvpConfirmAccept">Confirm</button>
+                </div>
             </div>
-            {% endif %}
-            {% block content %}
-            {% endblock %}
         </div>
     </div>
 
-    <!-- Mobile Bottom Navigation -->
-    <nav class="mobile-bottom-nav">
-        <a href="{% url 'home' %}"
-            class="nav-link home-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}">
-            <i class="material-icons">home</i>
-            <span>Home</span>
-        </a>
-        {% if user.is_authenticated %}
-        <a href="{% url 'notifications_page' %}" class="nav-link" id="mobileNotificationsLink">
-            <i class="material-icons" id="mobileNotificationsIcon">notifications</i>
-            <span>Alerts</span>
-        </a>
-        {% endif %}
-        {% if user.group_roles.all or user.delegated_groups_as_delegate.exists %}
-        <a href="{% url 'create_event' %}" class="nav-link">
-            <i class="material-icons">add</i>
-            <span>New Event</span>
-        </a>
-        {% endif %}
-        {% if user.is_authenticated %}
-        <a href="{% url 'profile' %}"
-            class="nav-link {% if request.resolver_match.url_name == 'profile' %}active{% endif %}">
-            <i class="material-icons">person</i>
-            <span>Profile</span>
-        </a>
-        <form action="{% url 'logout' %}" method="post" class="d-inline" style="margin: 0;">
-            {% csrf_token %}
-            <button type="submit" class="nav-link logout-link">
-                <i class="material-icons">logout</i>
-                <span>Logout</span>
+    <div class="fursvp-toasts" id="fursvp-toasts" aria-live="polite">
+        {% for message in messages %}
+        {% if not "admin_notification" in message.tags %}
+        <div class="fursvp-toast fursvp-toast--{{ message.level_tag }}" role="status">
+            <i class="material-icons fursvp-toast-icon">{% if 'bell' in message.tags %}notifications{% elif message.level_tag == 'error' %}error{% elif message.level_tag == 'success' %}check_circle{% elif message.level_tag == 'warning' %}warning{% else %}info{% endif %}</i>
+            <span class="fursvp-toast-text">{{ message }}</span>
+            <button type="button" class="fursvp-toast-close" aria-label="Dismiss">
+                <i class="material-icons">close</i>
             </button>
-        </form>
-        {% else %}
-        <a href="{% url 'login' %}"
-            class="nav-link {% if request.resolver_match.url_name == 'login' %}active{% endif %}">
-            <i class="material-icons">login</i>
-            <span>Login</span>
-        </a>
-        <a href="{% url 'register' %}"
-            class="nav-link {% if request.resolver_match.url_name == 'register' %}active{% endif %}">
-            <i class="material-icons">person_add</i>
-            <span>Register</span>
-        </a>
+            <span class="fursvp-toast-bar"></span>
+        </div>
         {% endif %}
-    </nav>
+        {% endfor %}
+        {% block page_toasts %}{% endblock %}
+    </div>
+
+    <div class="main-content">
+        <div class="container">
+            {% block content %}
+            {% endblock %}
+        </div>
 
     <footer class="gradient-footer">
         <div class="container text-center">
@@ -426,6 +404,55 @@
             </div>
         </div>
     </footer>
+    </div>
+
+    <nav class="mobile-bottom-nav" aria-label="Primary">
+        <a href="{% url 'home' %}"
+            class="nav-link home-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}">
+            <i class="material-icons">home</i>
+            <span>Home</span>
+        </a>
+        {% if user.is_authenticated %}
+        <a href="{% url 'notifications_page' %}"
+            class="nav-link {% if request.resolver_match.url_name == 'notifications_page' %}active{% endif %}"
+            id="mobileNotificationsLink">
+            <i class="material-icons" id="mobileNotificationsIcon">notifications</i>
+            <span>Alerts</span>
+        </a>
+        {% endif %}
+        {% if user.group_roles.all or user.delegated_groups_as_delegate.exists %}
+        <a href="{% url 'create_event' %}"
+            class="nav-link {% if request.resolver_match.url_name == 'create_event' %}active{% endif %}">
+            <i class="material-icons">add</i>
+            <span>New Event</span>
+        </a>
+        {% endif %}
+        {% if user.is_authenticated %}
+        <a href="{% url 'profile' %}"
+            class="nav-link {% if request.resolver_match.url_name == 'profile' %}active{% endif %}">
+            <i class="material-icons">person</i>
+            <span>Profile</span>
+        </a>
+        <form action="{% url 'logout' %}" method="post">
+            {% csrf_token %}
+            <button type="submit" class="nav-link logout-link">
+                <i class="material-icons">logout</i>
+                <span>Logout</span>
+            </button>
+        </form>
+        {% else %}
+        <a href="{% url 'login' %}"
+            class="nav-link {% if request.resolver_match.url_name == 'login' %}active{% endif %}">
+            <i class="material-icons">login</i>
+            <span>Login</span>
+        </a>
+        <a href="{% url 'register' %}"
+            class="nav-link {% if request.resolver_match.url_name == 'register' %}active{% endif %}">
+            <i class="material-icons">person_add</i>
+            <span>Register</span>
+        </a>
+        {% endif %}
+    </nav>
 
     <!-- Bootstrap 5 JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
@@ -433,14 +460,18 @@
     <script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
     <!-- Flatpickr JS -->
     <script src="https://cdn.jsdelivr.net/npm/flatpickr@4.6.9/dist/flatpickr.min.js"></script>
+    <script>
+        if (window.flatpickr && flatpickr.defaultConfig) {
+            flatpickr.defaultConfig.appendTo = document.body;
+        }
+        if (window.TomSelect && TomSelect.defaults) {
+            TomSelect.defaults.dropdownParent = 'body';
+        }
+    </script>
     <!-- Cropper JS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.12/cropper.min.js"></script>
     <!-- TinyMCE -->
     <script src="https://cdn.jsdelivr.net/npm/tinymce@7.9.1/tinymce.min.js" referrerpolicy="origin"></script>
-    <!-- Leaflet CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <!-- Leaflet JS -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="{% static 'js/client-ip.js' %}"></script>
     {% block extra_js %}
     {{ block.super }}
@@ -480,6 +511,34 @@
                 window.location.assign(destination);
             }
 
+            function toastFreshNotifications(notifications) {
+                if (!window.fursvpShowToast || !notifications) return;
+                let toasted = [];
+                try {
+                    toasted = JSON.parse(sessionStorage.getItem('fursvpToastedNotificationIds') || '[]');
+                } catch (error) {
+                    toasted = [];
+                }
+                const seen = new Set(toasted);
+                const now = Date.now();
+                notifications.forEach(function (notification) {
+                    if (notification.is_read || seen.has(notification.id)) return;
+                    const age = now - new Date(notification.timestamp).getTime();
+                    if (age > 20000) return;
+                    const text = notification.event_name
+                        ? notification.event_name + ' — ' + notification.message
+                        : notification.message;
+                    window.fursvpShowToast({
+                        level: 'info',
+                        icon: 'notifications',
+                        text: text
+                    });
+                    seen.add(notification.id);
+                    window.fursvpFlickerBell();
+                });
+                sessionStorage.setItem('fursvpToastedNotificationIds', JSON.stringify(Array.from(seen).slice(-80)));
+            }
+
             function formatRelativeTime(dateString) {
                 const date = new Date(dateString);
                 const now = new Date();
@@ -504,6 +563,7 @@
                     }
                     const data = await response.json();
                     const unreadCount = data.unread_count;
+                    toastFreshNotifications(data.notifications);
 
                     // Update desktop badge if dropdown exists
                     if (notificationsDropdown) {
@@ -658,69 +718,32 @@
 
             // Function to clear all notifications
             async function clearAllNotifications() {
-                // Create and show a Bootstrap modal for confirmation
-                const modalHtml = `
-                    <div class="modal fade" id="clearNotificationsModal" tabindex="-1" aria-hidden="true">
-                        <div class="modal-dialog modal-dialog-centered">
-                            <div class="modal-content">
-                                <div class="modal-header">
-                                    <h5 class="modal-title">
-                                        <i class="material-icons me-2">delete</i>
-                                        Clear Notifications
-                                    </h5>
-                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                </div>
-                                <div class="modal-body">
-                                    <p>Are you sure you want to clear all notifications? This action cannot be undone.</p>
-                                </div>
-                                <div class="modal-footer">
-                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                    <button type="button" class="btn btn-danger" id="confirmClearNotifications">
-                                        <i class="material-icons me-1">delete</i>
-                                        Clear All Notifications
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-
-                // Add modal to body
-                document.body.insertAdjacentHTML('beforeend', modalHtml);
-                const modal = new bootstrap.Modal(document.getElementById('clearNotificationsModal'));
-                modal.show();
-
-                // Handle confirmation
-                document.getElementById('confirmClearNotifications').addEventListener('click', async () => {
-                    try {
-                        const response = await fetch('/users/notifications/purge_read/', {
-                            method: 'POST',
-                            headers: {
-                                'X-CSRFToken': getCookie('csrftoken'),
-                                'Content-Type': 'application/json'
-                            }
-                        });
-                        if (!response.ok) {
-                            throw new Error(`HTTP error! status: ${response.status}`);
-                        }
-
-                        // Fetch notifications again to update counts and flashing icon
-                        fetchNotifications();
-
-                        // Hide and remove the modal
-                        modal.hide();
-                        document.getElementById('clearNotificationsModal').remove();
-                    } catch (error) {
-                        console.error('Error clearing notifications:', error);
-                        alert('Failed to clear notifications. Please try again.');
-                    }
+                const ok = await window.fursvpConfirm({
+                    title: 'Clear notifications',
+                    body: 'Are you sure you want to clear all notifications? This action cannot be undone.',
+                    confirmLabel: 'Clear all',
+                    icon: 'delete',
+                    danger: true
                 });
-
-                // Clean up modal when hidden
-                document.getElementById('clearNotificationsModal').addEventListener('hidden.bs.modal',
-                    function () {
-                        this.remove();
+                if (!ok) return;
+                try {
+                    const response = await fetch('/users/notifications/purge_read/', {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRFToken': getCookie('csrftoken'),
+                            'Content-Type': 'application/json'
+                        }
                     });
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    fetchNotifications();
+                } catch (error) {
+                    console.error('Error clearing notifications:', error);
+                    if (window.fursvpShowToast) {
+                        window.fursvpShowToast({ level: 'error', text: 'Failed to clear notifications. Please try again.' });
+                    }
+                }
             }
 
             // Get CSRF token
@@ -859,6 +882,160 @@
                     window.location.href = '/users/notifications/all/';
                 });
             }
+        });
+    </script>
+    <script>
+        window.fursvpConfirm = function (options) {
+            options = options || {};
+            return new Promise(function (resolve) {
+                var modalEl = document.getElementById('fursvpConfirmModal');
+                if (!modalEl || !window.bootstrap) {
+                    resolve(window.confirm(options.body || options.title || 'Are you sure?'));
+                    return;
+                }
+                var title = document.getElementById('fursvpConfirmTitle');
+                var body = document.getElementById('fursvpConfirmBody');
+                var icon = document.getElementById('fursvpConfirmIcon');
+                var iconWrap = document.getElementById('fursvpConfirmIconWrap');
+                var accept = document.getElementById('fursvpConfirmAccept');
+                title.textContent = options.title || 'Are you sure?';
+                body.textContent = options.body || '';
+                body.hidden = !options.body;
+                icon.textContent = options.icon || (options.danger ? 'warning' : 'help');
+                iconWrap.classList.toggle('is-danger', !!options.danger);
+                iconWrap.classList.toggle('is-success', !!options.success);
+                accept.classList.toggle('group-toolbar-btn--danger', !!options.danger);
+                accept.replaceChildren();
+                var acceptIcon = document.createElement('i');
+                acceptIcon.className = 'material-icons';
+                acceptIcon.textContent = options.icon || 'check';
+                accept.appendChild(acceptIcon);
+                accept.appendChild(document.createTextNode(' ' + (options.confirmLabel || 'Confirm')));
+                var settled = false;
+                var pausedFocus = [];
+                var savedBodyPad = document.body.style.paddingRight;
+                var savedBodyOverflow = document.body.style.overflow;
+                function finish(ok) {
+                    if (settled) return;
+                    settled = true;
+                    resolve(!!ok);
+                }
+                function pauseOpenModalFocus() {
+                    document.querySelectorAll('.modal.show').forEach(function (el) {
+                        if (el === modalEl) return;
+                        var instance = bootstrap.Modal.getInstance(el);
+                        if (instance && instance._focustrap) {
+                            instance._focustrap.deactivate();
+                            pausedFocus.push(instance);
+                        }
+                    });
+                }
+                function resumeOpenModalFocus() {
+                    pausedFocus.forEach(function (instance) {
+                        if (instance._isShown && instance._focustrap) {
+                            instance._focustrap.activate();
+                        }
+                    });
+                    pausedFocus = [];
+                }
+                function onAccept() {
+                    finish(true);
+                    var instance = bootstrap.Modal.getInstance(modalEl);
+                    if (instance) instance.hide();
+                }
+                function onHidden() {
+                    accept.removeEventListener('click', onAccept);
+                    modalEl.removeEventListener('hidden.bs.modal', onHidden);
+                    resumeOpenModalFocus();
+                    if (document.querySelector('.modal.show')) {
+                        document.body.classList.add('modal-open');
+                        document.body.style.overflow = savedBodyOverflow || 'hidden';
+                        document.body.style.paddingRight = savedBodyPad;
+                    }
+                    finish(false);
+                }
+                function raiseBackdrop() {
+                    var backdrops = document.querySelectorAll('.modal-backdrop');
+                    if (!backdrops.length) return;
+                    backdrops[backdrops.length - 1].classList.add('fursvp-confirm-backdrop');
+                }
+                accept.addEventListener('click', onAccept);
+                modalEl.addEventListener('hidden.bs.modal', onHidden);
+                pauseOpenModalFocus();
+                bootstrap.Modal.getOrCreateInstance(modalEl).show();
+                raiseBackdrop();
+            });
+        };
+        document.addEventListener('submit', function (event) {
+            var form = event.target;
+            if (!form || !form.dataset) return;
+            if (form.dataset.fursvpConfirmed === '1') {
+                delete form.dataset.fursvpConfirmed;
+                return;
+            }
+            var source = event.submitter && event.submitter.dataset.confirmTitle ? event.submitter : null;
+            if (!source && form.dataset.confirmTitle) source = form;
+            if (!source) return;
+            event.preventDefault();
+            var submitter = event.submitter;
+            window.fursvpConfirm({
+                title: source.dataset.confirmTitle,
+                body: source.dataset.confirmBody || '',
+                confirmLabel: source.dataset.confirmLabel || 'Confirm',
+                icon: source.dataset.confirmIcon || '',
+                danger: source.dataset.confirmDanger === '1',
+                success: source.dataset.confirmSuccess === '1'
+            }).then(function (ok) {
+                if (!ok) return;
+                form.dataset.fursvpConfirmed = '1';
+                if (typeof form.requestSubmit === 'function') form.requestSubmit(submitter || undefined);
+                else form.submit();
+            });
+        }, true);
+        window.fursvpShowToast = function (options) {
+            var level = options.level || 'info';
+            var icon = options.icon || (level === 'error' ? 'error' : level === 'success' ? 'check_circle' : level === 'warning' ? 'warning' : 'info');
+            var text = options.text || '';
+            if (!text) return;
+            var existing = document.querySelectorAll('.fursvp-toast-text');
+            for (var i = 0; i < existing.length; i++) {
+                if (existing[i].textContent.trim() === text.trim()) return;
+            }
+            var container = document.getElementById('fursvp-toasts');
+            if (!container) return;
+            var toast = document.createElement('div');
+            toast.className = 'fursvp-toast fursvp-toast--' + level;
+            toast.setAttribute('role', 'status');
+            toast.innerHTML = '<i class="material-icons fursvp-toast-icon"></i><span class="fursvp-toast-text"></span><button type="button" class="fursvp-toast-close" aria-label="Dismiss"><i class="material-icons">close</i></button><span class="fursvp-toast-bar"></span>';
+            toast.querySelector('.fursvp-toast-icon').textContent = icon;
+            toast.querySelector('.fursvp-toast-text').textContent = text;
+            container.appendChild(toast);
+            window.fursvpBindToast(toast);
+        };
+        window.fursvpFlickerBell = function () {
+            var bellIcon = document.querySelector('.notification-bell-icon .material-icons');
+            var mobileIcon = document.getElementById('mobileNotificationsIcon');
+            [bellIcon, mobileIcon].forEach(function (icon) {
+                if (!icon) return;
+                icon.classList.remove('is-flickering');
+                void icon.offsetWidth;
+                icon.classList.add('is-flickering');
+            });
+        };
+        window.fursvpBindToast = function (toast) {
+            function dismiss() {
+                if (toast.classList.contains('is-leaving')) return;
+                toast.classList.add('is-leaving');
+                setTimeout(function () { toast.remove(); }, 280);
+            }
+            var closeBtn = toast.querySelector('.fursvp-toast-close');
+            if (closeBtn) closeBtn.addEventListener('click', dismiss);
+            setTimeout(dismiss, 5000);
+        };
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('.fursvp-toast').forEach(function (toast) {
+                window.fursvpBindToast(toast);
+            });
         });
     </script>
     <script>

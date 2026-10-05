@@ -3,15 +3,33 @@
 
 {% block content %}
 <div class="container py-4">
-    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
-        <div>
-            <h1 class="mb-1 fw-bold text-primary">My RSVPs</h1>
-            <p class="text-muted mb-0">All events you've responded to, in one place.</p>
+    <header class="page-hero" aria-label="My RSVPs">
+        <div class="page-hero-main">
+            <div class="page-hero-icon" aria-hidden="true">
+                <i class="material-icons">event_available</i>
+            </div>
+            <div class="page-hero-copy">
+                <p class="page-hero-kicker">Your events</p>
+                <h1>My RSVPs</h1>
+                <p class="page-hero-lead">All events you've responded to, in one place.</p>
+                <div class="page-hero-stats">
+                    <span class="page-hero-stat">
+                        <i class="material-icons">upcoming</i>
+                        {{ upcoming_rsvps|length }} upcoming
+                    </span>
+                    <span class="page-hero-stat">
+                        <i class="material-icons">history</i>
+                        {{ past_rsvps|length }} past
+                    </span>
+                </div>
+            </div>
         </div>
-        <a href="{% url 'event_calendar' %}" class="btn btn-outline-primary d-inline-flex align-items-center">
-            <i class="material-icons me-1">calendar_month</i> Browse events
-        </a>
-    </div>
+        <div class="page-hero-actions">
+            <a href="{% url 'event_calendar' %}" class="page-hero-btn">
+                <i class="material-icons">calendar_month</i> Browse events
+            </a>
+        </div>
+    </header>
 
     <div class="group-section-card profile-page-card mb-4">
         <div class="group-section-header">

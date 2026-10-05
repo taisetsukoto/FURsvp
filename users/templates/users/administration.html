@@ -3,6 +3,21 @@
 {% load widget_tweaks %}
 {% block title %}Administration - FURsvp{% endblock %}
 
+{% block page_toasts %}
+{% for message in messages %}
+{% if "admin_notification" in message.tags %}
+<div class="fursvp-toast fursvp-toast--{{ message.level_tag }}" role="status">
+    <i class="material-icons fursvp-toast-icon">{% if message.level_tag == 'error' %}error{% elif message.level_tag == 'success' %}check_circle{% elif message.level_tag == 'warning' %}warning{% else %}info{% endif %}</i>
+    <span class="fursvp-toast-text">{{ message }}</span>
+    <button type="button" class="fursvp-toast-close" aria-label="Dismiss">
+        <i class="material-icons">close</i>
+    </button>
+    <span class="fursvp-toast-bar"></span>
+</div>
+{% endif %}
+{% endfor %}
+{% endblock %}
+
 {% block content %}
 <div class="profile-gradient-bg">
     <div class="row justify-content-center">
@@ -126,7 +141,30 @@
                                             <span class="fw-medium">{{ user_obj.profile.get_display_name }}</span>
                                             <small class="text-muted d-block">({{ user_obj.username }})</small>
                                         </td>
-                                        <td>{{ user_obj.email }}</td>
+                                        <td class="admin-email-cell">
+                                            <div class="admin-email-line">
+                                                <span class="admin-email-address">{{ user_obj.email|default:"—" }}</span>
+                                                {% if user_obj.profile.is_verified %}
+                                                <span class="admin-verify-badge admin-verify-badge--ok">Verified</span>
+                                                {% else %}
+                                                <span class="admin-verify-badge admin-verify-badge--pending">Unverified</span>
+                                                {% endif %}
+                                            </div>
+                                            {% if user.is_superuser %}
+                                            <div class="admin-email-actions">
+                                                {% if not user_obj.profile.is_verified %}
+                                                <button type="button" class="admin-email-btn admin-email-resend" data-form="resend-verification-{{ user_obj.id }}">
+                                                    <i class="material-icons">forward_to_inbox</i>
+                                                    Resend
+                                                </button>
+                                                {% endif %}
+                                                <button type="button" class="admin-email-btn" data-bs-toggle="modal" data-bs-target="#fixEmailModal" data-user-id="{{ user_obj.id }}" data-user-name="{{ user_obj.profile.get_display_name }}" data-user-email="{{ user_obj.email }}">
+                                                    <i class="material-icons">edit</i>
+                                                    Fix email
+                                                </button>
+                                            </div>
+                                            {% endif %}
+                                        </td>
                                         <td>
                                             <span class="badge {% if user_obj.is_superuser %}bg-success{% else %}bg-danger{% endif %} py-2 px-3 rounded-pill fw-normal">
                                                 {{ user_obj.is_superuser|yesno:"Yes,No" }}
@@ -1012,20 +1050,79 @@
     </div>
 </div>
 
+{% if user.is_superuser %}
+<div class="d-none" aria-hidden="true">
+    {% for user_obj in users_to_promote %}
+    {% if not user_obj.profile.is_verified %}
+    <form method="post" id="resend-verification-{{ user_obj.id }}" action="{% url 'administration' %}">
+        {% csrf_token %}
+        {% admin_state_fields %}
+        <input type="hidden" name="resend_verification_submit" value="1">
+        <input type="hidden" name="user_id" value="{{ user_obj.id }}">
+    </form>
+    {% endif %}
+    {% endfor %}
+</div>
+
+<div class="modal fade" id="fixEmailModal" tabindex="-1" aria-labelledby="fixEmailModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content fursvp-modal">
+            <div class="fursvp-modal-header">
+                <div class="fursvp-modal-header-icon">
+                    <i class="material-icons">edit</i>
+                </div>
+                <div class="fursvp-modal-header-text">
+                    <h5 class="fursvp-modal-title" id="fixEmailModalLabel">Fix email address</h5>
+                    <p class="fursvp-modal-subtitle">Correct a wrong address and send a new verification link</p>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="post" id="fixEmailForm" action="{% url 'administration' %}">
+                {% csrf_token %}
+                {% admin_state_fields %}
+                <input type="hidden" name="fix_user_email_submit" value="1">
+                <input type="hidden" name="user_id" id="fixEmailUserId" value="">
+                <div class="modal-body fursvp-modal-body">
+                    <p class="mb-3">Update the email for <strong id="fixEmailUserName"></strong>. They cannot sign in until they open the verification link sent to this address.</p>
+                    <div class="auth-field mb-0">
+                        <label for="fixEmailInput" class="auth-form-label">Email address</label>
+                        <div class="input-group auth-input-group">
+                            <span class="input-group-text"><i class="material-icons">email</i></span>
+                            <input type="email" class="form-control" id="fixEmailInput" name="email" required maxlength="254" autocomplete="off" placeholder="name@example.com">
+                        </div>
+                        <div class="auth-field-help">If the address is already correct, saving just resends the verification email.</div>
+                    </div>
+                </div>
+                <div class="fursvp-modal-footer">
+                    <button type="button" class="group-toolbar-btn group-toolbar-btn--secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="group-toolbar-btn">
+                        <i class="material-icons">send</i> Save and send verification
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <!-- Create Group Modal -->
 <div class="modal fade" id="createGroupModal" tabindex="-1" aria-labelledby="createGroupModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content auth-glass-card border-0">
-            <div class="modal-header border-0 pb-0">
-                <h5 class="modal-title auth-page-title" id="createGroupModalLabel">
-                    <i class="material-icons align-middle me-1">group_add</i> Create New Group
-                </h5>
+        <div class="modal-content fursvp-modal">
+            <div class="fursvp-modal-header">
+                <div class="fursvp-modal-header-icon">
+                    <i class="material-icons">group_add</i>
+                </div>
+                <div class="fursvp-modal-header-text">
+                    <h5 class="fursvp-modal-title" id="createGroupModalLabel">Create new group</h5>
+                    <p class="fursvp-modal-subtitle">Groups can host events and manage their own roster</p>
+                </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form method="post">
                 {% csrf_token %}
                 {% admin_state_fields %}
-                <div class="modal-body pt-3">
+                <div class="modal-body fursvp-modal-body">
                     <div class="auth-field mb-0">
                         <label for="id_name" class="auth-form-label">Group name</label>
                         <div class="input-group auth-input-group">
@@ -1034,10 +1131,10 @@
                         </div>
                     </div>
                 </div>
-                <div class="modal-footer border-0 pt-2">
-                    <button type="button" class="auth-btn-secondary admin-btn-inline" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" name="create_group_submit" class="profile-btn-primary admin-btn-inline">
-                        <i class="material-icons">add</i> Create Group
+                <div class="fursvp-modal-footer">
+                    <button type="button" class="group-toolbar-btn group-toolbar-btn--secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" name="create_group_submit" class="group-toolbar-btn">
+                        <i class="material-icons">add</i> Create group
                     </button>
                 </div>
             </form>
@@ -1055,6 +1152,44 @@
             if (flag) {
                 flag.value = '1';
             }
+        }
+
+        document.querySelectorAll('.admin-email-resend').forEach(function(button) {
+            button.addEventListener('click', function() {
+                const form = document.getElementById(button.getAttribute('data-form'));
+                if (form) {
+                    form.requestSubmit();
+                }
+            });
+        });
+
+        const fixEmailModal = document.getElementById('fixEmailModal');
+        if (fixEmailModal) {
+            fixEmailModal.addEventListener('show.bs.modal', function(event) {
+                const button = event.relatedTarget;
+                if (!button) {
+                    return;
+                }
+                const userId = document.getElementById('fixEmailUserId');
+                const emailInput = document.getElementById('fixEmailInput');
+                const nameLabel = document.getElementById('fixEmailUserName');
+                if (userId) {
+                    userId.value = button.getAttribute('data-user-id') || '';
+                }
+                if (emailInput) {
+                    emailInput.value = button.getAttribute('data-user-email') || '';
+                }
+                if (nameLabel) {
+                    nameLabel.textContent = button.getAttribute('data-user-name') || 'this user';
+                }
+            });
+            fixEmailModal.addEventListener('shown.bs.modal', function() {
+                const emailInput = document.getElementById('fixEmailInput');
+                if (emailInput) {
+                    emailInput.focus();
+                    emailInput.select();
+                }
+            });
         }
 
         if (window.TomSelect) {

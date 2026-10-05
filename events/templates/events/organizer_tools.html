@@ -39,10 +39,15 @@
                         <i class="material-icons">badge</i>
                     </div>
                     <h3 class="organizer-tools-action-title">Badge Stickers</h3>
-                    <p class="organizer-tools-action-text">Print Avery 5162 labels with names, badge numbers, QR check-in codes, ranks, and accessibility icons.</p>
-                    <a href="{% url 'generate_badges' event.id %}" class="organizer-tools-btn organizer-order-link">
-                        <i class="material-icons">print</i> Generate Badges
-                    </a>
+                    <p class="organizer-tools-action-text">Print names, badge numbers, QR check-in codes, ranks, and accessibility icons. Pick the label sheet.</p>
+                    <div class="organizer-badge-buttons">
+                        {% for template in badge_templates %}
+                        <a href="{% url 'generate_badges' event.id %}?template={{ template.key }}" class="organizer-tools-btn organizer-badge-btn organizer-order-link">
+                            <span class="organizer-badge-btn-name"><i class="material-icons">print</i> {{ template.name }}</span>
+                            <span class="organizer-badge-btn-dim">{{ template.dimensions }} · {{ template.layout }} per sheet</span>
+                        </a>
+                        {% endfor %}
+                    </div>
                 </div>
 
                 <div class="organizer-tools-action-card">
@@ -88,14 +93,17 @@
                                 {% endif %}
                             </p>
                             <div class="organizer-attendee-meta">
-                                {% if rsvp.status == 'confirmed' %}
-                                <span class="organizer-status-chip organizer-status-chip--confirmed">Confirmed</span>
-                                {% else %}
-                                <span class="organizer-status-chip organizer-status-chip--waitlisted">Waitlisted</span>
-                                {% endif %}
-                                {% if rsvp.custom_rank %}
-                                <span class="organizer-status-chip organizer-status-chip--confirmed">{{ rsvp.custom_rank }}</span>
-                                {% endif %}
+                                <div class="organizer-rank-field">
+                                    <span class="organizer-rank-label">Rank</span>
+                                    <input type="text" class="organizer-rank-input rank-input"
+                                           placeholder="Sponsor, VIP, Staff…"
+                                           data-rsvp-id="{{ rsvp.id }}"
+                                           value="{{ rsvp.custom_rank|default:'' }}"
+                                           aria-label="Rank or role">
+                                    <button class="organizer-rank-save save-rank-btn" type="button" data-rsvp-id="{{ rsvp.id }}" title="Save rank">
+                                        <i class="material-icons">save</i>
+                                    </button>
+                                </div>
                             </div>
                         </div>
                         <div class="organizer-attendee-controls">
@@ -106,17 +114,11 @@
                                        {% if rsvp.accessibility_needs %}checked{% endif %}>
                                 Accessibility
                             </label>
-                            <div class="organizer-rank-field">
-                                <span class="organizer-rank-label">Rank</span>
-                                <input type="text" class="organizer-rank-input rank-input"
-                                       placeholder="Sponsor, VIP, Staff…"
-                                       data-rsvp-id="{{ rsvp.id }}"
-                                       value="{{ rsvp.custom_rank|default:'' }}"
-                                       aria-label="Rank or role">
-                                <button class="organizer-rank-save save-rank-btn" type="button" data-rsvp-id="{{ rsvp.id }}" title="Save rank">
-                                    <i class="material-icons">save</i>
-                                </button>
-                            </div>
+                            {% if rsvp.status == 'confirmed' %}
+                            <span class="organizer-status-chip organizer-status-chip--confirmed">Confirmed</span>
+                            {% else %}
+                            <span class="organizer-status-chip organizer-status-chip--waitlisted">Waitlisted</span>
+                            {% endif %}
                         </div>
                     </div>
                     {% empty %}
@@ -125,9 +127,12 @@
                 </div>
 
                 <div class="organizer-tools-footer-actions">
-                    <a href="{% url 'generate_badges' event.id %}" class="organizer-tools-btn organizer-order-link">
-                        <i class="material-icons">print</i> Generate Badges (this order)
+                    {% for template in badge_templates %}
+                    <a href="{% url 'generate_badges' event.id %}?template={{ template.key }}" class="organizer-tools-btn organizer-badge-btn organizer-order-link">
+                        <span class="organizer-badge-btn-name"><i class="material-icons">print</i> {{ template.name }}</span>
+                        <span class="organizer-badge-btn-dim">{{ template.dimensions }} · {{ template.layout }}</span>
                     </a>
+                    {% endfor %}
                     <button type="button" class="organizer-tools-btn organizer-tools-btn--secondary" id="resetOrder">
                         <i class="material-icons">refresh</i> Reset to RSVP order
                     </button>
