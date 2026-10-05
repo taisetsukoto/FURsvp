@@ -4,6 +4,19 @@ import subprocess
 
 RSVP_LOCK_MESSAGE = 'RSVPs are locked because this event has started.'
 
+
+def rsvp_signup_block_message(event):
+    """Why a new RSVP cannot be created."""
+    if event.status != 'active':
+        return 'RSVPs are locked because this event has been cancelled.'
+    if event.has_started():
+        return RSVP_LOCK_MESSAGE
+    close = getattr(event, 'rsvp_close_date', None)
+    if close:
+        label = f"{close.strftime('%b')} {close.day}, {close.year}"
+        return f'RSVPs closed on {label}.'
+    return 'RSVPs are closed for this event.'
+
 def post_to_telegram_channel(channel, message, parse_mode=None):
     """
     Post a message to a Telegram channel using the Telegram Bot API.

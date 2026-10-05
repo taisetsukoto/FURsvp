@@ -47,6 +47,12 @@
                 {% elif event.age_restriction == 'adult' %}
                 <span class="group-event-age-pill group-event-age-pill--18"><i class="material-icons">warning</i> 18+</span>
                 {% endif %}
+                {% if event.rsvp_close_date and event.status == 'active' and not event.has_started %}
+                <span class="group-event-age-pill group-event-close-pill">
+                    <i class="material-icons">{% if event.rsvp_close_date_passed %}lock{% else %}event_busy{% endif %}</i>
+                    {% if event.rsvp_close_date_passed %}RSVPs closed{% else %}Closes {{ event.rsvp_close_date|date:"M j" }}{% endif %}
+                </span>
+                {% endif %}
             </div>
         </a>
     </div>
@@ -95,6 +101,11 @@
             <span class="group-event-age-pill group-event-age-pill--21">21+</span>
             {% elif event.age_restriction == 'adult' %}
             <span class="group-event-age-pill group-event-age-pill--18">18+</span>
+            {% endif %}
+            {% if event.rsvp_close_date and event.status == 'active' and not event.has_started %}
+            <span class="group-event-age-pill group-event-close-pill">
+                {% if event.rsvp_close_date_passed %}RSVPs closed{% else %}Closes {{ event.rsvp_close_date|date:"M j" }}{% endif %}
+            </span>
             {% endif %}
             <i class="material-icons group-event-list-chevron">chevron_right</i>
         </div>

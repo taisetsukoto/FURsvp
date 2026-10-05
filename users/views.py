@@ -13,7 +13,7 @@ from django.views.decorators.http import require_POST, require_GET
 from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.db.models import Q
-from django.db import models, transaction
+from django.db import IntegrityError, models, transaction
 import json
 from datetime import timedelta
 from django.utils import timezone
@@ -46,11 +46,214 @@ import os
 from atproto import Client, models as atproto_models
 import uuid
 from django.core.mail import send_mail
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
 from django.conf import settings
 from django.contrib.auth.views import PasswordResetView
 from django.urls import reverse_lazy
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Create your views here.
+
+def send_email_verification(request, user, *, corrected=False):
+    """Issue a fresh verification token and email the link. Marks the account unverified."""
+    profile = user.profile
+    token = uuid.uuid4().hex
+    profile.verification_token = token
+    profile.is_verified = False
+    profile.save(update_fields=['verification_token', 'is_verified'])
+    verification_link = request.build_absolute_uri(reverse('verify_email', args=[token]))
+    if corrected:
+        subject = 'Verify your updated email address'
+        body = (
+            'The email address on your FURsvp account was updated. '
+            f'Please verify it by clicking this link: {verification_link}'
+        )
+    else:
+        subject = 'Verify your email address'
+        body = f'Welcome to FURsvp! Please verify your email by clicking this link: {verification_link}'
+    send_mail(
+        subject,
+        body,
+        settings.DEFAULT_FROM_EMAIL,
+        [user.email],
+        fail_silently=False,
+    )
+
+
+def _administration_redirect(request, default_tab='organizers-tab'):
+    from urllib.parse import urlencode
+    from users.templatetags.users_extras import ADMINISTRATION_QUERY_KEYS
+
+    params = {}
+    for key in ADMINISTRATION_QUERY_KEYS:
+        value = (request.POST.get(key) or '').strip()
+        if value:
+            params[key] = value
+    params.setdefault('tab', default_tab)
+    query = urlencode(params)
+    target = reverse('administration')
+    return redirect(f'{target}?{query}' if query else target)
+
+
+def _handle_admin_user_email(request):
+    """Resend a verification email, or correct the address and send a new link."""
+    if not request.user.is_superuser:
+        messages.error(request, 'Only site admins can change account emails.', extra_tags='admin_notification')
+        return _administration_redirect(request)
+
+    raw_id = (request.POST.get('user_id') or '').strip()
+    try:
+        target = User.objects.select_related('profile').get(pk=int(raw_id))
+    except (TypeError, ValueError, User.DoesNotExist):
+        messages.error(request, 'User not found.', extra_tags='admin_notification')
+        return _administration_redirect(request)
+
+    if not hasattr(target, 'profile'):
+        Profile.objects.create(user=target)
+        target = User.objects.select_related('profile').get(pk=target.pk)
+
+    fixing = 'fix_user_email_submit' in request.POST
+    if fixing:
+        new_email = (request.POST.get('email') or '').strip()
+        if len(new_email) > 254:
+            messages.error(request, 'Enter a valid email address.', extra_tags='admin_notification')
+            return _administration_redirect(request)
+        try:
+            validate_email(new_email)
+        except ValidationError:
+            messages.error(request, 'Enter a valid email address.', extra_tags='admin_notification')
+            return _administration_redirect(request)
+        if User.objects.filter(email__iexact=new_email).exclude(pk=target.pk).exists():
+            messages.error(request, 'That email is already used by another account.', extra_tags='admin_notification')
+            return _administration_redirect(request)
+
+        old_email = target.email or ''
+        changed = old_email.lower() != new_email.lower()
+        if not changed and target.profile.is_verified:
+            messages.info(
+                request,
+                f'{target.username} already uses that verified email.',
+                extra_tags='admin_notification',
+            )
+            return _administration_redirect(request)
+
+        if changed:
+            target.email = new_email
+            try:
+                target.save(update_fields=['email'])
+            except IntegrityError:
+                messages.error(request, 'That email is already used by another account.', extra_tags='admin_notification')
+                return _administration_redirect(request)
+            if old_email:
+                send_mail(
+                    'Your FURsvp email address was changed',
+                    (
+                        f'An administrator changed the email on the FURsvp account "{target.username}" '
+                        f'from this address to {new_email}. '
+                        'If you did not expect this, contact the site administrator.'
+                    ),
+                    settings.DEFAULT_FROM_EMAIL,
+                    [old_email],
+                    fail_silently=True,
+                )
+
+        try:
+            send_email_verification(request, target, corrected=changed)
+        except Exception:
+            logger.exception('Failed to send verification email for user %s', target.pk)
+            if changed:
+                AuditLog.log_action(
+                    user=request.user,
+                    action='user_profile_updated',
+                    description=f'Changed email for {target.username} from {old_email} to {new_email}, but the verification email failed to send',
+                    target_user=target,
+                    request=request,
+                    additional_data={'old_email': old_email, 'new_email': new_email, 'email_sent': False},
+                )
+                messages.error(
+                    request,
+                    f'The email for {target.username} was updated, but the verification message could not be sent. Use Resend to try again.',
+                    extra_tags='admin_notification',
+                )
+            else:
+                messages.error(
+                    request,
+                    f'Could not send a verification email to {target.email}.',
+                    extra_tags='admin_notification',
+                )
+            return _administration_redirect(request)
+
+        AuditLog.log_action(
+            user=request.user,
+            action='user_profile_updated',
+            description=(
+                f'Changed email for {target.username} from {old_email} to {new_email} and sent a verification email'
+                if changed else
+                f'Resent verification email to {target.username} at {new_email}'
+            ),
+            target_user=target,
+            request=request,
+            additional_data={
+                'old_email': old_email,
+                'new_email': new_email,
+                'email_changed': changed,
+                'email_sent': True,
+            },
+        )
+        if changed:
+            messages.success(
+                request,
+                f"Updated {target.username}'s email to {new_email} and sent a verification link. They need to open it before they can sign in.",
+                extra_tags='admin_notification',
+            )
+        else:
+            messages.success(
+                request,
+                f'Verification email resent to {new_email}.',
+                extra_tags='admin_notification',
+            )
+        return _administration_redirect(request)
+
+    if target.profile.is_verified:
+        messages.info(request, f"{target.username}'s email is already verified.", extra_tags='admin_notification')
+        return _administration_redirect(request)
+    if not target.email:
+        messages.error(
+            request,
+            f'{target.username} has no email address. Use Fix email first.',
+            extra_tags='admin_notification',
+        )
+        return _administration_redirect(request)
+
+    try:
+        send_email_verification(request, target)
+    except Exception:
+        logger.exception('Failed to resend verification email for user %s', target.pk)
+        messages.error(
+            request,
+            f'Could not send a verification email to {target.email}.',
+            extra_tags='admin_notification',
+        )
+        return _administration_redirect(request)
+
+    AuditLog.log_action(
+        user=request.user,
+        action='user_profile_updated',
+        description=f'Resent verification email to {target.username} at {target.email}',
+        target_user=target,
+        request=request,
+        additional_data={'email': target.email, 'email_sent': True},
+    )
+    messages.success(
+        request,
+        f'Verification email resent to {target.email}.',
+        extra_tags='admin_notification',
+    )
+    return _administration_redirect(request)
+
 
 @require_POST
 @ensure_csrf_cookie
@@ -75,21 +278,7 @@ def register(request):
             user.save()
             if not hasattr(user, 'profile'):
                 Profile.objects.create(user=user)
-            profile = user.profile
-            # Generate verification token
-            token = uuid.uuid4().hex
-            profile.verification_token = token
-            profile.is_verified = False
-            profile.save()
-            # Send verification email
-            verification_link = request.build_absolute_uri(f"/users/verify/{token}/")
-            send_mail(
-                'Verify your email address',
-                f'Welcome to FURsvp! Please verify your email by clicking this link: {verification_link}',
-                settings.DEFAULT_FROM_EMAIL,
-                [user.email],
-                fail_silently=False,
-            )
+            send_email_verification(request, user)
             messages.info(request, 'A verification email has been sent to your address. Please verify to activate your account.')
             return redirect('login')
     else:
@@ -656,6 +845,9 @@ def administration(request):
             messages.error(request, f'Error fetching Bluesky posts: {e}')
 
     if request.method == 'POST':
+        if 'resend_verification_submit' in request.POST or 'fix_user_email_submit' in request.POST:
+            return _handle_admin_user_email(request)
+
         if 'promote_users_submit' in request.POST:
             success_count = 0
             error_count = 0
@@ -1064,25 +1256,34 @@ def user_search_autocomplete(request):
         users_query = User.objects.select_related('profile')
 
         if group_id and not request.user.is_superuser:
-            # Group leaders may only resolve an exact username (no display-name search).
-            user = users_query.filter(username__iexact=query).first()
-            if not user:
+            # Group leaders search by username only (no display-name search).
+            lookup = query.strip().lstrip('@')
+            if len(lookup) < 2:
                 return JsonResponse({'results': []})
-            if exclude_current and user.id == request.user.id:
-                return JsonResponse({'results': []})
-            if exclude_banned_group and BannedUser.objects.filter(
-                group_id=exclude_banned_group, user_id=user.id
-            ).exists():
-                return JsonResponse({'results': []})
-            if exclude_group_leaders and GroupRole.objects.filter(
-                group_id=exclude_group_leaders, user_id=user.id
-            ).exists():
-                return JsonResponse({'results': []})
-            return JsonResponse({'results': [{
-                'id': user.id,
-                'text': user.username,
-                'username': user.username,
-            }]})
+            users_query = users_query.filter(username__icontains=lookup)
+            if exclude_current:
+                users_query = users_query.exclude(id=request.user.id)
+            if exclude_banned_group:
+                banned_ids = BannedUser.objects.filter(
+                    group_id=exclude_banned_group
+                ).values_list('user_id', flat=True)
+                users_query = users_query.exclude(id__in=banned_ids)
+            if exclude_group_leaders:
+                leader_ids = GroupRole.objects.filter(
+                    group_id=exclude_group_leaders
+                ).values_list('user_id', flat=True)
+                users_query = users_query.exclude(id__in=leader_ids)
+            results = []
+            for user in users_query.order_by('username')[:10]:
+                display_name = user.profile.get_display_name() if hasattr(user, 'profile') else user.username
+                text = user.username if display_name == user.username else f"{display_name} (@{user.username})"
+                results.append({
+                    'id': user.id,
+                    'text': text,
+                    'username': user.username,
+                    'display_name': display_name,
+                })
+            return JsonResponse({'results': results})
 
         users_query = users_query.filter(
             Q(username__icontains=query) |

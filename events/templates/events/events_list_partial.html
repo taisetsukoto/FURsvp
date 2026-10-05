@@ -59,6 +59,12 @@
                     <i class="material-icons">warning</i> 18+
                 </span>
                 {% endif %}
+                {% if event.rsvp_close_date and event.status == 'active' and not event.has_started %}
+                <span class="home-event-badge home-event-badge--closed">
+                    <i class="material-icons">{% if event.rsvp_close_date_passed %}lock{% else %}event_busy{% endif %}</i>
+                    {% if event.rsvp_close_date_passed %}RSVPs closed{% else %}Closes {{ event.rsvp_close_date|date:"M j" }}{% endif %}
+                </span>
+                {% endif %}
             </div>
         </div>
     </a>
@@ -132,6 +138,12 @@
                     <span class="home-event-badge home-event-badge--21"><i class="material-icons">warning</i> 21+</span>
                     {% elif event.age_restriction == 'adult' %}
                     <span class="home-event-badge home-event-badge--18"><i class="material-icons">warning</i> 18+</span>
+                    {% endif %}
+                    {% if event.rsvp_close_date and event.status == 'active' and not event.has_started %}
+                    <span class="home-event-badge home-event-badge--closed">
+                        <i class="material-icons">{% if event.rsvp_close_date_passed %}lock{% else %}event_busy{% endif %}</i>
+                        {% if event.rsvp_close_date_passed %}RSVPs closed{% else %}Closes {{ event.rsvp_close_date|date:"M j" }}{% endif %}
+                    </span>
                     {% endif %}
                 </div>
             </div>

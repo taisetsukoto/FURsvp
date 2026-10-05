@@ -1358,56 +1358,93 @@
 
         /* Mobile Bottom Navigation */
         @media (max-width: 768px) {
+            body {
+                height: 100dvh;
+                max-height: 100dvh;
+                min-height: 0;
+                overflow: hidden;
+            }
+
+            .main-content {
+                flex: 1 1 auto;
+                min-height: 0;
+                overflow-x: hidden;
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+                overscroll-behavior: contain;
+                padding-bottom: 0.75rem;
+            }
+
             .mobile-bottom-nav {
                 display: flex;
-                position: fixed;
-                bottom: 0;
-                left: 0;
-                right: 0;
-                background: white;
-                box-shadow: 0 -6px 15px rgba(0, 0, 0, 0.15);
+                position: relative;
+                flex: 0 0 auto;
+                bottom: auto;
+                left: auto;
+                right: auto;
                 z-index: 1000;
-                padding: 0.4rem 0.1rem;
                 justify-content: space-around;
-                align-items: center;
-                border-top-left-radius: 15px;
-                border-top-right-radius: 15px;
-                flex-wrap: nowrap;
-                overflow: hidden;
+                align-items: stretch;
+                gap: 0.15rem;
+                padding: 0.35rem 0.4rem calc(0.4rem + env(safe-area-inset-bottom, 0px));
+                background: var(--fursvp-surface);
+                border-top: 1px solid var(--fursvp-border-subtle);
+                box-shadow: 0 -8px 24px var(--fursvp-shadow);
+            }
+
+            .mobile-bottom-nav form {
+                flex: 1 1 0;
+                min-width: 0;
+                margin: 0;
+                display: flex;
             }
 
             .mobile-bottom-nav .nav-link {
                 display: flex;
                 flex-direction: column;
                 align-items: center;
-                color: var(--primary-color);
-                font-size: 0.6rem;
-                flex: 1;
-                margin: 0 0.05rem;
+                justify-content: center;
+                gap: 0.12rem;
+                flex: 1 1 0;
+                min-width: 0;
+                min-height: 3.15rem;
+                margin: 0;
+                padding: 0.3rem 0.1rem 0.2rem !important;
+                border: 0;
+                border-radius: 0.85rem;
+                background: transparent;
+                color: var(--fursvp-text-muted) !important;
+                font-family: inherit;
+                font-size: 0.68rem !important;
+                font-weight: 650;
+                line-height: 1.1;
                 text-align: center;
                 text-decoration: none;
-                transition: all 0.3s ease;
-                min-width: 0;
-                padding: 0.15rem 0.05rem;
+                cursor: pointer;
+                appearance: none;
+                -webkit-appearance: none;
+                transform: none !important;
             }
 
             .mobile-bottom-nav .nav-link:hover,
+            .mobile-bottom-nav .nav-link:focus-visible,
             .mobile-bottom-nav .nav-link.active {
-                color: var(--primary-color);
-                text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.4);
+                color: var(--fursvp-link) !important;
+                background: var(--fursvp-surface-muted);
+                text-shadow: none;
+                transform: none !important;
             }
 
-            .mobile-bottom-nav .nav-link:hover .material-icons,
-            .mobile-bottom-nav .nav-link.active .material-icons {
-                filter: drop-shadow(2px 2px 5px rgba(0, 0, 0, 0.5));
-                transform: scale(1.25);
-            }
-
+            .mobile-bottom-nav .nav-link i.material-icons,
             .mobile-bottom-nav .material-icons {
-                font-size: 1.2rem;
-                margin-bottom: 0.05rem;
-                color: var(--primary-color);
-                transition: all 0.3s ease;
+                font-size: 1.35rem !important;
+                width: 1.55rem;
+                height: 1.55rem;
+                margin: 0;
+                color: inherit;
+                line-height: 1;
+                filter: none;
+                transform: none;
             }
 
             .mobile-bottom-nav .nav-link span {
@@ -1416,10 +1453,6 @@
                 text-overflow: ellipsis;
                 max-width: 100%;
                 line-height: 1.1;
-            }
-
-            .main-content {
-                padding-bottom: 5.5rem;
             }
 
             .navbar {
@@ -2060,19 +2093,29 @@
         }
 
         .dark-mode .mobile-bottom-nav {
-            background: var(--fursvp-surface) !important;
-            color: var(--fursvp-text) !important;
-            border-color: var(--fursvp-border-subtle) !important;
+            background: var(--fursvp-surface);
+            color: var(--fursvp-text);
+            border-color: var(--fursvp-border-subtle);
         }
 
         .dark-mode .mobile-bottom-nav .nav-link,
         .dark-mode .mobile-bottom-nav .material-icons {
-            color: var(--fursvp-text) !important;
+            color: var(--fursvp-text-muted) !important;
         }
 
+        .dark-mode .mobile-bottom-nav .nav-link:hover,
+        .dark-mode .mobile-bottom-nav .nav-link:focus-visible,
         .dark-mode .mobile-bottom-nav .nav-link.active,
-        .dark-mode .mobile-bottom-nav .nav-link:active {
-            color: var(--fursvp-accent-light) !important;
+        .dark-mode .mobile-bottom-nav .nav-link:hover .material-icons,
+        .dark-mode .mobile-bottom-nav .nav-link.active .material-icons {
+            color: var(--fursvp-link) !important;
+            background: transparent;
+        }
+
+        .dark-mode .mobile-bottom-nav .nav-link:hover,
+        .dark-mode .mobile-bottom-nav .nav-link:focus-visible,
+        .dark-mode .mobile-bottom-nav .nav-link.active {
+            background: var(--fursvp-surface-muted);
         }
 
         /* Modern Header Styles */
@@ -2572,7 +2615,7 @@
             .site-footer {
                 border-radius: 0;
                 padding: 1.5rem 0.5rem 1rem 0.5rem;
-                margin-bottom: 4.5rem;
+                margin-bottom: 0;
             }
 
             .footer-btn-modern {

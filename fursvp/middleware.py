@@ -66,9 +66,11 @@ class StaticFilesMiddleware:
             
             response = HttpResponse(content, content_type=content_type)
             
-            # Add cache headers for static files
             if path.startswith('/static/'):
-                response['Cache-Control'] = 'public, max-age=31536000'  # 1 year
+                if ext.lower() in ('.css', '.js'):
+                    response['Cache-Control'] = 'public, max-age=3600'
+                else:
+                    response['Cache-Control'] = 'public, max-age=31536000'
             
             return response
         except Exception:

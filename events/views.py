@@ -18,7 +18,7 @@ from django.db.models import Q
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 import calendar
 from django.forms.utils import ErrorList
-from events.utils import post_to_telegram_channel, RSVP_LOCK_MESSAGE
+from events.utils import post_to_telegram_channel, RSVP_LOCK_MESSAGE, rsvp_signup_block_message
 from django.urls import reverse
 from django.conf import settings
 import os
@@ -254,6 +254,7 @@ def event_detail(request, event_id):
     event_has_started = event.has_started()
     event_has_passed = event.has_ended()
     rsvps_locked = event.rsvps_locked
+    signups_closed = event.signups_closed
 
     # Get user's RSVP if they're logged in
     user_rsvp = None
@@ -374,6 +375,7 @@ def event_detail(request, event_id):
                     
                     user_rsvp.delete()
                     create_notification(request.user, f'You have removed your RSVP for {event.title}.', link=event.get_absolute_url())
+                    messages.info(request, f'You have removed your RSVP for {event.title}.', extra_tags='bell')
                     # If a confirmed spot opened up and waitlist is enabled, promote oldest waitlisted
                     if was_confirmed:
                         promote_waitlisted_if_spot(event)
@@ -421,8 +423,15 @@ def event_detail(request, event_id):
             )
             return redirect('event_detail', event_id=event.id)
 
-        if rsvps_locked:
-            messages.error(request, RSVP_LOCK_MESSAGE, extra_tags='admin_notification')
+        if signups_closed:
+            messages.error(request, rsvp_signup_block_message(event), extra_tags='admin_notification')
+            return redirect('event_detail', event_id=event.id)
+
+        if user_rsvp:
+            messages.error(
+                request,
+                'You have already RSVPed to this event. Remove your RSVP first if you want to change it.',
+            )
             return redirect('event_detail', event_id=event.id)
 
         form = RSVPForm(request.POST, instance=user_rsvp, event=event)
@@ -469,7 +478,16 @@ def event_detail(request, event_id):
             create_notification(request.user, f'Your RSVP status has been updated to {rsvp.get_status_display()!s} for {event.title}.', link=event.get_absolute_url())
             return redirect('event_detail', event_id=event.id)
         else:
-            messages.error(request, f'Error updating RSVP: {form.errors}', extra_tags='admin_notification')
+            status_errors = [str(error) for error in form.errors.get('status', [])]
+            full_message = next((error for error in status_errors if error.startswith('Your RSVP was not entered.')), None)
+            if full_message:
+                # Warning (yellow) when they can still join the waitlist; error (red) when they cannot.
+                if can_join_waitlist:
+                    messages.warning(request, full_message)
+                else:
+                    messages.error(request, full_message)
+            else:
+                messages.error(request, f'Error updating RSVP: {form.errors}', extra_tags='admin_notification')
 
     elif 'update_rsvp_status_by_organizer' in request.POST:
         if not can_ban_user: # Use the new flag
@@ -604,10 +622,10 @@ def event_detail(request, event_id):
 
     # Determine if the RSVP form should be displayed
     show_rsvp_form = (
-        not rsvps_locked and
+        not signups_closed and
         not is_banned_from_event and
-        ((not is_event_full or can_join_waitlist) or
-         (user_rsvp is not None and user_rsvp.status != 'confirmed'))
+        user_rsvp is None and
+        (not is_event_full or can_join_waitlist)
     )
 
     # Determine attendee list visibility
@@ -645,6 +663,7 @@ def event_detail(request, event_id):
         'event_has_passed': event_has_passed,
         'event_has_started': event_has_started,
         'rsvps_locked': rsvps_locked,
+        'signups_closed': signups_closed,
         'confirmed_rsvps_count': confirmed_rsvps_count,
         'waitlisted_rsvps_count': waitlisted_rsvps_count,
         'is_event_full': is_event_full,
@@ -1043,7 +1062,13 @@ def manage_group_leadership(request, group_id):
 
 def groups_list(request):
     search_query = request.GET.get('search', '').strip()
-    groups = Group.objects.all()
+    now = timezone.now()
+    upcoming_filter = models.Q(event__status='active') & Event.active_not_ended_q(now, prefix='event__')
+    groups = Group.objects.annotate(
+        upcoming_count=models.Count('event', filter=upcoming_filter, distinct=True),
+    )
+    group_count = groups.count()
+    groups_with_upcoming = groups.filter(upcoming_count__gt=0).count()
     if search_query:
         groups = groups.filter(
             models.Q(name__icontains=search_query) |
@@ -1061,6 +1086,8 @@ def groups_list(request):
     context = {
         'groups': paginated_groups,
         'search_query': search_query,
+        'group_count': group_count,
+        'groups_with_upcoming': groups_with_upcoming,
     }
     return render(request, 'events/groups_list.html', context)
 
@@ -1272,11 +1299,33 @@ def telegram_bot_webhook(request):
                     pass
             # Check if user already RSVP'd
             existing_rsvp = RSVP.objects.filter(event=event, user=user).first() if user else None
+            if event.signups_closed and not existing_rsvp:
+                send_telegram_message(chat_id, rsvp_signup_block_message(event))
+                return JsonResponse({'ok': True})
             # Check if event is full
             confirmed_count = RSVP.objects.filter(event=event, status='confirmed').count()
             is_full = event.capacity is not None and confirmed_count >= event.capacity
             # Build RSVP options
             keyboard = []
+            if existing_rsvp:
+                keyboard.append([{"text": "Remove RSVP", "callback_data": f"rsvp_remove_{event.id}"}])
+                if event.signups_closed:
+                    menu_text = (
+                        f"RSVPs are closed for <b>{event.title}</b>. "
+                        "You can still remove your RSVP."
+                    )
+                else:
+                    menu_text = (
+                        f"You have already RSVPed to <b>{event.title}</b>. "
+                        "Remove your RSVP first if you want to change it."
+                    )
+                send_telegram_message(
+                    chat_id,
+                    menu_text,
+                    parse_mode="HTML",
+                    reply_markup={"inline_keyboard": keyboard},
+                )
+                return JsonResponse({'ok': True})
             keyboard.append([
                 {"text": "✅ Confirm", "callback_data": f"rsvp_confirm_{event.id}"},
                 {"text": "❔ Maybe", "callback_data": f"rsvp_maybe_{event.id}"},
@@ -1284,8 +1333,6 @@ def telegram_bot_webhook(request):
             ])
             if is_full and event.waitlist_enabled:
                 keyboard.append([{"text": "⏳ Waitlist", "callback_data": f"rsvp_waitlist_{event.id}"}])
-            if existing_rsvp:
-                keyboard.append([{"text": "Remove RSVP", "callback_data": f"rsvp_remove_{event.id}"}])
             send_telegram_message(chat_id, f"<b>Choose your RSVP status for</b> <i>{event.title}</i>", parse_mode="HTML", reply_markup={"inline_keyboard": keyboard})
             return JsonResponse({'ok': True})
         # RSVP actions
@@ -1299,6 +1346,9 @@ def telegram_bot_webhook(request):
                     return JsonResponse({'ok': True})
                 if event.rsvps_locked:
                     send_telegram_message(chat_id, RSVP_LOCK_MESSAGE)
+                    return JsonResponse({'ok': True})
+                if status != 'remove' and event.signups_closed:
+                    send_telegram_message(chat_id, rsvp_signup_block_message(event))
                     return JsonResponse({'ok': True})
                 # Find user by Telegram username
                 user = None
@@ -1322,6 +1372,9 @@ def telegram_bot_webhook(request):
                 # Set RSVP status
                 desired_status = 'not_attending' if status == 'no' else ('waitlisted' if status == 'waitlist' else ('maybe' if status == 'maybe' else 'confirmed'))
                 rsvp, created = RSVP.objects.get_or_create(event=event, user=user, defaults={'status': desired_status})
+                if not created:
+                    send_telegram_message(chat_id, f"You have already RSVPed to <b>{event.title}</b>. Remove your RSVP first if you want to change it.", parse_mode="HTML")
+                    return JsonResponse({'ok': True})
 
                 # Enforce capacity rules for confirmed status
                 if desired_status == 'confirmed':
@@ -1335,13 +1388,9 @@ def telegram_bot_webhook(request):
                             send_telegram_message(chat_id, f"Event is full — you've been added to the waitlist for <b>{event.title}</b>.", parse_mode="HTML")
                             return JsonResponse({'ok': True})
                         else:
+                            rsvp.delete()
                             send_telegram_message(chat_id, f"Cannot confirm — <b>{event.title}</b> is at capacity.", parse_mode="HTML")
                             return JsonResponse({'ok': True})
-
-                # For non-confirmed desired statuses or when capacity allows
-                if not created:
-                    rsvp.status = desired_status
-                    rsvp.save()
 
                 # Build the user-facing status text
                 display_text = 'Waitlisted' if desired_status == 'waitlisted' else (desired_status.capitalize() if desired_status != 'not_attending' else 'Not Attending')
@@ -1425,8 +1474,8 @@ def rsvp_telegram(request, event_id):
         event = Event.objects.get(id=event_id)
     except Event.DoesNotExist:
         return HttpResponse('Event not found.', status=404)
-    if event.rsvps_locked:
-        return HttpResponse(RSVP_LOCK_MESSAGE, status=403)
+    if event.signups_closed:
+        return HttpResponse(rsvp_signup_block_message(event), status=403)
     if user_is_banned_from_event(profile.user, event):
         return HttpResponse('You are banned from RSVPing to this event.', status=403)
     from events.models import RSVP
@@ -1564,9 +1613,88 @@ def export_attendees_csv(request, event_id):
 
     return response
 
+# US Letter label layouts. Pitches and margins match Avery sheet specs.
+BADGE_LABEL_TEMPLATES = {
+    '5162': {
+        'name': 'Avery 5162',
+        'dimensions': '4" × 1⅓"',
+        'layout': '2 × 7',
+        'cols': 2,
+        'rows': 7,
+        'width': 4.0,
+        'height': 4.0 / 3.0,
+        'h_pitch': 4.188,
+        'v_pitch': 4.0 / 3.0,
+        'left': 0.156,
+        'top': 0.833,
+        'name_fonts': (28, 20, 16),
+        'rank_font': 11,
+        'meta_font': 12,
+        'qr': 0.30,
+        'corner': 12,
+        'top_pad': 10,
+        'edge': 0.12,
+        'text_inset': 0.4,
+    },
+    '5161': {
+        'name': 'Avery 5161',
+        'dimensions': '4" × 1"',
+        'layout': '2 × 10',
+        'cols': 2,
+        'rows': 10,
+        'width': 4.0,
+        'height': 1.0,
+        'h_pitch': 4.188,
+        'v_pitch': 1.0,
+        'left': 0.156,
+        'top': 0.5,
+        'name_fonts': (18, 14, 12),
+        'rank_font': 9,
+        'meta_font': 8,
+        'qr': 0.30,
+        'corner': 6,
+        'top_pad': 4,
+        'edge': 0.08,
+        'text_inset': 0.42,
+    },
+    '5160': {
+        'name': 'Avery 5160',
+        'dimensions': '2.625" × 1"',
+        'layout': '3 × 10',
+        'cols': 3,
+        'rows': 10,
+        'width': 2.625,
+        'height': 1.0,
+        'h_pitch': 2.75,
+        'v_pitch': 1.0,
+        'left': 0.1875,
+        'top': 0.5,
+        'name_fonts': (14, 11, 9),
+        'rank_font': 8,
+        'meta_font': 7,
+        'qr': 0.26,
+        'corner': 4,
+        'top_pad': 3,
+        'edge': 0.05,
+        'text_inset': 0.34,
+    },
+}
+
+
+def _badge_template(key):
+    return BADGE_LABEL_TEMPLATES.get(key) or BADGE_LABEL_TEMPLATES['5162']
+
+
+def badge_template_choices():
+    return [
+        {'key': key, **{field: spec[field] for field in ('name', 'dimensions', 'layout')}}
+        for key, spec in BADGE_LABEL_TEMPLATES.items()
+    ]
+
+
 @login_required
 def generate_badges(request, event_id):
-    """Generate printable Avery 5162 badges with QR codes (no border)."""
+    """Generate printable name-badge labels for an Avery sheet size."""
     from reportlab.lib.pagesizes import letter
     from reportlab.lib.units import inch
     from reportlab.pdfgen import canvas
@@ -1603,22 +1731,35 @@ def generate_badges(request, event_id):
         return HttpResponseForbidden("You don't have permission to generate badges.")
 
     rsvps = _ordered_organizer_rsvps(event, request.GET.get('order'))
+    if not rsvps:
+        messages.error(request, 'No attendees to print. Badges need at least one confirmed or waitlisted RSVP.')
+        return redirect('organizer_tools', event_id=event.id)
 
+    template_key = request.GET.get('template', '5162')
+    spec = _badge_template(template_key)
+    if template_key not in BADGE_LABEL_TEMPLATES:
+        template_key = '5162'
+
+    safe_title = ''.join(ch if ch.isalnum() or ch in ('-', '_') else '_' for ch in event.title)[:60]
     response = HttpResponse(content_type='application/pdf')
-    response['Content-Disposition'] = f'attachment; filename="badge_labels_{event.title.replace(" ", "_")}.pdf"'
+    response['Content-Disposition'] = f'attachment; filename="badge_labels_{safe_title}_{template_key}.pdf"'
 
     p = canvas.Canvas(response, pagesize=letter)
     width, height = letter
 
-    # Avery 5162: 4" x 1-1/3" labels, 14 per sheet (2 columns x 7 rows)
-    labels_per_row = 2
-    labels_per_col = 7
-    badge_width = 4.0 * inch
-    badge_height = (4.0 / 3.0) * inch
-    horizontal_pitch = 4.188 * inch
-    vertical_pitch = (4.0 / 3.0) * inch
-    left_margin = 0.156 * inch
-    top_margin = 0.833 * inch
+    labels_per_row = spec['cols']
+    labels_per_col = spec['rows']
+    badge_width = spec['width'] * inch
+    badge_height = spec['height'] * inch
+    horizontal_pitch = spec['h_pitch'] * inch
+    vertical_pitch = spec['v_pitch'] * inch
+    left_margin = spec['left'] * inch
+    top_margin = spec['top'] * inch
+    qr_size = spec['qr'] * inch
+    corner = spec['corner']
+    top_pad = spec['top_pad']
+    edge = spec['edge'] * inch
+    text_inset = spec['text_inset'] * inch
 
     for idx, rsvp in enumerate(rsvps):
         if idx > 0 and idx % (labels_per_row * labels_per_col) == 0:
@@ -1643,17 +1784,15 @@ def generate_badges(request, event_id):
         qr_buffer.seek(0)
         qr_reader = ImageReader(qr_buffer)
 
-        qr_size = 0.30 * inch
-        # Keep original QR position for consistency
-        p.drawImage(qr_reader, x + 12, y + badge_height - qr_size - 10, qr_size, qr_size)
+        p.drawImage(qr_reader, x + corner, y + badge_height - qr_size - top_pad, qr_size, qr_size)
 
         # Draw accessibility indicator if needed (same as prior behavior)
         if rsvp.accessibility_needs:
             from svglib.svglib import svg2rlg
             from reportlab.graphics import renderPDF
-            icon_size = 0.30 * inch
-            icon_x = x + 12 + qr_size + 6
-            icon_y = y + badge_height - qr_size - 10
+            icon_size = qr_size
+            icon_x = x + corner + qr_size + 6
+            icon_y = y + badge_height - qr_size - top_pad
 
             # Draw black background
             p.setFillColorRGB(0, 0, 0)
@@ -1712,28 +1851,24 @@ def generate_badges(request, event_id):
                 p.circle(center_x + icon_size * 0.02, center_y - icon_size * 0.08, icon_size * 0.24, fill=0, stroke=1)
                 p.restoreState()
 
-        font_size = 28
+        p.setFillColorRGB(0, 0, 0)
+        available = badge_width - text_inset
+        font_size = spec['name_fonts'][0]
         p.setFont(name_font, font_size)
         text_width = p.stringWidth(name, name_font, font_size)
 
-        # Downsize name if too wide
-        if text_width > badge_width - 0.4 * inch:
-            font_size = 20
-            p.setFont(name_font, font_size)
-            text_width = p.stringWidth(name, name_font, font_size)
-        if text_width > badge_width - 0.4 * inch:
-            font_size = 16
+        for smaller in spec['name_fonts'][1:]:
+            if text_width <= available:
+                break
+            font_size = smaller
             p.setFont(name_font, font_size)
             text_width = p.stringWidth(name, name_font, font_size)
 
-        # Truncate with ellipsis if still too wide
-        if text_width > badge_width - 0.4 * inch:
-            available = badge_width - 0.4 * inch
+        if text_width > available:
             truncated = name
             while truncated and p.stringWidth(truncated + '...', name_font, font_size) > available:
                 truncated = truncated[:-1]
             name = truncated + '...' if truncated else '...'
-            text_width = p.stringWidth(name, name_font, font_size)
 
         name_x = x + (badge_width / 2)
         name_y = y + (badge_height / 2) - (font_size * 0.3)
@@ -1742,19 +1877,23 @@ def generate_badges(request, event_id):
         p.drawCentredString(name_x, name_y, name)
 
         if rsvp.custom_rank:
-            rank_font_size = 11
+            rank_font_size = spec['rank_font']
             p.setFont(font_name, rank_font_size)
             rank_label = rsvp.custom_rank.upper()
-            if p.stringWidth(rank_label, font_name, rank_font_size) > badge_width - 0.4 * inch:
-                while rank_label and p.stringWidth(rank_label + '...', font_name, rank_font_size) > badge_width - 0.4 * inch:
+            if p.stringWidth(rank_label, font_name, rank_font_size) > available:
+                while rank_label and p.stringWidth(rank_label + '...', font_name, rank_font_size) > available:
                     rank_label = rank_label[:-1]
                 rank_label = (rank_label + '...') if rank_label else '...'
             p.drawCentredString(name_x, name_y - font_size * 0.55, rank_label)
 
-        p.setFont(font_name, 12)
+        p.setFont(font_name, spec['meta_font'])
         status_label = rsvp.get_status_display().upper()
-        p.drawString(x + 0.12 * inch, y + 0.12 * inch, f'{badge_num}')
-        p.drawString(x + badge_width - p.stringWidth(status_label, font_name, 10) - 0.12 * inch, y + 0.12 * inch, status_label)
+        p.drawString(x + edge, y + edge, f'{badge_num}')
+        p.drawString(
+            x + badge_width - p.stringWidth(status_label, font_name, spec['meta_font']) - edge,
+            y + edge,
+            status_label,
+        )
 
     p.save()
     return response
@@ -1958,5 +2097,6 @@ def organizer_tools(request, event_id):
     context = {
         'event': event,
         'rsvps': rsvps,
+        'badge_templates': badge_template_choices(),
     }
     return render(request, 'events/organizer_tools.html', context)

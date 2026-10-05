@@ -77,6 +77,12 @@ class EventForm(forms.ModelForm):
         widget=forms.DateInput(attrs={'type': 'text', 'class': 'form-control'}),
         input_formats=['%Y-%m-%d', '%m/%d/%Y', '%m/%d/%y'],
     )
+    rsvp_close_date = forms.DateField(
+        required=False,
+        label='RSVP close date',
+        widget=forms.DateInput(attrs={'type': 'text', 'class': 'form-control'}),
+        input_formats=['%Y-%m-%d', '%m/%d/%Y', '%m/%d/%y'],
+    )
     start_time = forms.TimeField(
         required=True,
         widget=forms.TimeInput(attrs={'type': 'text', 'class': 'form-control'}),
@@ -97,7 +103,7 @@ class EventForm(forms.ModelForm):
     class Meta:
         model = Event
         fields = [
-            'title', 'group', 'date', 'end_date', 'start_time', 'end_time',
+            'title', 'group', 'date', 'end_date', 'rsvp_close_date', 'start_time', 'end_time',
             'address', 'city', 'state', 'age_restriction', 'description',
             'capacity', 'waitlist_enabled', 'attendee_list_public', 'enable_rsvp_questions',
             'question1_text', 'question2_text', 'question3_text',
@@ -128,6 +134,8 @@ class EventForm(forms.ModelForm):
                 self.initial['date'] = instance.date.isoformat()
             if instance.end_date and instance.end_date != instance.date:
                 self.initial['end_date'] = instance.end_date.isoformat()
+            if instance.rsvp_close_date:
+                self.initial['rsvp_close_date'] = instance.rsvp_close_date.isoformat()
             if instance.start_time:
                 self.initial['start_time'] = instance.start_time.strftime('%H:%M')
             if instance.end_time:
@@ -185,6 +193,7 @@ class EventForm(forms.ModelForm):
         capacity = cleaned_data.get('capacity')
         start_date = cleaned_data.get('date')
         end_date = cleaned_data.get('end_date')
+        rsvp_close_date = cleaned_data.get('rsvp_close_date')
 
         if waitlist_enabled and not capacity:
             self.add_error('waitlist_enabled', 'Capacity must be set when waitlist is enabled.')
@@ -192,6 +201,9 @@ class EventForm(forms.ModelForm):
 
         if start_date and end_date and end_date < start_date:
             self.add_error('end_date', 'End date cannot be before the start date.')
+
+        if start_date and rsvp_close_date and rsvp_close_date > start_date:
+            self.add_error('rsvp_close_date', 'RSVP close date cannot be after the event start date.')
 
         if start_date and end_date and end_date == start_date:
             cleaned_data['end_date'] = None
@@ -285,8 +297,11 @@ class RSVPForm(forms.ModelForm):
     def clean(self):
         cleaned_data = super().clean()
         status = cleaned_data.get('status')
-        if self.event and self.event.rsvps_locked:
-            raise forms.ValidationError('RSVPs are locked because this event has started.')
+        if getattr(self.instance, 'pk', None):
+            raise forms.ValidationError('You have already RSVPed to this event.')
+        if self.event and self.event.signups_closed:
+            from events.utils import rsvp_signup_block_message
+            raise forms.ValidationError(rsvp_signup_block_message(self.event))
         # Enforce capacity: prevent selecting 'confirmed' when capacity is reached
         if self.event and status == 'confirmed' and self.event.capacity is not None:
             # Count confirmed RSVPs excluding the current instance (if updating)
@@ -297,9 +312,15 @@ class RSVPForm(forms.ModelForm):
                 confirmed_count_qs = confirmed_count_qs.exclude(pk=exclude_pk)
             confirmed_count = confirmed_count_qs.count()
             if confirmed_count >= self.event.capacity and self.event.waitlist_enabled:
-                self.add_error('status', 'This event is currently full. If you’d like to be notified if a spot opens up, please join the waitlist`.')
-            elif self.event.capacity is not None and confirmed_count >= self.event.capacity:
-                self.add_error('status', 'This event is currently full. Please check back later to see if a spot opens up.')
+                self.add_error(
+                    'status',
+                    'Your RSVP was not entered. This event is full. Join the waitlist if you want to be notified when a spot opens.',
+                )
+            elif confirmed_count >= self.event.capacity:
+                self.add_error(
+                    'status',
+                    'Your RSVP was not entered. This event is full. Check back later if a spot opens up.',
+                )
         return cleaned_data
 
     class Meta:

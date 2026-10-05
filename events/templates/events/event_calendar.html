@@ -144,6 +144,9 @@
                                                 {% if event.city %}
                                                 <span><i class="material-icons">location_on</i>{{ event.city }}{% if event.state %}, {{ event.state|state_abbr }}{% endif %}</span>
                                                 {% endif %}
+                                                {% if event.rsvp_close_date and event.status == 'active' and not event.has_started %}
+                                                <span><i class="material-icons">event_busy</i>{% if event.rsvp_close_date_passed %}RSVPs closed{% else %}RSVPs close {{ event.rsvp_close_date|date:"M j" }}{% endif %}</span>
+                                                {% endif %}
                                             </div>
                                         </div>
                                         <div class="calendar-agenda-event-side">
